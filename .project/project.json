@@ -1,0 +1,56 @@
+{
+  "$schema": "../schemas/project.schema.json",
+  "project_id": "p_wskd",
+  "author": {
+    "id": "2047389104"
+  },
+  "entry": "main.lua",
+  "version": "1.0.70",
+  "taptap_publish": {
+    "title": "棋妙英雄 Combo Checkers",
+    "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+    "category": "strategy",
+    "screen_orientation": "portrait",
+    "collection_type": "sce",
+    "trial_note": "v1.0.70 稳定性修复\n\n🔧 本次更新\n• 修复公会排行榜刷新可能导致页面卡住的问题\n• 修复金币/进度重复结算风险，胜负结算现已保证只执行一次\n• 失败弹窗在场景切换时不再产生错误日志\n• 失败按钮文案调整为「重新挑战」\n存档完全兼容，金币/装备/天赋/关卡进度全部保留\n\n--- 历史更新 ---\n\nv1.0.66 稳定性更新\n修复多处潜在卡关逻辑，增强游戏流程稳定性\n\n🎰 装备抽奖系统\n单抽100G / 三连260G（省40G），内置保底机制，金色套装概率 UP！\n\n⚔️ 金色套装\n3套金色稀有套装，装备4/6件触发强力机制效果：\n🦅 飞跃先锋：可跳过2~3名连续敌人\n🔥 连击心得：30%/75%概率Combo+1\n🩸 嗜血猎魂：击杀回血，低血量时触发血怒叠加\n\n🌊 无尽模式\n通关主线后解锁，敌人强度无上限递增！\n\n🏆 排行榜系统\n公会排行榜，与所有玩家比拼最高关卡和无尽最高波次",
+    "app_platforms": "1,2",
+    "gameplay_demo_video_source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+    "developer_id": 393475,
+    "app_id": 850473,
+    "miniapp_id": "tapmcauxykjmazqjed"
+  },
+  "assets": {
+    "icon": "./assets/image/edited_game_logo_final_20260514085721.png",
+    "screenshots": [
+      "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+      "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+      "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png",
+      "./game_material/screenshot_boss_battle.png",
+      "./game_material/screenshot_combo_rewards.png"
+    ],
+    "promotional_image": "./game_material/promo_new.png",
+    "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/edited_game_logo_final_20260514085721.png",
+    "screenshot_urls": [
+      "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+      "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+      "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png",
+      "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/screenshot_boss_battle.png",
+      "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/screenshot_combo_rewards.png"
+    ],
+    "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/promo_new.png",
+    "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+    "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/棋妙英雄 Combo Checkers/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+    "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+    "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/棋妙英雄 Combo Checkers/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+    "square_promotional_image": "./game_material/square_promo_new.png",
+    "square_promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/square_promo_new.png"
+  },
+  "test_qrcode": {
+    "url": "https://tapcode-sce.spark.xd.com/qrcode/p_wskd_1779717843046.png",
+    "generated_at": "2026-05-25T14:04:03.172Z"
+  },
+  "metadata": {
+    "updated_at": "2026-05-25T14:04:03.172Z",
+    "promo_dependent_hash": "40472d7d1fd6b3ffd0fb7431fe9c052e"
+  }
+}

@@ -52,8 +52,8 @@ local BOARD_THEMES = {
         hexFill     = {32, 50, 80, 255},
         hexStroke   = {55, 90, 140, 200},
         hexGlow     = {40, 120, 220},
-        bgTop       = {12, 20, 45, 255},
-        bgBot       = {20, 35, 68, 255},
+        bgTop       = {15, 25, 60, 255},
+        bgBot       = {22, 42, 85, 255},
         fogColor    = {15, 30, 60, 60},
         particle    = "bubble",
         particleClr = {{80, 180, 255}, {60, 140, 220}, {120, 200, 255}},
@@ -63,11 +63,11 @@ local BOARD_THEMES = {
         silType     = "seaweed",
     },
     [2] = { -- 烈焰山脉
-        hexFill     = {40, 22, 15, 255},
-        hexStroke   = {75, 42, 28, 180},
-        hexGlow     = {200, 80, 30},
-        bgTop       = {28, 12, 8, 255},
-        bgBot       = {45, 20, 12, 255},
+        hexFill     = {55, 30, 15, 255},          -- 调暗降饱和：暗橙棕
+        hexStroke   = {105, 55, 25, 180},          -- 低调描边：深橙棕，alpha降低参考ch1风格
+        hexGlow     = {160, 70, 25},
+        bgTop       = {40, 16, 8, 255},            -- 调暗：深暗红棕
+        bgBot       = {58, 22, 10, 255},           -- 调暗
         fogColor    = {50, 20, 10, 60},
         particle    = "ember",
         particleClr = {{255, 140, 30}, {255, 80, 20}, {255, 200, 60}},
@@ -80,8 +80,8 @@ local BOARD_THEMES = {
         hexFill     = {42, 65, 58, 255},
         hexStroke   = {82, 145, 125, 200},
         hexGlow     = {120, 220, 180},
-        bgTop       = {18, 35, 30, 255},
-        bgBot       = {28, 52, 45, 255},
+        bgTop       = {15, 45, 35, 255},
+        bgBot       = {22, 68, 52, 255},
         fogColor    = {20, 40, 35, 60},
         particle    = "bubble",
         particleClr = {{120, 255, 200}, {80, 220, 180}, {180, 255, 220}},
@@ -90,27 +90,33 @@ local BOARD_THEMES = {
         silClr      = {10, 30, 25, 180},
         silType     = "coral",
     },
-    [4] = { -- 六芒对抗
-        hexFill     = {45, 32, 65, 255},        -- 更深沉的紫色基底
-        hexStroke   = {90, 60, 140, 180},        -- 柔和紫色描边
-        hexGlow     = {140, 90, 210},             -- 紫色内发光
-        bgTop       = {18, 10, 32, 255},         -- 更深紫背景
-        bgBot       = {28, 16, 48, 255},
-        fogColor    = {25, 12, 40, 60},
-        particle    = "aurora",                   -- 极光粒子（独特类型）
-        particleClr = {{160, 100, 240}, {100, 140, 255}, {200, 130, 255}},
-        shaftClr    = {100, 50, 180},
-        frameClr    = {130, 80, 210},
-        silClr      = {12, 6, 25, 180},
+    [4] = { -- 六芒对抗（无尽深渊）：调暗降饱和
+        hexFill     = {58, 40, 90, 255},          -- 调暗降饱和：深暗紫
+        hexStroke   = {90, 68, 135, 180},         -- 低调描边：深紫，alpha降低参考ch1风格
+        hexGlow     = {150, 110, 210},
+        bgTop       = {32, 20, 58, 255},          -- 调暗：深暗紫背景
+        bgBot       = {42, 28, 72, 255},          -- 调暗
+        fogColor    = {35, 22, 65, 45},
+        particle    = "aurora",
+        particleClr = {{200, 160, 255}, {160, 120, 240}, {220, 180, 255}},
+        shaftClr    = {130, 70, 200},
+        frameClr    = {175, 125, 250},
+        silClr      = {18, 10, 40, 180},
         silType     = "rocks",
     },
 }
 
 --- 获取当前战斗的章节主题
 local function GetCurrentBoardTheme()
-    if G.battle and G.battle.level then
-        local chapter = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
-        return BOARD_THEMES[chapter] or BOARD_THEMES[1]
+    if G.battle then
+        -- 无尽模式始终使用第4章紫色主题
+        if G.battle.isEndless then
+            return BOARD_THEMES[4]
+        end
+        if G.battle.level then
+            local chapter = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
+            return BOARD_THEMES[chapter] or BOARD_THEMES[1]
+        end
     end
     return BOARD_THEMES[1]
 end
@@ -149,18 +155,32 @@ function BoardWidget:Render(nvg)
     nvgFontFace(nvg, UI.Theme.FontFace("sans", "normal"))
     G.gridParams = HexGrid.CalcGridParams(l.w, l.h, HexGrid.COLS, HexGrid.ROWS, G.BOARD_ZOOM)
 
-    -- === 章节主题背景渐变 ===
+    -- === 章节主题背景：以棋盘为中心的径向晕染，边缘透明，与全局渐变无缝融合 ===
     local theme = GetCurrentBoardTheme()
     local bt = theme.bgTop
     local bb = theme.bgBot
-    local bgPaint = nvgLinearGradient(nvg, l.x, l.y, l.x, l.y + l.h,
-        nvgRGBA(bt[1], bt[2], bt[3], bt[4]), nvgRGBA(bb[1], bb[2], bb[3], bb[4]))
+    -- 棋盘中心点和覆盖半径
+    local bcx = l.x + l.w * 0.5
+    local bcy = l.y + l.h * 0.5
+    local boardR = math.min(l.w, l.h) * 0.62  -- 略大于六边形棋盘外接圆
+    -- 上半段：以棋盘中上为圆心的径向渐变（bgTop色调，向外透明）
+    local topPaint = nvgRadialGradient(nvg, bcx, bcy - boardR * 0.15, boardR * 0.1, boardR * 1.3,
+        nvgRGBA(bt[1], bt[2], bt[3], 220),
+        nvgRGBA(bt[1], bt[2], bt[3], 0))
     nvgBeginPath(nvg)
     nvgRect(nvg, l.x, l.y, l.w, l.h)
-    nvgFillPaint(nvg, bgPaint)
+    nvgFillPaint(nvg, topPaint)
+    nvgFill(nvg)
+    -- 下半段：略偏下，bgBot色调叠加，形成上深下浅（或上浅下深）的纵向过渡
+    local botPaint = nvgRadialGradient(nvg, bcx, bcy + boardR * 0.2, boardR * 0.1, boardR * 1.1,
+        nvgRGBA(bb[1], bb[2], bb[3], 160),
+        nvgRGBA(bb[1], bb[2], bb[3], 0))
+    nvgBeginPath(nvg)
+    nvgRect(nvg, l.x, l.y, l.w, l.h)
+    nvgFillPaint(nvg, botPaint)
     nvgFill(nvg)
 
-    -- （暗角和边缘遮罩已移除，仅保留上方章节主题渐变背景）
+
 
     local t = G.time or 0
 
@@ -525,12 +545,14 @@ function BoardWidget:Render(nvg)
                         fillB = math.floor(55 * edgeDim)
                     end
                 end
-                local strokeA = math.floor(hs[4] * edgeDim * 0.7)
-                HexGrid.DrawHex(nvg, cx, cy, hexSize * 0.92,
+                local strokeA = math.floor(hs[4] * edgeDim)
+                HexGrid.DrawHex(nvg, cx, cy, hexSize * 0.90,
                     nvgRGBA(fillR, fillG, fillB, fillA), nvgRGBA(hs[1], hs[2], hs[3], strokeA))
                 -- 每个格子中心微弱内发光（营造宝石感）
                 local glowPulse = math.sin(t * 1.2 + c * 0.5 + r * 0.7) * 0.3 + 0.7
-                local innerGlowA = math.floor(15 * glowPulse * edgeDim)
+                -- 无尽模式背景极深，内发光加强以增加格子层次感
+                local baseGlowAlpha = (G.battle and G.battle.isEndless) and 30 or 15
+                local innerGlowA = math.floor(baseGlowAlpha * glowPulse * edgeDim)
                 local innerPaint = nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.5,
                     nvgRGBA(hg[1], hg[2], hg[3], innerGlowA),
                     nvgRGBA(hg[1], hg[2], hg[3], 0))

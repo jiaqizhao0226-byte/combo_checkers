@@ -703,7 +703,7 @@ function MenuSystem.RebuildMenuPage(tabId)
 
         local function fillContainer(container, rowChildren)
             if not container then return end
-            container:RemoveAllChildren()
+            container:ClearChildren()
             for _, child in ipairs(rowChildren) do
                 container:AddChild(child)
             end

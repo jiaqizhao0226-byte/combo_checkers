@@ -4038,7 +4038,7 @@ Battle.COMBO_REWARDS = {
     [3] = { name = "稻草人",   icon = "combo_tier2", desc = "吸引全部仇恨，替你挡刀2回合" },
     [4] = { name = "六芒冲击波", icon = "combo_tier3", desc = "6方向射线秒杀小怪，对Boss造成60伤害" },
     [5] = { name = "生命虹吸", icon = "combo_tier4", desc = "吸取全体敌人20%当前生命(Boss固定30)，等量恢复自身血量，溢出转虹吸护盾(上限60)" },
-    [6] = { name = "天罚陨石", icon = "combo_tier5", desc = "主角周围4格内陨石轰炸，造成敌人75%当前生命伤害(Boss上限160)" },
+    [6] = { name = "天罚陨石", icon = "combo_tier5", desc = "主角周围4格内陨石轰炸，造成敌人90%当前生命伤害(Boss上限240)" },
     [7] = { name = "末日炸弹", icon = "combo_tier6", desc = "秒杀全部小怪，对Boss造成150伤害" },
     [8] = { name = "末日炸弹", icon = "combo_tier6", desc = "秒杀全部小怪，对Boss造成150伤害" },
 }
@@ -4509,7 +4509,7 @@ function Battle.ExecuteComboReward(state, threshold)
 
     elseif threshold == 6 then
         -- === 6连: 天罚陨石（局部范围） ===
-        -- 主角周围4格内的敌人受75%当前HP伤害，Boss上限160
+        -- 主角周围4格内的敌人受90%当前HP伤害，Boss上限240
         local meteorRange = 4
         local enemies = HexGrid.GetTeamPieces(board, "enemy")
         local hitCount = 0
@@ -4532,9 +4532,9 @@ function Battle.ExecuteComboReward(state, threshold)
             if e.hp > 0 then
                 local dist = HexGrid.CubeDistance(hero.col, hero.row, e.col, e.row)
                 if dist <= meteorRange then
-                    local meteorDmg = math.floor(e.hp * 0.75)
-                    if e.isBoss and meteorDmg > 160 then
-                        meteorDmg = 160
+                    local meteorDmg = math.floor(e.hp * 0.90)
+                    if e.isBoss and meteorDmg > 240 then
+                        meteorDmg = 240
                     end
                     meteorDmg = Battle.ApplyAltarReduction(state, e, meteorDmg)
                     if e.isBoss then

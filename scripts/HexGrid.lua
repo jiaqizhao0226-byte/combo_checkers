@@ -967,7 +967,7 @@ function HexGrid.DrawHex(nvg, cx, cy, size, fillColor, strokeColor)
     end
     if strokeColor then
         nvgStrokeColor(nvg, strokeColor)
-        nvgStrokeWidth(nvg, 1.5)
+        nvgStrokeWidth(nvg, 2.0)
         nvgStroke(nvg)
     end
 end

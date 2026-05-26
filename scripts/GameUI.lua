@@ -11,7 +11,6 @@ local BoardWidget = require "BoardWidget"
 local IconAtlas = require "IconAtlas"
 local AM = require "AudioManager"
 local SettingsPopup = require "SettingsPopup"
-local TestPanel    = require "TestPanel"
 
 
 local GameUI = {}
@@ -21,10 +20,6 @@ function GameUI.CreateHUD()
     local isMobile = logW < 500
     return UI.SafeAreaView {
         width = "100%",
-        backgroundGradient = {
-            type = "linear", direction = "to-bottom",
-            from = {22, 18, 48, 255}, to = {14, 10, 35, 255},
-        },
         children = {
             UI.Panel {
                 width = "100%",
@@ -219,22 +214,6 @@ function GameUI.CreateHUD()
                                 end,
                             },
 
-                            -- 测试面板按钮
-                            UI.Button {
-                                text = "🧪",
-                                fontSize = 20,
-                                width = 32, height = 28,
-                                borderRadius = 8,
-                                backgroundColor = {35, 50, 45, 200},
-                                fontColor = {140, 230, 190, 230},
-                                borderWidth = 1,
-                                borderColor = {60, 120, 90, 120},
-                                pressedBackgroundColor = {45, 65, 60, 255},
-                                onClick = function(self)
-                                    TestPanel.Show()
-                                end,
-                            },
-
                             -- 教程按钮
                             UI.Button {
                                 text = "📖",
@@ -301,12 +280,8 @@ function GameUI.CreateBottomBar()
         paddingLeft = 12, paddingRight = 12,
         paddingTop = 5, paddingBottom = 9,
         gap = 4,
-        backgroundGradient = {
-            type = "linear", direction = "to-bottom",
-            from = {22, 24, 42, 255}, to = {16, 18, 32, 255},
-        },
         borderTopWidth = 1,
-        borderTopColor = {50, 45, 80, 80},
+        borderTopColor = {80, 60, 120, 60},
         children = {
             UI.Label {
                 id = "comboLabel", text = "",
@@ -625,15 +600,55 @@ function GameUI.PopulateSkillCards(choices)
     end
 end
 
+-- 章节背景主题色表（饱和度提高，确保棋盘外区域也能体现章节色）
+local BG_THEMES = {
+    [1] = { top={15,25,60,255},   bot={22,42,85,255}  },  -- 深海蓝（保持不变）
+    [2] = { top={40,16,8,255},    bot={58,22,10,255}  },  -- 熔岩暗红棕（调暗降饱和）
+    [3] = { top={15,45,35,255},   bot={22,68,52,255}  },  -- 珊瑚深绿（保持不变）
+    [4] = { top={32,20,58,255},   bot={42,28,72,255}  },  -- 深渊紫（调暗降饱和）
+}
+
+--- 动态更新根面板背景渐变（换章节时调用）
+function GameUI.UpdateBackground()
+    if not G.uiRoot then return end
+    local isEndless = G.battle and G.battle.isEndless
+    local ch = 1
+    if G.battle and G.battle.level then
+        ch = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
+    end
+    if isEndless then ch = 4 end
+    local t = BG_THEMES[ch] or BG_THEMES[1]
+    G.uiRoot:SetBackgroundGradient({
+        type = "linear", direction = "to-bottom",
+        from = t.top, to = t.bot,
+    })
+end
+
 --- 构建完整游戏 UI（HUD + 棋盘 + 底栏 + 面板）
 function GameUI.CreateUI()
+    -- 根据章节/模式选择全屏背景渐变色
+    local isEndless = G.battle and G.battle.isEndless
+    local ch = 1
+    if G.battle and G.battle.level then
+        ch = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
+    end
+    if isEndless then ch = 4 end
+
+    -- 直接用棋盘主题的 bgTop/bgBot，与 BoardWidget 背景无缝衔接
+    local t = BG_THEMES[ch] or BG_THEMES[1]
+    local gradFrom = t.top
+    local gradTo   = t.bot
+
     G.uiRoot = UI.Panel {
         width = "100%", height = "100%",
         flexDirection = "column",
-        backgroundColor = {10, 8, 18, 255},
+        backgroundGradient = {
+            type = "linear", direction = "to-bottom",
+            from = gradFrom, to = gradTo,
+        },
         children = {
             GameUI.CreateHUD(),
-            -- 棋盘容器
+            -- 棋盘容器（透明，背景由根节点渐变透出）
             UI.Panel {
                 flexGrow = 1,
                 children = {

@@ -684,6 +684,7 @@ function TestPanel.Show()
                                             if G.playerData then PlayerData.Save(G.playerData) end
                                             TestPanel.Close()
                                             local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
                                             local bonus = PlayerData.GetTotalBonus(G.playerData)
                                             G.battle = Battle.New(bonus)
                                             Battle.GenerateLevel(G.battle, 11)
@@ -691,6 +692,7 @@ function TestPanel.Show()
                                             TurnFlow.ClearPlan()
                                             if G.resultPanel then G.resultPanel:SetVisible(false) end
                                             AM.UpdateBattleBGM(11)
+                                            GameUI.UpdateBackground()
                                             TurnFlow.StartPlayerTurn()
                                         end,
                                     },
@@ -713,6 +715,7 @@ function TestPanel.Show()
                                             if G.playerData then PlayerData.Save(G.playerData) end
                                             TestPanel.Close()
                                             local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
                                             local bonus = PlayerData.GetTotalBonus(G.playerData)
                                             G.battle = Battle.New(bonus)
                                             Battle.GenerateLevel(G.battle, 21)
@@ -720,6 +723,7 @@ function TestPanel.Show()
                                             TurnFlow.ClearPlan()
                                             if G.resultPanel then G.resultPanel:SetVisible(false) end
                                             AM.UpdateBattleBGM(21)
+                                            GameUI.UpdateBackground()
                                             TurnFlow.StartPlayerTurn()
                                         end,
                                     },
@@ -742,6 +746,7 @@ function TestPanel.Show()
                                             if G.playerData then PlayerData.Save(G.playerData) end
                                             TestPanel.Close()
                                             local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
                                             local bonus = PlayerData.GetTotalBonus(G.playerData)
                                             G.battle = Battle.New(bonus)
                                             Battle.GenerateLevel(G.battle, 31)
@@ -749,6 +754,7 @@ function TestPanel.Show()
                                             TurnFlow.ClearPlan()
                                             if G.resultPanel then G.resultPanel:SetVisible(false) end
                                             AM.UpdateBattleBGM(31)
+                                            GameUI.UpdateBackground()
                                             TurnFlow.StartPlayerTurn()
                                         end,
                                     },

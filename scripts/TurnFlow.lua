@@ -17,6 +17,35 @@ local TurnFlow = {}
 -- 前向声明：上报进度到云端（定义在文件底部，但 ReturnToMenu 较早调用）
 local UploadProgressToCloud
 
+--- 幂等结算：金币 + 进度，最多执行一次（通过 G.battle._rewardsSettled 保护）
+local function SettleBattleRewards()
+    if not G.battle or G.battle._rewardsSettled then return end
+    G.battle._rewardsSettled = true
+
+    -- 金币（无论胜负都结算当局累计金币）
+    PlayerData.AddGold(G.playerData, G.battle.gold or 0)
+    G.battle.gold = 0
+
+    -- 进度
+    if G.battle.isEndless then
+        local wave = G.battle.endlessWave or 1
+        if wave > (G.playerData.highestEndlessWave or 0) then
+            G.playerData.highestEndlessWave = wave
+        end
+    else
+        local level = G.battle.level or 1
+        if level > G.highestLevel then
+            G.highestLevel = level
+        end
+        if level > (G.playerData.highestLevel or 1) then
+            G.playerData.highestLevel = level
+        end
+    end
+
+    PlayerData.Save(G.playerData)
+    UploadProgressToCloud(G.playerData)
+end
+
 -- ============================================================================
 -- 摄像机辅助
 -- ============================================================================
@@ -24,15 +53,8 @@ local UploadProgressToCloud
 --- 瞬间将摄像机对齐到英雄位置（无插值，用于关卡切换）
 function TurnFlow.SnapCameraToHero()
     if not G.battle or not G.battle.hero then return end
-    -- 根据章节调整缩放参数（六芒星棋盘更大，需要更低的基准值）
-    local chapter = G.battle.level and math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER) or 1
-    if chapter == 4 then
-        G.ZOOM_IN = 1.45         -- 六芒星棋盘拉近倍率（与其他章节一致）
-        G.ZOOM_OUT = 0.95        -- 拉远时能看到更多棋盘
-    else
-        G.ZOOM_IN = 1.45         -- 普通棋盘默认值
-        G.ZOOM_OUT = 1.05
-    end
+    G.ZOOM_IN = 1.45
+    G.ZOOM_OUT = 1.05
     -- 重置动态缩放到拉近状态（关卡切换时从近处开始）
     G.zoomCurrent = G.ZOOM_IN
     G.zoomTarget = G.ZOOM_IN
@@ -131,31 +153,7 @@ end
 
 function TurnFlow.ReturnToMenu()
     G.gamePhase = "MENU"
-    if G.battle then
-        if not G.battle._goldSettled then
-            PlayerData.AddGold(G.playerData, G.battle.gold)
-            G.battle._goldSettled = true
-            G.battle.gold = 0
-        end
-        -- 无尽模式：记录最高波次
-        if G.battle.isEndless then
-            local wave = G.battle.endlessWave or 1
-            local prevBest = G.playerData.highestEndlessWave or 0
-            if wave > prevBest then
-                G.playerData.highestEndlessWave = wave
-            end
-        else
-            -- 普通模式：记录最高关卡
-            if G.battle.level > G.highestLevel then
-                G.highestLevel = G.battle.level
-            end
-            if G.battle.level > (G.playerData.highestLevel or 1) then
-                G.playerData.highestLevel = G.battle.level
-            end
-        end
-        PlayerData.Save(G.playerData)
-        UploadProgressToCloud(G.playerData)
-    end
+    SettleBattleRewards()
     G.menuTab = "adventure"
     G.selectedLevel = G.highestLevel
     -- 第4章已开放（无尽模式），允许导航到第4章
@@ -283,6 +281,7 @@ function TurnFlow.NextLevel()
         Battle.GenerateLevel(G.battle, nextLv)
         TurnFlow.SnapCameraToHero()
         AM.UpdateBattleBGM(nextLv)
+        GameUI.UpdateBackground()  -- 新章节：更新全屏背景渐变色
     else
         -- 同章节普通关: 无缝过渡，保留英雄和敌人位置
         Battle.ContinueLevel(G.battle, nextLv)
@@ -1090,17 +1089,11 @@ local function CreateDefeatPopup()
     G._defeatPopupShown = true
 
     local ok, err = pcall(function()
+        if not G.battle then return end
         local isEndless = G.battle.isEndless
         local wave = G.battle.endlessWave or 1
-        -- 记录无尽最高波次
-        if isEndless then
-            local prevBest = G.playerData.highestEndlessWave or 0
-            if wave > prevBest then
-                G.playerData.highestEndlessWave = wave
-                PlayerData.Save(G.playerData)
-                UploadProgressToCloud(G.playerData)
-            end
-        end
+        -- 失败时统一结算（幂等，后续 ReturnToMenu/RestartGame 不会重复执行）
+        SettleBattleRewards()
 
         local infoText
         if isEndless then
@@ -1140,7 +1133,7 @@ local function CreateDefeatPopup()
                             fontColor = {190, 185, 220, 220}, textAlign = "center",
                             marginTop = 12, numberOfLines = 5 },
                         UI.Button {
-                            text = isEndless and "🌀 再挑战" or "🔄 重试本关",
+                            text = isEndless and "🌀 再挑战" or "🔄 重新挑战",
                             variant = "primary",
                             width = 220, height = 48, fontSize = 21, marginTop = 20,
                             borderRadius = 24,
@@ -1509,14 +1502,8 @@ function TurnFlow.RestartGame()
         TurnFlow.ReturnToMenu()
         return
     end
+    SettleBattleRewards()
     if G.battle then
-        PlayerData.AddGold(G.playerData, G.battle.gold)
-        if G.battle.level > G.highestLevel then
-            G.highestLevel = G.battle.level
-        end
-        if G.battle.level > (G.playerData.highestLevel or 1) then
-            G.playerData.highestLevel = G.battle.level
-        end
         G.playerData.totalRuns = (G.playerData.totalRuns or 0) + 1
         PlayerData.Save(G.playerData)
     end
@@ -1534,6 +1521,7 @@ function TurnFlow.RestartGame()
     if G.resultPanel then G.resultPanel:SetVisible(false) end
     if G.skillModal then G.skillModal:Close() end
     AM.UpdateBattleBGM(restartLevel)
+    GameUI.UpdateBackground()  -- 重开时刷新全屏背景色（避免跨章节重开后背景不更新）
     checkAndShowEnemyIntro()
     TurnFlow.StartPlayerTurn()
     local chapter, _ = Battle.GetChapterInfo(restartLevel)
