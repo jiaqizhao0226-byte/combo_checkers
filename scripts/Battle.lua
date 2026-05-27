@@ -1533,7 +1533,9 @@ function Battle.GenerateLevel(state, level)
                     Battle.AddLog(state, string.format("🐚 Boss关寄居蟹在(%d,%d)，壳在(%d,%d)", crabCol, row, shellCol, row))
                 end
             end
-            Battle.AddLog(state, "🦀 Boss关救援任务：2只寄居蟹需要回家！")
+            -- 修正：用实际放置数覆盖目标
+            state.rescueTarget = #board.crabs
+            Battle.AddLog(state, string.format("🦀 Boss关救援任务：%d只寄居蟹需要回家！", state.rescueTarget))
         end
 
         Battle.AddLog(state, string.format("=== 第%d章 Boss战！%s 出现了！===", chapter, boss.name))
@@ -1777,6 +1779,8 @@ function Battle.GenerateLevel(state, level)
                     Battle.AddLog(state, string.format("🐚 寄居蟹在 (%d,%d)，壳在 (%d,%d)", crabCol, row, shellCol, row))
                 end
             end
+            -- 修正：用实际放置的螃蟹数覆盖目标，防止放置失败导致无法通关
+            state.rescueTarget = #board.crabs
             Battle.AddLog(state, string.format("🦀 救援目标: %d只寄居蟹需要回家！", state.rescueTarget))
         end
 
@@ -2272,6 +2276,8 @@ function Battle.ContinueLevel(state, nextLevel)
                 Battle.AddLog(state, string.format("🐚 寄居蟹在(%d,%d)，壳在(%d,%d)", crabCol, row, shellCol, row))
             end
         end
+        -- 修正：用实际放置的螃蟹数覆盖目标，防止放置失败导致无法通关
+        state.rescueTarget = #board.crabs
         Battle.AddLog(state, string.format("🦀 救援目标: %d只寄居蟹需要回家！", state.rescueTarget))
     elseif chapter == 3 then
         board.crabs = {}
@@ -2744,9 +2750,12 @@ function Battle.CheckItemPickup(state, col, row)
         AM.PlaySFX("heal_pickup", 1.0)
 
     elseif item.type == "gold_bag" then
-        state.gold = state.gold + 3
-        Battle.AddFloatingText(state, col, row, "+3💰", {255, 215, 0, 255}, nil, 2.5)
-        Battle.AddLog(state, "拾取 " .. def.name .. "，获得3金币")
+        local goldOverflow = (state.kills or 0) - (state.killTarget or 999)
+        local bagBlocked = (goldOverflow > 5) and not Battle.IsBossLevel(state.level)
+        local bagGold = bagBlocked and 1 or 3
+        state.gold = state.gold + bagGold
+        Battle.AddFloatingText(state, col, row, "+" .. bagGold .. "💰", {255, 215, 0, 255}, nil, 2.5)
+        Battle.AddLog(state, "拾取 " .. def.name .. "，获得" .. bagGold .. "金币")
         AM.PlaySFX("item_pickup")
 
     elseif item.type == "shield" then
@@ -3630,9 +3639,11 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
     end
 
     -- === 基础金币 (根据敌人类型) + bounty_hunter / treasure_trap / blood_money ===
+    -- 防刷机制：击杀数超过目标+5后，不再获得金币（防止故意不完成章节任务拖关刷金）
+    local killOverflow = (state.kills or 0) - (state.killTarget or 999)
+    local goldBlocked = (killOverflow > 5) and not Battle.IsBossLevel(state.level)
+
     local baseGold = ENEMY_GOLD[enemy.enemyType] or 3
-    -- 每关递增 +0（已移除，金币产出已大幅降低）
-    -- baseGold = baseGold + (state.level - 1)
     local killGold = baseGold
     local btyLv = Skills.Level(state.skills, "bounty_hunter")
     -- 赏金猎人Lv4: 击杀金翻倍
@@ -3652,8 +3663,14 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         local bonusAmt = math.floor(totalKillGold * state.goldBonus / 100)
         totalKillGold = totalKillGold + bonusAmt
     end
+
+    if goldBlocked then
+        -- 超出击杀目标过多，金币收益降为1（保留正反馈但去除刷金收益）
+        totalKillGold = 1
+    end
+
     state.gold = state.gold + totalKillGold
-    if bountyBonus > 0 then
+    if bountyBonus > 0 and not goldBlocked then
         Battle.AddFloatingText(state, enemy.col, enemy.row,
             "+" .. bountyBonus .. "💎", {150, 220, 255, 255})
     end
@@ -4819,7 +4836,10 @@ function Battle.ProcessEnemyTurn(state)
     -- 0.6 (已移至敌人攻击后清理)
 
     -- 0.7 魅惑水母：英雄进入2格范围则触发魅惑（下一玩家回合跳过）
-    if not (state.heroCharmedTurns and state.heroCharmedTurns > 0) then
+    -- 免疫期内不触发（被魅惑结束后有2回合免疫，防止无限循环控制）
+    if (state.heroCharmImmunity and state.heroCharmImmunity > 0) then
+        -- 免疫期中，不检查魅惑
+    elseif not (state.heroCharmedTurns and state.heroCharmedTurns > 0) then
         -- 本回合还未被魅惑，才检查（避免重复触发）
         for _, e in ipairs(HexGrid.GetTeamPieces(state.board, "enemy")) do
             if e.hp > 0 and e.enemyType == "charm_jelly" then

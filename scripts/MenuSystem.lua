@@ -1829,14 +1829,10 @@ function MenuSystem.CreateMenuUI()
             end
         end,
         children = {
-            -- 顶部安全区（移动端避开刘海，PC端自动为0）
-            UI.SafeAreaView { width = "100%", edges = "top",
-                backgroundColor = {28, 22, 52, 255},
-            },
-            -- 顶部状态栏（纯色，与底部 tab 栏一致）
-            UI.Panel {
+            -- 顶部安全区（避开刘海+左右系统UI，透明）
+            UI.SafeAreaView {
                 width = "100%",
-                backgroundColor = {28, 22, 52, 255},
+                edges = { "top", "left", "right" },
                 children = {
                     -- 顶栏内容行
                     (function()
@@ -2107,27 +2103,33 @@ function MenuSystem.CreateMenuUI()
                     from = {50, 45, 80, 30}, to = {80, 60, 140, 80},
                 },
             },
-            -- 底部 Tab 栏分割线
-            UI.Panel {
-                width = "100%", height = 1, flexShrink = 0,
-                backgroundGradient = {
-                    type = "linear", direction = "to-right",
-                    from = {40, 35, 70, 0}, to = {80, 65, 140, 180},
-                    mid = {100, 80, 180, 200}, midPoint = 0.5,
-                },
-            },
-            -- 底部 Tab 栏
-            UI.Panel {
+            -- 底部 Tab 栏（含安全区，避开 iOS Home 指示条）
+            UI.SafeAreaView {
                 width = "100%", flexShrink = 0,
-                flexDirection = "row",
-                overflow = "visible",
-                backgroundGradient = {
-                    type = "linear", direction = "to-bottom",
-                    from = {35, 28, 65, 255}, to = {18, 14, 36, 255},
+                edges = { "bottom", "left", "right" },
+                backgroundColor = {18, 14, 36, 255},
+                children = {
+                    -- 分割线
+                    UI.Panel {
+                        width = "100%", height = 1,
+                        backgroundGradient = {
+                            type = "linear", direction = "to-right",
+                            from = {40, 35, 70, 0}, to = {80, 65, 140, 180},
+                            mid = {100, 80, 180, 200}, midPoint = 0.5,
+                        },
+                    },
+                    -- Tab 按钮行
+                    UI.Panel {
+                        width = "100%",
+                        flexDirection = "row",
+                        overflow = "visible",
+                        backgroundGradient = {
+                            type = "linear", direction = "to-bottom",
+                            from = {35, 28, 65, 255}, to = {18, 14, 36, 255},
+                        },
+                        children = tabChildren,
+                    },
                 },
-                borderTopWidth = 1,
-                borderColor = {80, 65, 140, 180},
-                children = tabChildren,
             },
 
         },

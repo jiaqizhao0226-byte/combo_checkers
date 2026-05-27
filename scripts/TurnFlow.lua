@@ -338,9 +338,18 @@ function TurnFlow.StartPlayerTurn()
     -- 猎手印记: 每回合开始标记血量最高的敌人
     Battle.ApplyHunterMarks(G.battle)
 
+    -- 魅惑免疫期递减（每回合开始时）
+    if G.battle.heroCharmImmunity and G.battle.heroCharmImmunity > 0 then
+        G.battle.heroCharmImmunity = G.battle.heroCharmImmunity - 1
+    end
+
     -- 魅惑水母: 被魅惑则跳过本回合玩家行动
     if G.battle.heroCharmedTurns and G.battle.heroCharmedTurns > 0 then
         G.battle.heroCharmedTurns = G.battle.heroCharmedTurns - 1
+        -- 魅惑结束后给予2回合免疫期，防止被连续魅惑无限控死
+        if G.battle.heroCharmedTurns <= 0 then
+            G.battle.heroCharmImmunity = 2
+        end
         GameUI.UpdateLog("💜 被魅惑！本回合无法行动…")
         GameUI.UpdateHUD()
         if G.btnPanel then G.btnPanel:SetVisible(false) end

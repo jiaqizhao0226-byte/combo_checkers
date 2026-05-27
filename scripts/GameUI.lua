@@ -13,6 +13,7 @@ local AM = require "AudioManager"
 local SettingsPopup = require "SettingsPopup"
 
 
+
 local GameUI = {}
 
 function GameUI.CreateHUD()
@@ -20,14 +21,16 @@ function GameUI.CreateHUD()
     local isMobile = logW < 500
     return UI.SafeAreaView {
         width = "100%",
+        edges = { "top", "left", "right" },
+        paddingTop = 6,
         children = {
             UI.Panel {
                 width = "100%",
                 flexDirection = "row",
                 justifyContent = "space-between",
                 alignItems = "center",
-                paddingLeft = 8, paddingRight = 8,
-                paddingTop = 8, paddingBottom = 6,
+                paddingLeft = 8, paddingRight = 12,
+                paddingTop = 6, paddingBottom = 6,
                 children = {
                     -- ===== 左侧: HP 徽章 + 血条 =====
                     UI.Panel {
@@ -132,7 +135,7 @@ function GameUI.CreateHUD()
                     -- ===== 右侧: 金币显示 =====
                     UI.Panel {
                         flexDirection = "row", alignItems = "center", gap = 3,
-                        flexShrink = 1,
+                        flexShrink = 0,
                         overflow = "visible",
                         children = {
                             -- 金币圆形图标
@@ -186,89 +189,7 @@ function GameUI.CreateHUD()
                     },
                 },
             },
-            -- 第二行: 技能图标 + 退出按钮
-            UI.Panel {
-                width = "100%",
-                flexDirection = "row",
-                justifyContent = "space-between",
-                alignItems = "center",
-                paddingLeft = 12, paddingRight = 10,
-                paddingBottom = 6,
-                children = {
-                    -- 左侧: 设置按钮 + 技能图标
-                    UI.Panel {
-                        flexDirection = "row", alignItems = "center", gap = 4, flexShrink = 1,
-                        children = {
-                            UI.Button {
-                                text = "⚙",
-                                fontSize = 22,
-                                width = 32, height = 28,
-                                borderRadius = 8,
-                                backgroundColor = {45, 38, 75, 200},
-                                fontColor = {180, 175, 215, 230},
-                                borderWidth = 1,
-                                borderColor = {80, 65, 130, 120},
-                                pressedBackgroundColor = {55, 45, 90, 255},
-                                onClick = function(self)
-                                    SettingsPopup.Show()
-                                end,
-                            },
 
-                            -- 教程按钮
-                            UI.Button {
-                                text = "📖",
-                                fontSize = 20,
-                                width = 32, height = 28,
-                                borderRadius = 8,
-                                backgroundColor = {35, 55, 75, 200},
-                                fontColor = {150, 200, 230, 230},
-                                borderWidth = 1,
-                                borderColor = {60, 100, 150, 120},
-                                pressedBackgroundColor = {45, 65, 90, 255},
-                                onClick = function(self)
-                                    GameUI.ShowTutorialGuide()
-                                end,
-                            },
-
-
-                            UI.Panel {
-                                id = "skillsRow",
-                                flexDirection = "row", alignItems = "center",
-                                gap = 4, flexShrink = 1, flexWrap = "wrap",
-                            },
-                        },
-                    },
-                    UI.Panel {
-                        width = 44, height = 44,
-                        borderRadius = 22,
-                        justifyContent = "center", alignItems = "center",
-                        backgroundGradient = {
-                            type = "linear", direction = "to-bottom",
-                            from = {85, 40, 40, 230}, to = {55, 25, 25, 230},
-                        },
-                        borderWidth = 1.5,
-                        borderColor = {180, 70, 70, 150},
-                        boxShadow = {
-                            { x = 0, y = 2, blur = 6, spread = 0, color = {0, 0, 0, 60} },
-                        },
-                        onClick = function(self)
-                            AM.PlaySFX("ui_click")
-                            if G.callbacks and G.callbacks.ReturnToMenu then
-                                G.callbacks.ReturnToMenu()
-                            end
-                        end,
-                        children = {
-                            UI.Label {
-                                text = "X",
-                                fontSize = 20,
-                                fontWeight = "bold",
-                                fontColor = {255, 200, 200, 255},
-                                textAlign = "center",
-                            },
-                        },
-                    },
-                },
-            },
 
         },
     }
@@ -658,12 +579,74 @@ function GameUI.CreateUI()
                             G.callbacks.HandleCellClick(col, row)
                         end,
                     },
+                    -- 设置按钮 + 技能图标（绝对定位，左上角，与目标栏同行）
+                    UI.Panel {
+                        position = "absolute",
+                        top = 6, left = 10,
+                        flexDirection = "row", alignItems = "center", gap = 4,
+                        zIndex = 10,
+                        children = {
+                            UI.Button {
+                                text = "⚙",
+                                fontSize = 20,
+                                width = 34, height = 34,
+                                borderRadius = 17,
+                                backgroundColor = {45, 38, 75, 220},
+                                fontColor = {180, 175, 215, 230},
+                                borderWidth = 1,
+                                borderColor = {80, 65, 130, 120},
+                                pressedBackgroundColor = {55, 45, 90, 255},
+                                onClick = function(self)
+                                    SettingsPopup.Show()
+                                end,
+                            },
+                            UI.Panel {
+                                id = "skillsRow",
+                                flexDirection = "row", alignItems = "center",
+                                gap = 3, flexShrink = 1,
+                            },
+                        },
+                    },
+
+                    -- 退出按钮（绝对定位，右上角，与目标栏同行）
+                    UI.Panel {
+                        position = "absolute",
+                        top = 6, right = 10,
+                        width = 38, height = 38,
+                        borderRadius = 19,
+                        justifyContent = "center", alignItems = "center",
+                        backgroundGradient = {
+                            type = "linear", direction = "to-bottom",
+                            from = {85, 40, 40, 230}, to = {55, 25, 25, 230},
+                        },
+                        borderWidth = 1.5,
+                        borderColor = {180, 70, 70, 150},
+                        boxShadow = {
+                            { x = 0, y = 2, blur = 6, spread = 0, color = {0, 0, 0, 60} },
+                        },
+                        zIndex = 10,
+                        onClick = function(self)
+                            AM.PlaySFX("ui_click")
+                            if G.callbacks and G.callbacks.ReturnToMenu then
+                                G.callbacks.ReturnToMenu()
+                            end
+                        end,
+                        children = {
+                            UI.Label {
+                                text = "X",
+                                fontSize = 18,
+                                fontWeight = "bold",
+                                fontColor = {255, 200, 200, 255},
+                                textAlign = "center",
+                            },
+                        },
+                    },
                     -- 击杀/救援目标提示条（绝对定位浮在棋盘上方）
                     UI.Panel {
                         id = "killBar",
                         visible = false,
                         position = "absolute",
-                        top = 4, left = 0, right = 0,
+                        top = 4, left = 50, right = 54,
                         flexDirection = "row",
                         justifyContent = "center",
                         alignItems = "center",
@@ -905,6 +888,32 @@ function GameUI.CreateUI()
                 },
             },
             GameUI.CreateBottomBar(),
+            -- 教程按钮（绝对定位在根容器左下角）
+            UI.Panel {
+                position = "absolute",
+                bottom = 70, left = 10,
+                zIndex = 20,
+                flexDirection = "row", alignItems = "center", gap = 4,
+                backgroundColor = {35, 55, 75, 200},
+                borderRadius = 14,
+                borderWidth = 1,
+                borderColor = {60, 100, 150, 120},
+                paddingLeft = 8, paddingRight = 10, paddingTop = 6, paddingBottom = 6,
+                onClick = function(self)
+                    GameUI.ShowTutorialGuide()
+                end,
+                children = {
+                    UI.Label {
+                        text = "📖",
+                        fontSize = 16,
+                    },
+                    UI.Label {
+                        text = "教程",
+                        fontSize = 12,
+                        fontColor = {150, 200, 230, 230},
+                    },
+                },
+            },
             GameUI.CreateResultPanel(),
             GameUI.CreateSkillModal(),
         },
@@ -1784,12 +1793,12 @@ local TUTORIAL_PAGES = {
         accent = {70, 150, 230},
         icon = "⚔️",
         entries = {
-            { emoji = "🔵  👉  ⬜",  text = "点击相邻空格移动英雄" },
-            { emoji = "🔵 ⚔️ 🔴 💥", text = "跳过敌人造成伤害（消耗行动点）" },
-            { emoji = "💥💥💥 ➡️ 🌟", text = "连续跳杀触发COMBO奖励" },
-            { emoji = "💊  💰  🛡️",  text = "路上可拾取血瓶、金币、护盾" },
-            { emoji = "⏭️  🔴  ⚔️",  text = "行动点耗尽后轮到敌人行动" },
-            { emoji = "🏆  ⚔️  🔢",  text = "击杀足够敌人即可通关" },
+            { emoji = "👆", text = "点击相邻空格移动英雄" },
+            { emoji = "⚔️", text = "跳过敌人造成伤害（消耗行动点）" },
+            { emoji = "🌟", text = "连续跳杀触发COMBO奖励" },
+            { emoji = "🎁", text = "路上可拾取血瓶、金币、护盾" },
+            { emoji = "⏭️", text = "行动点耗尽后轮到敌人行动" },
+            { emoji = "🏆", text = "击杀足够敌人即可通关" },
         },
     },
     -- ========== Page 2: 道具与连击 ==========
@@ -1800,14 +1809,14 @@ local TUTORIAL_PAGES = {
         entries = {
             { emoji = "💊", text = "小血瓶 — 回复20HP", isSeparator = false },
             { emoji = "💖", text = "大血瓶 — 回满HP（稀有）" },
-            { emoji = "💰", text = "金币袋 — 获得8金币" },
+            { emoji = "💰", text = "金币袋 — 获得3金币" },
             { emoji = "🛡️", text = "护盾 — 下次受击伤害减半" },
             { separator = true, text = "── 连击奖励 ──" },
             { emoji = "2️⃣", text = "追踪飞镖 — 追踪敌人50伤害或拾取道具" },
             { emoji = "3️⃣", text = "稻草人 — 吸引仇恨替挡2回合" },
             { emoji = "4️⃣", text = "六芒冲击波 — 6方向秒杀小怪，Boss受60伤害" },
-            { emoji = "5️⃣", text = "生命虹吸 — 吸取全体生命，溢出转护盾" },
-            { emoji = "6️⃣", text = "天罚陨石 — 主角周围4格陨石轰炸" },
+            { emoji = "5️⃣", text = "生命虹吸 — 吸取敌人20%HP，溢出转护盾" },
+            { emoji = "6️⃣", text = "天罚陨石 — 周围4格轰炸，90%HP(Boss上限240)" },
             { emoji = "7️⃣", text = "末日炸弹 — 秒杀小怪+Boss受150伤害" },
         },
     },
@@ -1819,13 +1828,13 @@ local TUTORIAL_PAGES = {
         entries = {
             { emoji = "👾", text = "史莱姆 — HP25 ATK6 | 基础近战敌人" },
             { emoji = "💀", text = "骷髅兵 — HP40 ATK12 | 射程2，投骨远攻" },
-            { emoji = "🎐", text = "电水母 — HP28 ATK10 | 反伤6：攻击它会被电" },
+            { emoji = "🎐", text = "电水母 — HP28 ATK10 | 近战电击" },
             { emoji = "🐢", text = "铁甲龟 — HP55 ATK11 | 防御5：减免所有伤害" },
             { emoji = "🌀", text = "漩涡鳗 — HP35 ATK12 | 死亡时搅乱棋盘" },
             { emoji = "🦈", text = "幽灵鲨 — HP22 ATK14 | 瞬移：会随机传送" },
             { emoji = "🐠", text = "射水鱼 — HP18 ATK11 | 射程2+逃跑：保持距离" },
             { emoji = "⚡", text = "电鳐 — HP40 ATK9 | AOE放电：伤害周围全部" },
-            { emoji = "🐚", text = "寄居蟹 — HP38 ATK9 | 缩壳：受击时缩入壳中减伤" },
+            { emoji = "🐚", text = "寄居蟹 — HP38 ATK9 | 缩壳：受击时伤害减半" },
         },
     },
     -- ========== Page 4: 炎魔怪物 ==========
@@ -1834,7 +1843,7 @@ local TUTORIAL_PAGES = {
         accent = {230, 120, 50},
         icon = "🔥",
         entries = {
-            { emoji = "🔥", text = "火灵 — HP22 ATK8 | 灼烧：跳过它会持续掉血2回合" },
+            { emoji = "🔥", text = "火灵 — HP22 ATK8 | 灼烧：附加每回合5伤害，持续2回合" },
             { emoji = "🗿", text = "熔岩巨人 — HP55 ATK14 | 死亡留岩浆：每回合8伤害" },
             { emoji = "🍄", text = "毒蘑菇 — HP18 ATK0 | 死亡爆炸：对周围造成8伤害" },
             { emoji = "✨", text = "裂焰精 — HP28 ATK8 | 分裂：死亡时变成两个焰碎片" },
@@ -1850,10 +1859,11 @@ local TUTORIAL_PAGES = {
         icon = "🪸",
         entries = {
             { emoji = "🦞", text = "珊瑚夹 — HP28 ATK9 | 基础近战" },
-            { emoji = "🌰", text = "海胆 — HP18 ATK6 | 反伤6：近战攻击它会受伤" },
+            { emoji = "🌰", text = "海胆 — HP18 ATK6 | 反伤：近战攻击它会受伤" },
             { emoji = "⭐", text = "礁石海星 — HP20 ATK5 | 回血4：每回合恢复生命" },
             { emoji = "🌺", text = "棘刺海葵 — HP22 ATK7 | 射程3+逃跑：远程狙击" },
             { emoji = "🧙", text = "珊瑚祭司 — HP25 ATK0 | 辅助：治疗6HP+强化ATK3" },
+            { emoji = "💥", text = "裂变海胆 — HP26 ATK7 | HP低于50%分裂为2只小海胆" },
             { separator = true, text = "── 特殊机制 ──" },
             { emoji = "🦀", text = "珊瑚迷宫 — 清除障碍打通道路，帮助小蟹回家" },
         },
@@ -1879,21 +1889,19 @@ local TUTORIAL_PAGES = {
         icon = "👑",
         entries = {
             { separator = true, text = "── 深渊海沟 Boss ──" },
-            { emoji = "🐙", text = "深渊海妖 — HP450 ATK25 | 护盾60" },
-            { emoji = "🦑", text = "触手重击 — 近距离猛力横扫，重击伤害×2.2" },
-            { emoji = "☠️", text = "深渊喷毒 — 中距喷射毒液，附加3~4回合持续中毒" },
+            { emoji = "🐙", text = "深渊海妖 — HP450 ATK20 | 护盾60" },
+            { emoji = "🦑", text = "触手障碍 — 在棋盘放置触手阻挡移动" },
             { emoji = "🌊", text = "漩涡牵引 — 将你拉向Boss并造成伤害" },
             { emoji = "🕳️", text = "深渊收缩 — 棋盘边缘崩塌，可活动范围缩小" },
             { separator = true, text = "── 熔岩祭坛 Boss ──" },
-            { emoji = "🌋", text = "熔岩领主 — HP280 ATK22 | 护盾50" },
-            { emoji = "🔥", text = "熔岩重拳 — 近身砸落，英雄脚下留下持续灼烧地形" },
-            { emoji = "💥", text = "火焰弹射 — 精准射出火球，周边3格溅射熔岩" },
-            { emoji = "🌋", text = "熔岩喷发 — 随机区域喷出岩浆，踩到持续灼烧" },
+            { emoji = "🌋", text = "熔岩领主 — HP350 ATK21 | 护盾70" },
+            { emoji = "🔥", text = "熔岩喷射 — 射程2远程攻击" },
+            { emoji = "🌋", text = "熔岩喷发 — 在英雄周围放置岩浆地形" },
             { separator = true, text = "── 珊瑚迷宫 Boss ──" },
-            { emoji = "🪸", text = "珊瑚守卫 — HP320 ATK20 | 护盾55" },
-            { emoji = "⚡", text = "珊瑚刺击 — 近身贯穿刺击，附加2~3回合中毒" },
-            { emoji = "🪸", text = "珊瑚投掷 — 砸出巨石，碎片封堵退路" },
-            { emoji = "🌊", text = "潮汐冲击 — 汹涌冲击将你推离，途经格受伤" },
+            { emoji = "🪸", text = "珊瑚守卫 — HP480 ATK22 | 护盾80" },
+            { emoji = "🌊", text = "潮汐冲击 — 将你推离并造成伤害" },
+            { emoji = "🪸", text = "珊瑚墙 — 放置珊瑚障碍封堵退路" },
+            { emoji = "🧙", text = "召唤小兵 — 召唤珊瑚夹增援" },
             { separator = true, text = "── Boss 通用机制 ──" },
             { emoji = "🛡️", text = "Boss护盾 — 每阶段恢复护盾，必须先击破" },
             { emoji = "😡", text = "狂暴阶段 — HP低于50%进入狂暴，技能CD缩短" },
@@ -1902,7 +1910,7 @@ local TUTORIAL_PAGES = {
     },
 }
 
---- 生成单个条目卡片
+--- 生成单个条目卡片（实底卡片风格，复刻章节教学样式）
 ---@param entry table
 ---@param idx number
 ---@param accent table
@@ -1913,41 +1921,56 @@ local function MakeTutorialEntry(entry, idx, accent)
         return UI.Panel {
             width = "100%",
             alignItems = "center",
-            marginTop = 8, marginBottom = 4,
+            marginTop = 10, marginBottom = 6,
             children = {
+                UI.Panel {
+                    width = "90%", height = 1,
+                    backgroundColor = {accent[1], accent[2], accent[3], 60},
+                    borderRadius = 1,
+                    marginBottom = 4,
+                },
                 UI.Label {
                     text = entry.text,
-                    fontSize = 14,
-                    fontColor = {accent[1], accent[2], accent[3], 160},
+                    fontSize = 15, fontWeight = "bold",
+                    fontColor = {accent[1], accent[2], accent[3], 200},
                     textAlign = "center",
                 },
             },
         }
     end
-    -- 普通条目
+    -- 普通条目：编号圆圈 + emoji + 文本（实底卡片）
     return UI.Panel {
         width = "100%",
         flexDirection = "row",
         alignItems = "center",
         gap = 10,
-        paddingTop = 7, paddingBottom = 7,
-        paddingLeft = 10, paddingRight = 10,
-        backgroundColor = {20, 28, 42, 220},
-        borderRadius = 10,
+        paddingTop = 10, paddingBottom = 10,
+        paddingLeft = 12, paddingRight = 12,
+        backgroundColor = {accent[1], accent[2], accent[3], 18},
+        borderRadius = 12,
+        borderWidth = 1,
+        borderColor = {accent[1], accent[2], accent[3], 40},
         children = {
-            -- 左侧emoji
-            UI.Label {
-                text = entry.emoji or "",
-                fontSize = 26,
-                width = 36,
-                textAlign = "center",
+            -- 左侧大emoji
+            UI.Panel {
+                width = 40, height = 40,
+                borderRadius = 20,
+                backgroundColor = {accent[1], accent[2], accent[3], 35},
+                justifyContent = "center", alignItems = "center",
                 flexShrink = 0,
+                children = {
+                    UI.Label {
+                        text = entry.emoji or "📌",
+                        fontSize = 22,
+                        textAlign = "center",
+                    },
+                },
             },
             -- 右侧文本
             UI.Label {
                 text = entry.text or "",
                 fontSize = 15,
-                fontColor = {210, 220, 235, 230},
+                fontColor = {220, 230, 245, 240},
                 flexGrow = 1, flexShrink = 1,
                 numberOfLines = 2,
             },
@@ -1955,43 +1978,46 @@ local function MakeTutorialEntry(entry, idx, accent)
     }
 end
 
---- 构建指定页面的内容 children 列表
+--- 构建指定页面的内容（拆分为 header / scrollBody / navBar 三段）
 ---@param pageIdx number
----@return table children
+---@return table headerChildren
+---@return table bodyChildren
+---@return table navBar
 ---@return table accent
 local function BuildTutorialPageContent(pageIdx)
     local page = TUTORIAL_PAGES[pageIdx]
-    if not page then return {}, {100, 100, 100} end
+    if not page then return {}, {}, UI.Panel{}, {100, 100, 100} end
     local ac = page.accent
     local totalPages = #TUTORIAL_PAGES
-    local children = {}
 
-    -- 顶栏: 页码指示器 + 关闭按钮
-    children[#children + 1] = UI.Panel {
+    -- === Header（标题 + 分割线） ===
+    local headerChildren = {}
+    headerChildren[#headerChildren + 1] = UI.Panel {
         width = "100%",
         flexDirection = "row",
         justifyContent = "space-between",
         alignItems = "center",
-        marginBottom = 4,
+        marginBottom = 2,
         children = {
             -- 左侧占位
             UI.Panel { width = 32, height = 32 },
-            -- 页码标签
+            -- 标题
             UI.Label {
                 text = page.icon .. "  " .. page.title,
-                fontSize = 22, fontWeight = "bold",
+                fontSize = 20, fontWeight = "bold",
                 fontColor = {ac[1], ac[2], ac[3], 255},
                 textAlign = "center",
-                flexGrow = 1,
+                flexGrow = 1, flexShrink = 1,
+                numberOfLines = 1,
             },
             -- 关闭按钮
             UI.Button {
-                text = "X",
+                text = "✕",
                 fontSize = 16, fontWeight = "bold",
                 width = 32, height = 32,
                 borderRadius = 16,
-                backgroundColor = {255, 255, 255, 25},
-                fontColor = {200, 200, 200, 200},
+                backgroundColor = {255, 255, 255, 20},
+                fontColor = {200, 200, 200, 180},
                 pressedBackgroundColor = {255, 80, 80, 100},
                 onClick = function(self)
                     AM.PlaySFX("ui_popup_close")
@@ -2002,21 +2028,20 @@ local function BuildTutorialPageContent(pageIdx)
             },
         },
     }
-
-    -- 分割线
-    children[#children + 1] = UI.Panel {
-        width = 50, height = 2,
-        backgroundColor = {ac[1], ac[2], ac[3], 100},
+    headerChildren[#headerChildren + 1] = UI.Panel {
+        width = 60, height = 2,
+        backgroundColor = {ac[1], ac[2], ac[3], 120},
         alignSelf = "center", borderRadius = 1,
-        marginBottom = 6,
+        marginBottom = 4,
     }
 
-    -- 内容条目
+    -- === Body（内容条目，将放入可滚动区域） ===
+    local bodyChildren = {}
     for i, entry in ipairs(page.entries) do
-        children[#children + 1] = MakeTutorialEntry(entry, i, ac)
+        bodyChildren[#bodyChildren + 1] = MakeTutorialEntry(entry, i, ac)
     end
 
-    -- 底部: 页码 + 翻页按钮
+    -- === NavBar（翻页按钮，固定在底部） ===
     local navChildren = {}
     -- 上一页按钮
     navChildren[#navChildren + 1] = UI.Button {
@@ -2064,26 +2089,29 @@ local function BuildTutorialPageContent(pageIdx)
         end or nil,
     }
 
-    children[#children + 1] = UI.Panel {
+    local navBar = UI.Panel {
         width = "100%",
-        flexDirection = "row",
-        justifyContent = "space-between",
         alignItems = "center",
-        marginTop = 10,
-        children = navChildren,
+        gap = 4,
+        paddingTop = 8,
+        children = {
+            UI.Panel {
+                width = "100%",
+                flexDirection = "row",
+                justifyContent = "space-between",
+                alignItems = "center",
+                children = navChildren,
+            },
+            UI.Label {
+                text = pageIdx .. " / " .. totalPages,
+                fontSize = 14,
+                fontColor = {160, 160, 170, 120},
+                textAlign = "center",
+            },
+        },
     }
 
-    -- 页码文字
-    children[#children + 1] = UI.Label {
-        text = pageIdx .. " / " .. totalPages,
-        fontSize = 14,
-        fontColor = {160, 160, 170, 120},
-        textAlign = "center",
-        alignSelf = "center",
-        marginTop = 2,
-    }
-
-    return children, ac
+    return headerChildren, bodyChildren, navBar, ac
 end
 
 --- 显示教程指南弹窗（可翻页）
@@ -2095,7 +2123,7 @@ function GameUI.ShowTutorialGuide(pageIdx)
 
     AM.PlaySFX("ui_popup_open")
 
-    local contentChildren, ac = BuildTutorialPageContent(pageIdx)
+    local headerChildren, bodyChildren, navBar, ac = BuildTutorialPageContent(pageIdx)
 
     -- 移除旧弹窗
     if G.tutorialGuidePopup then
@@ -2107,7 +2135,8 @@ function GameUI.ShowTutorialGuide(pageIdx)
         position = "absolute",
         top = 0, left = 0, right = 0, bottom = 0,
         justifyContent = "center", alignItems = "center",
-        backgroundColor = {8, 12, 22, 160},
+        backgroundColor = {0, 0, 0, 180},
+        backdropBlur = 4,
         zIndex = 800,
         onClick = function(self)
             -- 点击遮罩关闭
@@ -2118,28 +2147,45 @@ function GameUI.ShowTutorialGuide(pageIdx)
         end,
         children = {
             UI.Panel {
-                width = "90%", maxWidth = 420,
+                width = "88%", maxWidth = 380,
                 maxHeight = "85%",
                 backgroundGradient = {
                     type = "linear", direction = "to-bottom",
-                    from = {25, 35, 50, 255}, to = {15, 20, 32, 255},
+                    from = {25, 40, 50, 252}, to = {12, 18, 28, 252},
                 },
-                borderRadius = 18,
-                borderWidth = 2,
-                borderColor = {ac[1], ac[2], ac[3], 180},
-                paddingTop = 16, paddingBottom = 14,
-                paddingLeft = 14, paddingRight = 14,
-                gap = 3,
+                borderRadius = 16,
+                borderWidth = 1.5,
+                borderColor = {ac[1], ac[2], ac[3], 120},
+                paddingTop = 18, paddingBottom = 12,
+                paddingLeft = 16, paddingRight = 16,
                 alignItems = "center",
-                overflow = "scroll",
                 boxShadow = {
-                    { x = 0, y = 4, blur = 20, spread = 0, color = {0, 0, 0, 120} },
-                    { x = 0, y = 0, blur = 30, spread = 5, color = {ac[1], ac[2], ac[3], 25} },
+                    { x = 0, y = 6, blur = 24, spread = 0, color = {0, 0, 0, 160} },
+                    { x = 0, y = 0, blur = 40, spread = 8, color = {ac[1], ac[2], ac[3], 30} },
                 },
                 onClick = function(self)
                     -- 阻止事件冒泡到遮罩层
                 end,
-                children = contentChildren,
+                children = {
+                    -- 固定顶部：标题区
+                    UI.Panel {
+                        width = "100%",
+                        alignItems = "center",
+                        flexShrink = 0,
+                        children = headerChildren,
+                    },
+                    -- 中间可滚动区域：内容条目
+                    UI.Panel {
+                        width = "100%",
+                        flexGrow = 1, flexShrink = 1,
+                        overflow = "scroll",
+                        gap = 4,
+                        paddingTop = 4, paddingBottom = 4,
+                        children = bodyChildren,
+                    },
+                    -- 固定底部：导航栏
+                    navBar,
+                },
             },
         },
     }
