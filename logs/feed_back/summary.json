@@ -1,0 +1,23 @@
+{
+  "total": 1,
+  "fetched": 1,
+  "logs_downloaded": 1,
+  "screenshots_downloaded": 1,
+  "download_errors": 0,
+  "save_dir": "logs/feed_back/",
+  "feedbacks": [
+    {
+      "feedback_id": 5351,
+      "description": "问题反馈",
+      "device_model": "vivo V1824A (PD1824)",
+      "fps": 60,
+      "memory_usage_mb": 434,
+      "runtime_version": "2.16.8",
+      "version_id": 78178,
+      "status": "未处理",
+      "logs_downloaded": 1,
+      "screenshots_downloaded": 1,
+      "dir": "logs/feed_back/feedback_5351"
+    }
+  ]
+}

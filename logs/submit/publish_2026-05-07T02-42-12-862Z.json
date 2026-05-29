@@ -1,0 +1,201 @@
+{
+  "startTime": "2026-05-07T02:42:12.862Z",
+  "endTime": "2026-05-07T02:42:29.069Z",
+  "duration": "16207ms",
+  "result": {
+    "success": false,
+    "error": "请求失败：400 Bad Request - 该厂商尚未完成开发者认证，请前往认证: https://developer.taptap.cn/forge/393475/settings?tab=account_info"
+  },
+  "steps": [
+    {
+      "time": "2026-05-07T02:42:13.419Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:23.956Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "done"
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:23.956Z",
+      "stage": "network_config",
+      "data": {
+        "env": "production"
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:23.958Z",
+      "stage": "load_config",
+      "data": {
+        "projectId": "p_wskd",
+        "configPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/project.json",
+        "taptap_publish": {
+          "title": "Combo Checkers",
+          "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+          "category": "strategy",
+          "screen_orientation": "portrait",
+          "collection_type": "sce",
+          "trial_note": "跳棋+Roguelite的创意组合，希望每一次连跳都能带给你惊喜！欢迎反馈建议。",
+          "app_platforms": "1,2",
+          "developer_id": 393475,
+          "app_id": 850473,
+          "miniapp_id": "tapmcauxykjmazqjed"
+        },
+        "assets": {
+          "icon": "./game_material/ICON_2026-04-29T09-32-38_01.jpg",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image": "./game_material/PROMO_2026-04-29T09-10-23_01.jpg",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/ICON_2026-04-29T09-32-38_01.jpg",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/PROMO_2026-04-29T09-10-23_01.jpg",
+          "cover_horizontal": "./game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_vertical": "./game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_VERTICAL_2026-04-29T09-23-33_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:24.259Z",
+      "stage": "update_game",
+      "data": {
+        "app_id": 850473,
+        "developer_id": 393475
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:24.262Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "start",
+        "assets": {
+          "icon": "./game_material/ICON_2026-04-29T09-32-38_01.jpg",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image": "./game_material/PROMO_2026-04-29T09-10-23_01.jpg",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/ICON_2026-04-29T09-32-38_01.jpg",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/PROMO_2026-04-29T09-10-23_01.jpg",
+          "cover_horizontal": "./game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_vertical": "./game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_VERTICAL_2026-04-29T09-23-33_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:27.259Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "path": "./game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+        "resolvedPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png"
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:27.260Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "fileSize": 2403265
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:28.102Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FhFoQ8B9dolRXad501gEHCuAfc3I.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:28.102Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "path": "./game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+        "resolvedPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png"
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:28.104Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "fileSize": 1957874
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:29.005Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FndrfJYba3TisdJa3kAOzDtZJFRj.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:29.005Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "done",
+        "uploadedAssets": {
+          "iconUrl": "https://img-tc.tapimg.com/market/images/Fo6JZQI6dr0gQ18y9RlUuBG4zuhB.jpg",
+          "screenshotUrls": [
+            "https://img-tc.tapimg.com/market/images/FrIwYVp4_RIsnu5CjuY0jjaH1-yZ.jpg",
+            "https://img-tc.tapimg.com/market/images/FlLlP5t310o2vdj33eudQixwBSLj.png",
+            "https://img-tc.tapimg.com/market/images/FvbNp0yLbUMY7bsWXMJIMItUBbnY.png"
+          ],
+          "bannerUrl": "https://img-tc.tapimg.com/market/images/FtUXSmqZSKlwkRVwfiEpa8cqP9TJ.jpg",
+          "coverUrl": "https://img-tc.tapimg.com/market/images/FhFoQ8B9dolRXad501gEHCuAfc3I.png",
+          "coverVerticalUrl": "https://img-tc.tapimg.com/market/images/FndrfJYba3TisdJa3kAOzDtZJFRj.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-07T02:42:29.005Z",
+      "stage": "submit_spark_request",
+      "data": {
+        "app_id": 850473,
+        "developer_id": 393475,
+        "map_version": "15",
+        "sce_project_id": "p_wskd",
+        "category": "strategy",
+        "collection_type": "strategy",
+        "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+        "screen_orientation": 1,
+        "title": "Combo Checkers",
+        "icon": "https://img-tc.tapimg.com/market/images/Fo6JZQI6dr0gQ18y9RlUuBG4zuhB.jpg",
+        "screenshots": [
+          "https://img-tc.tapimg.com/market/images/FrIwYVp4_RIsnu5CjuY0jjaH1-yZ.jpg",
+          "https://img-tc.tapimg.com/market/images/FlLlP5t310o2vdj33eudQixwBSLj.png",
+          "https://img-tc.tapimg.com/market/images/FvbNp0yLbUMY7bsWXMJIMItUBbnY.png"
+        ],
+        "banner": "https://img-tc.tapimg.com/market/images/FtUXSmqZSKlwkRVwfiEpa8cqP9TJ.jpg",
+        "trial_note": "跳棋+Roguelite的创意组合，希望每一次连跳都能带给你惊喜！欢迎反馈建议。",
+        "app_platforms": "1,2",
+        "cover": "https://img-tc.tapimg.com/market/images/FhFoQ8B9dolRXad501gEHCuAfc3I.png",
+        "cover_vertical": "https://img-tc.tapimg.com/market/images/FndrfJYba3TisdJa3kAOzDtZJFRj.png"
+      }
+    }
+  ]
+}

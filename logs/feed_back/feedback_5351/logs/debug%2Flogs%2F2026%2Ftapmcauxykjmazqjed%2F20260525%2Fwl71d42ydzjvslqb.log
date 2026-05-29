@@ -1,0 +1,24 @@
+{"t":"2026-05-25 12_19_14_708","f":14304,"l":"INFO","m":"[i18n] loadConfig: uuid='Q4M3GntfTmiNZCdTeiz5Kg' engine='Q4M3GntfTmiNZCdTeiz5Kg' match=true"}
+{"t":"2026-05-25 12_19_14_709","f":14304,"l":"INFO","m":"[i18n] loadConfig: engine fallback, support_langs='zh_CN'"}
+{"t":"2026-05-25 12_19_14_709","f":14304,"l":"INFO","m":"[i18n] -lang='zh_CN' matched='zh_CN'"}
+{"t":"2026-05-25 12_19_14_709","f":14304,"l":"INFO","m":"[i18n] PreloadI18nStep: resolved='zh_CN'"}
+{"t":"2026-05-25 12_19_17_171","f":14412,"l":"INFO","m":"[BGM] Init preload OK: battle_calm -> audio/bgm_battle_calm.ogg"}
+{"t":"2026-05-25 12_19_17_174","f":14412,"l":"INFO","m":"[BGM] Init preload OK: boss_abyss -> audio/bgm_boss_abyss.ogg"}
+{"t":"2026-05-25 12_19_17_178","f":14412,"l":"INFO","m":"[BGM] Init preload OK: boss -> audio/bgm_boss.ogg"}
+{"t":"2026-05-25 12_19_17_180","f":14412,"l":"INFO","m":"[BGM] Init preload OK: boss_lava -> audio/bgm_boss_lava.ogg"}
+{"t":"2026-05-25 12_19_17_184","f":14412,"l":"INFO","m":"[BGM] Init preload OK: battle_endless -> audio/music_1779603354052.ogg"}
+{"t":"2026-05-25 12_19_17_186","f":14412,"l":"INFO","m":"[BGM] Init preload OK: menu -> audio/bgm_menu.ogg"}
+{"t":"2026-05-25 12_19_17_189","f":14412,"l":"INFO","m":"[BGM] Init preload OK: battle -> audio/bgm_battle.ogg"}
+{"t":"2026-05-25 12_19_17_193","f":14412,"l":"INFO","m":"[BGM] Init preload OK: boss_coral -> audio/music_1779514990986.ogg"}
+{"t":"2026-05-25 12_19_17_206","f":14412,"l":"INFO","m":"[BGM] PlayBGM: switching  -> menu"}
+{"t":"2026-05-25 12_19_17_206","f":14412,"l":"INFO","m":"[BGM] PlayBGM: play called, IsPlaying=true"}
+{"t":"2026-05-25 12_19_27_173","f":14998,"l":"INFO","m":"[BGM] EnterGame: startLevel=1 currentBGM=menu"}
+{"t":"2026-05-25 12_19_27_174","f":14998,"l":"INFO","m":"[BGM] PlayBGM: switching menu -> battle_calm"}
+{"t":"2026-05-25 12_19_27_174","f":14998,"l":"INFO","m":"[BGM] PlayBGM: play called, IsPlaying=true"}
+{"t":"2026-05-25 12_19_27_174","f":14998,"l":"INFO","m":"[BGM] EnterGame after update: currentBGM=battle_calm"}
+{"t":"2026-05-25 12_19_31_538","f":15257,"l":"ERROR","m":"StartPlayerTurn crashed: [string \"urhox-libs/Engine/i18n\"]:115: bad argument #2 to '_orig_string_format' (number has no integer representation)"}
+{"t":"2026-05-25 12_19_32_184","f":15295,"l":"ERROR","m":"[FinishExecution] [string \"urhox-libs/Engine/i18n\"]:115: bad argument #2 to '_orig_string_format' (number has no integer representation)"}
+{"t":"2026-05-25 12_19_38_417","f":15579,"l":"WARNING","m":"ENEMY_TURN watchdog: stuck > 5s, force StartPlayerTurn"}
+{"t":"2026-05-25 12_19_38_417","f":15579,"l":"ERROR","m":"Watchdog StartPlayerTurn failed: [string \"urhox-libs/Engine/i18n\"]:115: bad argument #2 to '_orig_string_format' (number has no integer representation)"}
+{"t":"2026-05-25 12_20_32_779","f":16162,"l":"WARNING","m":"ENEMY_TURN watchdog: stuck > 5s, force StartPlayerTurn"}
+{"t":"2026-05-25 12_20_32_780","f":16162,"l":"ERROR","m":"Watchdog StartPlayerTurn failed: [string \"urhox-libs/Engine/i18n\"]:115: bad argument #2 to '_orig_string_format' (number has no integer representation)"}

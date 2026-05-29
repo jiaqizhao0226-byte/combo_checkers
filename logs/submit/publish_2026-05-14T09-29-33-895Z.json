@@ -1,0 +1,275 @@
+{
+  "startTime": "2026-05-14T09:29:33.895Z",
+  "endTime": "2026-05-14T09:30:09.470Z",
+  "duration": "35575ms",
+  "result": {
+    "success": true
+  },
+  "steps": [
+    {
+      "time": "2026-05-14T09:29:34.071Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    },
+    {
+      "time": "2026-05-14T09:29:59.893Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "done"
+      }
+    },
+    {
+      "time": "2026-05-14T09:29:59.894Z",
+      "stage": "network_config",
+      "data": {
+        "env": "production"
+      }
+    },
+    {
+      "time": "2026-05-14T09:29:59.898Z",
+      "stage": "load_config",
+      "data": {
+        "projectId": "p_wskd",
+        "configPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/project.json",
+        "taptap_publish": {
+          "title": "Combo Checkers",
+          "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+          "category": "strategy",
+          "screen_orientation": "portrait",
+          "collection_type": "sce",
+          "trial_note": "v1.0.27 更新：稻草人全新形象+动态特效（飘浮稻草粒子/摇晃/地面光圈）；嘲讽连线改为红色；主角高亮圈加大加亮+呼吸动画；BGM切歌高亮修复；技能描述优化更易懂；冰霜格动态粒子特效；combo专属音效",
+          "app_platforms": "1,2",
+          "gameplay_demo_video_source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+          "developer_id": 393475,
+          "app_id": 850473,
+          "miniapp_id": "tapmcauxykjmazqjed"
+        },
+        "assets": {
+          "icon": "./game_material/ICON_2026-05-14T08-37-31_01.png",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image": "./game_material/PROMO_2026-04-29T09-10-23_01.jpg",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/ICON_2026-05-14T08-37-31_01.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/PROMO_2026-04-29T09-10-23_01.jpg",
+          "cover_horizontal": "./game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_vertical": "./game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+          "square_promotional_image": "./game_material/SQUARE_PROMO_2026-05-12T07-58-12_01.jpg",
+          "square_promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SQUARE_PROMO_2026-05-12T07-58-12_01.jpg"
+        }
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:00.208Z",
+      "stage": "update_game",
+      "data": {
+        "app_id": 850473,
+        "developer_id": 393475
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:00.211Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "start",
+        "assets": {
+          "icon": "./game_material/ICON_2026-05-14T08-37-31_01.png",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image": "./game_material/PROMO_2026-04-29T09-10-23_01.jpg",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/ICON_2026-05-14T08-37-31_01.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png"
+          ],
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/PROMO_2026-04-29T09-10-23_01.jpg",
+          "cover_horizontal": "./game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+          "cover_vertical": "./game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+          "square_promotional_image": "./game_material/SQUARE_PROMO_2026-05-12T07-58-12_01.jpg",
+          "square_promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SQUARE_PROMO_2026-05-12T07-58-12_01.jpg"
+        }
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:03.313Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "path": "./game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png",
+        "resolvedPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/game_material/COVER_HORIZONTAL_2026-04-29T09-21-41_01.png"
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:03.315Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "fileSize": 2403265
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:04.222Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FhFoQ8B9dolRXad501gEHCuAfc3I.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:04.222Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "path": "./game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png",
+        "resolvedPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/game_material/COVER_VERTICAL_2026-04-29T09-23-33_01.png"
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:04.224Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "fileSize": 1957874
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:05.290Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FndrfJYba3TisdJa3kAOzDtZJFRj.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:05.806Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "done",
+        "uploadedAssets": {
+          "iconUrl": "https://img-tc.tapimg.com/market/images/Flt74y287K50tzYcnWP9Q02MyBBq.png",
+          "screenshotUrls": [
+            "https://img-tc.tapimg.com/market/images/FrIwYVp4_RIsnu5CjuY0jjaH1-yZ.jpg",
+            "https://img-tc.tapimg.com/market/images/FlLlP5t310o2vdj33eudQixwBSLj.png",
+            "https://img-tc.tapimg.com/market/images/FvbNp0yLbUMY7bsWXMJIMItUBbnY.png"
+          ],
+          "bannerUrl": "https://img-tc.tapimg.com/market/images/FtUXSmqZSKlwkRVwfiEpa8cqP9TJ.jpg",
+          "coverUrl": "https://img-tc.tapimg.com/market/images/FhFoQ8B9dolRXad501gEHCuAfc3I.png",
+          "coverVerticalUrl": "https://img-tc.tapimg.com/market/images/FndrfJYba3TisdJa3kAOzDtZJFRj.png",
+          "squarePromoImageUrl": "https://img-tc.tapimg.com/market/images/FmWu2qz9oOeFdJX58T9G0rOrbOD2.jpg"
+        }
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:05.806Z",
+      "stage": "resolve_gameplay_demo_video",
+      "data": {
+        "source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+        "sourceType": "remote",
+        "appId": 850473,
+        "developerId": 393475
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:05.810Z",
+      "stage": "resolve_gameplay_demo_video_cache_lookup",
+      "data": {
+        "cacheEntry": {
+          "source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+          "source_type": "remote",
+          "video_id": 5655142,
+          "sha256": "97828cbbf0b932a2fc676f5d9927aab159b7c2425b289e261ba0538383e456b9",
+          "etag": "\"E6A51D62666B0149FAE08A6370BE20AE\"",
+          "last_modified": "Tue, 12 May 2026 07:42:33 GMT",
+          "content_length": 84447379
+        }
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:06.983Z",
+      "stage": "submit_spark_request",
+      "data": {
+        "app_id": 850473,
+        "developer_id": 393475,
+        "map_version": "33",
+        "sce_project_id": "p_wskd",
+        "category": "strategy",
+        "collection_type": "strategy",
+        "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+        "screen_orientation": 1,
+        "title": "Combo Checkers",
+        "icon": "https://img-tc.tapimg.com/market/images/Flt74y287K50tzYcnWP9Q02MyBBq.png",
+        "screenshots": [
+          "https://img-tc.tapimg.com/market/images/FrIwYVp4_RIsnu5CjuY0jjaH1-yZ.jpg",
+          "https://img-tc.tapimg.com/market/images/FlLlP5t310o2vdj33eudQixwBSLj.png",
+          "https://img-tc.tapimg.com/market/images/FvbNp0yLbUMY7bsWXMJIMItUBbnY.png"
+        ],
+        "banner": "https://img-tc.tapimg.com/market/images/FtUXSmqZSKlwkRVwfiEpa8cqP9TJ.jpg",
+        "trial_note": "v1.0.27 更新：稻草人全新形象+动态特效（飘浮稻草粒子/摇晃/地面光圈）；嘲讽连线改为红色；主角高亮圈加大加亮+呼吸动画；BGM切歌高亮修复；技能描述优化更易懂；冰霜格动态粒子特效；combo专属音效",
+        "app_platforms": "1,2",
+        "cover": "https://img-tc.tapimg.com/market/images/FhFoQ8B9dolRXad501gEHCuAfc3I.png",
+        "cover_vertical": "https://img-tc.tapimg.com/market/images/FndrfJYba3TisdJa3kAOzDtZJFRj.png",
+        "gameplay_demo_video_id": 5655142,
+        "square_promo_image": "https://img-tc.tapimg.com/market/images/FmWu2qz9oOeFdJX58T9G0rOrbOD2.jpg",
+        "publish_intl": false
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:09.304Z",
+      "stage": "submit_spark_response",
+      "data": {
+        "app_id": 850473,
+        "app_title": "Combo Checkers",
+        "category": "strategy",
+        "category_label": "策略",
+        "display_app_title": "策略游戏精选"
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:09.304Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "start",
+        "project_id": "p_wskd",
+        "app_id": 850473
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:09.470Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "success",
+        "project_id": "p_wskd",
+        "app_id": 850473
+      }
+    },
+    {
+      "time": "2026-05-14T09:30:09.470Z",
+      "stage": "publish_result",
+      "data": {
+        "action": "updated",
+        "status": "pending_review",
+        "game_id": 850473,
+        "message": "成功更新游戏 \"Combo Checkers\"",
+        "developer_id": 393475,
+        "config_file_path": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/project.json"
+      }
+    }
+  ]
+}

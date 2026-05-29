@@ -11,7 +11,7 @@ local MenuSystem = require "MenuSystem"
 local MenuPages = require "MenuPages"
 local AM = require "AudioManager"
 local Battle = require "Battle"
--- local TestPanel = require "TestPanel"  -- 发布时关闭
+local TestPanel = require "TestPanel"
 
 -- ============================================================================
 -- 注册模块间回调（解耦 UI 按钮 → 流程函数）
@@ -111,7 +111,7 @@ end
 ---@param eventData KeyDownEventData
 function HandleKeyDown(eventType, eventData)
     local key = eventData["Key"]:GetInt()
-    -- T 键：测试面板（发布时已关闭）
+    if key == KEY_T then TestPanel.Show() return end
     if G.gamePhase == "MENU" then return end
     TurnFlow.HandleKeyDown(key)
 end

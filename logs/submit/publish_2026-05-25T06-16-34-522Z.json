@@ -1,0 +1,288 @@
+{
+  "startTime": "2026-05-25T06:16:34.522Z",
+  "endTime": "2026-05-25T06:17:05.517Z",
+  "duration": "30995ms",
+  "result": {
+    "success": true
+  },
+  "steps": [
+    {
+      "time": "2026-05-25T06:16:34.698Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:53.209Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "done"
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:53.209Z",
+      "stage": "network_config",
+      "data": {
+        "env": "production"
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:53.375Z",
+      "stage": "load_config",
+      "data": {
+        "projectId": "p_wskd",
+        "configPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/project.json",
+        "taptap_publish": {
+          "title": "棋妙英雄 Combo Checkers",
+          "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+          "category": "strategy",
+          "screen_orientation": "portrait",
+          "collection_type": "sce",
+          "trial_note": "v1.0.59 重大更新\n\n🎰 全新装备抽奖系统\n新增装备抽奖玩法，单抽100G / 三连260G（省40G），内置保底机制，金色套装概率 UP！\n\n⚔️ 金色套装登场\n新增3套金色稀有套装，装备4/6件触发强力机制效果：\n🦅 飞跃先锋：可跳过2~3名连续敌人\n🔥 连击心得：30%/75%概率Combo+1\n🩸 嗜血猎魂：击杀回血，低血量时触发血怒叠加\n\n🔨 套装分解系统\n背包装备可分解为金币，随时优化装备配置\n\n🌟 天赋系统重做\n5大维度（生命/攻击/防御/暴击/金币）各10级，成长曲线重新平衡\n\n🌊 无尽模式上线\n通关主线后解锁，敌人强度无上限递增，挑战自己的极限！\n\n🏆 排行榜系统\n新增公会排行榜，与所有玩家比拼最高关卡和无尽最高波次\n\n⚠️ 存档重置说明\n本次更新系统改动较大，老玩家金币与装备将重置，关卡进度完整保留，感谢理解！",
+          "app_platforms": "1,2",
+          "gameplay_demo_video_source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+          "developer_id": 393475,
+          "app_id": 850473,
+          "miniapp_id": "tapmcauxykjmazqjed"
+        },
+        "assets": {
+          "icon": "./assets/image/edited_game_logo_final_20260514085721.png",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png",
+            "./game_material/screenshot_boss_battle.png",
+            "./game_material/screenshot_combo_rewards.png"
+          ],
+          "promotional_image": "./game_material/promo_new.png",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/edited_game_logo_final_20260514085721.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/screenshot_boss_battle.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/screenshot_combo_rewards.png"
+          ],
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/promo_new.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/棋妙英雄 Combo Checkers/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/棋妙英雄 Combo Checkers/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+          "square_promotional_image": "./game_material/square_promo_new.png",
+          "square_promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/square_promo_new.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:54.089Z",
+      "stage": "update_game",
+      "data": {
+        "app_id": 850473,
+        "developer_id": 393475
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:54.183Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "start",
+        "assets": {
+          "icon": "./assets/image/edited_game_logo_final_20260514085721.png",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "./game_material/SCREENSHOT_2026-04-29T09-10-23_03.png",
+            "./game_material/screenshot_boss_battle.png",
+            "./game_material/screenshot_combo_rewards.png"
+          ],
+          "promotional_image": "./game_material/promo_new.png",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/edited_game_logo_final_20260514085721.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_01.jpg",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_02.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/Combo Checkers/SCREENSHOT_2026-04-29T09-10-23_03.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/screenshot_boss_battle.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/screenshot_combo_rewards.png"
+          ],
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/promo_new.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/棋妙英雄 Combo Checkers/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/棋妙英雄 Combo Checkers/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+          "square_promotional_image": "./game_material/square_promo_new.png",
+          "square_promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_wskd/square_promo_new.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:59.486Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "path": "./.project/game_material/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png",
+        "resolvedPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/game_material/COVER_HORIZONTAL_2026-05-15T09-24-16_01.png"
+      }
+    },
+    {
+      "time": "2026-05-25T06:16:59.513Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "fileSize": 2345609
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:00.078Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FiPoWPYzSBkfx0HFmG-M5Jz5zkXn.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:00.078Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "path": "./.project/game_material/COVER_VERTICAL_2026-05-15T09-24-16_01.png",
+        "resolvedPath": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/game_material/COVER_VERTICAL_2026-05-15T09-24-16_01.png"
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:00.099Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "fileSize": 1979376
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:00.712Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FlHoZloXVBmvTp5hk3VUkDGAt4lD.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:01.975Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "done",
+        "uploadedAssets": {
+          "iconUrl": "https://img-tc.tapimg.com/market/images/Fu_mk9zwXgePAib26sFPCBsNO27M.png",
+          "screenshotUrls": [
+            "https://img-tc.tapimg.com/market/images/FrIwYVp4_RIsnu5CjuY0jjaH1-yZ.jpg",
+            "https://img-tc.tapimg.com/market/images/FlLlP5t310o2vdj33eudQixwBSLj.png",
+            "https://img-tc.tapimg.com/market/images/FvbNp0yLbUMY7bsWXMJIMItUBbnY.png",
+            "https://img-tc.tapimg.com/market/images/FlVnThciujfp2UkF-QySio8V7ywq.png",
+            "https://img-tc.tapimg.com/market/images/FhUhOTPffnwtiXZwDu1e3KfWYhEZ.png"
+          ],
+          "bannerUrl": "https://img-tc.tapimg.com/market/images/FmAhu3xQz-vRLtd5vp_RXeVMSpPN.png",
+          "coverUrl": "https://img-tc.tapimg.com/market/images/FiPoWPYzSBkfx0HFmG-M5Jz5zkXn.png",
+          "coverVerticalUrl": "https://img-tc.tapimg.com/market/images/FlHoZloXVBmvTp5hk3VUkDGAt4lD.png",
+          "squarePromoImageUrl": "https://img-tc.tapimg.com/market/images/FmAwEETLp6OQUXcGR_Dn_9IA3q3q.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:01.975Z",
+      "stage": "resolve_gameplay_demo_video",
+      "data": {
+        "source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+        "sourceType": "remote",
+        "appId": 850473,
+        "developerId": 393475
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:01.984Z",
+      "stage": "resolve_gameplay_demo_video_cache_lookup",
+      "data": {
+        "cacheEntry": {
+          "source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+          "source_type": "remote",
+          "video_id": 5655142,
+          "sha256": "97828cbbf0b932a2fc676f5d9927aab159b7c2425b289e261ba0538383e456b9",
+          "etag": "\"E6A51D62666B0149FAE08A6370BE20AE\"",
+          "last_modified": "Tue, 12 May 2026 07:42:33 GMT",
+          "content_length": 84447379
+        }
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:03.032Z",
+      "stage": "submit_spark_request",
+      "data": {
+        "app_id": 850473,
+        "developer_id": 393475,
+        "map_version": "63",
+        "sce_project_id": "p_wskd",
+        "category": "strategy",
+        "collection_type": "strategy",
+        "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",
+        "screen_orientation": 1,
+        "title": "棋妙英雄 Combo Checkers",
+        "icon": "https://img-tc.tapimg.com/market/images/Fu_mk9zwXgePAib26sFPCBsNO27M.png",
+        "screenshots": [
+          "https://img-tc.tapimg.com/market/images/FrIwYVp4_RIsnu5CjuY0jjaH1-yZ.jpg",
+          "https://img-tc.tapimg.com/market/images/FlLlP5t310o2vdj33eudQixwBSLj.png",
+          "https://img-tc.tapimg.com/market/images/FvbNp0yLbUMY7bsWXMJIMItUBbnY.png",
+          "https://img-tc.tapimg.com/market/images/FlVnThciujfp2UkF-QySio8V7ywq.png",
+          "https://img-tc.tapimg.com/market/images/FhUhOTPffnwtiXZwDu1e3KfWYhEZ.png"
+        ],
+        "banner": "https://img-tc.tapimg.com/market/images/FmAhu3xQz-vRLtd5vp_RXeVMSpPN.png",
+        "trial_note": "v1.0.59 重大更新\n\n🎰 全新装备抽奖系统\n新增装备抽奖玩法，单抽100G / 三连260G（省40G），内置保底机制，金色套装概率 UP！\n\n⚔️ 金色套装登场\n新增3套金色稀有套装，装备4/6件触发强力机制效果：\n🦅 飞跃先锋：可跳过2~3名连续敌人\n🔥 连击心得：30%/75%概率Combo+1\n🩸 嗜血猎魂：击杀回血，低血量时触发血怒叠加\n\n🔨 套装分解系统\n背包装备可分解为金币，随时优化装备配置\n\n🌟 天赋系统重做\n5大维度（生命/攻击/防御/暴击/金币）各10级，成长曲线重新平衡\n\n🌊 无尽模式上线\n通关主线后解锁，敌人强度无上限递增，挑战自己的极限！\n\n🏆 排行榜系统\n新增公会排行榜，与所有玩家比拼最高关卡和无尽最高波次\n\n⚠️ 存档重置说明\n本次更新系统改动较大，老玩家金币与装备将重置，关卡进度完整保留，感谢理解！",
+        "app_platforms": "1,2",
+        "cover": "https://img-tc.tapimg.com/market/images/FiPoWPYzSBkfx0HFmG-M5Jz5zkXn.png",
+        "cover_vertical": "https://img-tc.tapimg.com/market/images/FlHoZloXVBmvTp5hk3VUkDGAt4lD.png",
+        "gameplay_demo_video_id": 5655142,
+        "square_promo_image": "https://img-tc.tapimg.com/market/images/FmAwEETLp6OQUXcGR_Dn_9IA3q3q.png",
+        "publish_intl": true
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:05.192Z",
+      "stage": "submit_spark_response",
+      "data": {
+        "app_id": 850473,
+        "app_title": "棋妙英雄 Combo Checkers",
+        "category": "strategy",
+        "category_label": "策略",
+        "display_app_title": "策略游戏精选"
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:05.192Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "start",
+        "project_id": "p_wskd",
+        "app_id": 850473
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:05.357Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "success",
+        "project_id": "p_wskd",
+        "app_id": 850473
+      }
+    },
+    {
+      "time": "2026-05-25T06:17:05.517Z",
+      "stage": "publish_result",
+      "data": {
+        "action": "updated",
+        "status": "pending_review",
+        "game_id": 850473,
+        "message": "成功更新游戏 \"棋妙英雄 Combo Checkers\"",
+        "developer_id": 393475,
+        "multilang_job_id": "d4a4c855-3fb7-4c29-a55a-cd1b1cc80936",
+        "config_file_path": "/userspaces/9746d405-533d-4060-98f5-6c6a670a045d/workspace/.project/project.json"
+      }
+    }
+  ]
+}

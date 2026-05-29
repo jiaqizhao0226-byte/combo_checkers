@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "source": "https://tapcode-sce.spark.xd.com/videos/p_wskd/1778571750028-rec_ec522082-f45d-4dd8-b95d-42e665dff1c6.mp4",
+      "source_type": "remote",
+      "video_id": 5655142,
+      "sha256": "97828cbbf0b932a2fc676f5d9927aab159b7c2425b289e261ba0538383e456b9",
+      "etag": "\"E6A51D62666B0149FAE08A6370BE20AE\"",
+      "last_modified": "Tue, 12 May 2026 07:42:33 GMT",
+      "content_length": 84447379
+    },
+    {
+      "source": "https://user-assets.games.tapapps.cn/9746d405-533d-4060-98f5-6c6a670a045d/video/ef45539bb6fbaf95f186d5876aae91a0.mp4?t=1779789325622",
+      "source_type": "remote",
+      "video_id": 5679817,
+      "sha256": "a1255800b295171487e8f83652a8a461126978058322073fc0b672e682d823f6",
+      "etag": "\"6a156e0d-26b6f9\"",
+      "last_modified": "Tue, 26 May 2026 09:55:25 GMT",
+      "content_length": 2537209
+    }
+  ]
+}
