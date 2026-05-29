@@ -40,6 +40,10 @@ BattleData.ENEMY_GOLD = {
     splitting_urchin = 3,
     fission_flame   = 1,
     flame_shard     = 0,
+    -- 第五章（黄沙）
+    sand_scorpion   = 2,
+    quicksand_worm  = 1,
+    sand_hawk       = 2,
     -- Boss
     boss     = 10,
 }
@@ -233,6 +237,32 @@ BattleData.ENEMY_TEMPLATES = {
         isShard = true,        -- 碎片：不计入击杀目标，不再分裂
         name = "焰碎片",
     },
+    -- ====== 第四章: 流沙荒漠 ======
+    sand_scorpion = {
+        team = "enemy", enemyType = "sand_scorpion",
+        hp = 30, maxHp = 30,
+        atk = 10,
+        attackRange = 1,
+        attackLabel = "蛰刺",
+        name = "沙蝎",
+    },
+    quicksand_worm = {
+        team = "enemy", enemyType = "quicksand_worm",
+        hp = 15, maxHp = 15,
+        atk = 6,
+        attackRange = 1,
+        attackLabel = "啃噬",
+        name = "流沙虫",
+    },
+    sand_hawk = {
+        team = "enemy", enemyType = "sand_hawk",
+        hp = 20, maxHp = 20,
+        atk = 12,
+        attackRange = 2,
+        attackLabel = "俯冲",
+        fleesWhenClose = true,  -- 英雄靠近时后退
+        name = "沙鹰",
+    },
     -- ====== 无尽模式专属 ======
     swift_barracuda = {
         team = "enemy", enemyType = "swift_barracuda",
@@ -274,6 +304,10 @@ BattleData.ENEMY_INTRO = {
     fission_flame= { icon = "🔥", name = "裂焰精",   desc = "死亡时分裂成小碎片" },
     swift_barracuda = { icon = "💨", name = "疾梭鱼", desc = "每回合最多移动3格，来势凶猛" },
     charm_jelly  = { icon = "💜", name = "魅惑水母", desc = "英雄进入2格范围将被魅惑，跳过一回合" },
+    -- 第五章
+    sand_scorpion   = { icon = "🦂", name = "沙蝎",   desc = "沙漠中的伏击者" },
+    quicksand_worm  = { icon = "🪱", name = "流沙虫", desc = "潜伏沙中的蠕虫，近距啃噬" },
+    sand_hawk       = { icon = "🦅", name = "沙鹰",   desc = "远程俯冲，靠近会后退" },
 }
 
 BattleData.BOSS_TEMPLATES = {
@@ -334,18 +368,39 @@ BattleData.BOSS_TEMPLATES = {
         shrinkCount = 0,        -- 已缩圈次数（最多2次）
         enraged = false,
     },
+    -- 第四章Boss: 沙丘巨虫
+    sand_worm = {
+        team = "enemy", enemyType = "boss",
+        hp = 420, maxHp = 420,
+        atk = 18,
+        attackRange = 1,
+        attackLabel = "吞噬",
+        name = "沙丘巨虫",
+        isBoss = true,
+        bossType = "sand_worm",
+        phase = 1,
+        shieldHp = 0,
+        shieldMax = 50,
+        segments = 7,           -- 总节数（含头）
+        burrowCooldown = 0,     -- 钻地冷却
+        tailWhipCooldown = 0,   -- 尾部甩飞冷却
+        sandstormCooldown = 0,  -- 沙暴冷却
+        enraged = false,
+    },
 }
 
 BattleData.CHAPTER_BOSS = {
     [1] = "abyss_kraken",
     [2] = "lava_lord",
     [3] = "coral_guardian",
+    [4] = "sand_worm",
 }
 
 BattleData.BOSS_AURA = {
     abyss_kraken  = { range = 2, damage = 4, icon = "🌊", name = "深渊压迫", color = {60, 120, 200, 255} },
     -- lava_lord 灼烧光环已移除（改为祭坛破盾机制）
     coral_guardian = { range = 1, damage = 7, icon = "🪸", name = "珊瑚荆棘", color = {255, 120, 180, 255} },
+    -- sand_worm 光环已移除（沙虫Boss不使用周边伤害光环）
 }
 
 BattleData.ITEM_TYPES = {

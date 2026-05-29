@@ -526,7 +526,7 @@ local BG_THEMES = {
     [1] = { top={15,25,60,255},   bot={22,42,85,255}  },  -- 深海蓝（保持不变）
     [2] = { top={40,16,8,255},    bot={58,22,10,255}  },  -- 熔岩暗红棕（调暗降饱和）
     [3] = { top={15,45,35,255},   bot={22,68,52,255}  },  -- 珊瑚深绿（保持不变）
-    [4] = { top={32,20,58,255},   bot={42,28,72,255}  },  -- 深渊紫（调暗降饱和）
+    [4] = { top={40,30,12,255},   bot={55,40,18,255}  },  -- 流沙荒漠（与BoardWidget CHAPTER_THEMES[4]同步）
 }
 
 --- 动态更新根面板背景渐变（换章节时调用）
@@ -641,12 +641,12 @@ function GameUI.CreateUI()
                             },
                         },
                     },
-                    -- 击杀/救援目标提示条（绝对定位浮在棋盘上方）
+                    -- 击杀/救援目标提示条（绝对定位浮在棋盘上方，第二行避免被技能栏遮挡）
                     UI.Panel {
                         id = "killBar",
                         visible = false,
                         position = "absolute",
-                        top = 4, left = 50, right = 54,
+                        top = 44, left = 0, right = 0,
                         flexDirection = "row",
                         justifyContent = "center",
                         alignItems = "center",
@@ -1170,6 +1170,17 @@ local CHAPTER_TUTORIALS = {
         },
         goal = "⚔️ 击杀目标  +  🦀 救出全部蟹  =  通关",
         buttonText = "出发救蟹！🦀",
+    },
+    [4] = {
+        title = "流沙荒漠",
+        accentColor = {210, 170, 50, 255},
+        steps = {
+            { icon = "🦂  💀  ➡️  ⏳", caption = "击杀小怪有概率产生流沙区" },
+            { icon = "🐧  ⏳  💨  😵", caption = "流沙区会推开主角并中断连跳" },
+            { icon = "⏳  5️⃣  ➡️  ✨", caption = "流沙区5回合后自动消散" },
+        },
+        goal = "⚔️ 击杀目标  +  🚫 避开流沙  =  通关",
+        buttonText = "征服沙漠！🏜️",
     },
 }
 
@@ -1868,7 +1879,22 @@ local TUTORIAL_PAGES = {
             { emoji = "🦀", text = "珊瑚迷宫 — 清除障碍打通道路，帮助小蟹回家" },
         },
     },
-    -- ========== Page 6 (新): 无尽模式·特殊怪 ==========
+    -- ========== Page 6: 流沙怪物 ==========
+    {
+        title = "流沙荒漠·怪物",
+        accent = {210, 170, 50},
+        icon = "🏜️",
+        entries = {
+            { emoji = "🦂", text = "沙蝎 — HP30 ATK10 | 近战蛰刺：沙漠伏击者" },
+            { emoji = "🪱", text = "流沙虫 — HP15 ATK6 | 近战啃噬：潜伏沙中的蠕虫" },
+            { emoji = "🦅", text = "沙鹰 — HP20 ATK12 | 射程2+逃跑：远程俯冲打击" },
+            { separator = true, text = "── 特殊机制 ──" },
+            { emoji = "⏳", text = "流沙区 — 击杀敌人概率产生，5回合后消散" },
+            { emoji = "💨", text = "流沙推移 — 跳入流沙会被推开+受伤+中断连跳" },
+            { emoji = "🐛", text = "沙丘巨虫(Boss) — 蛇形移动+尾鞭+沙暴+钻地" },
+        },
+    },
+    -- ========== Page 7: 无尽模式·特殊怪 ==========
     {
         title = "无尽模式·特殊怪",
         accent = {160, 80, 220},

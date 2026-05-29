@@ -76,10 +76,13 @@ function BoardWidget_Overlays.Render(ctx)
         local alpha = math.floor(math.max(0, math.min(255, alphaF * 255)))
         if alpha > 5 then
             local centerX = l.x + l.w / 2
-            -- 放在棋盘上方，不遮挡棋盘
+            -- 放在击杀目标条下方，不遮挡棋盘
             -- 如果 Boss 技能公告正在播放，下移避让（技能横幅高度约 128px）
             local hasBossAnn = (G.battle.bossSkillAnnounce and G.battle.bossSkillAnnounce.timer > 0)
-            local centerY = hasBossAnn and (l.y + 150) or (l.y + 105)
+            -- killBar 高度约 44+36=80px，公告放在其下方
+            local hasKillBar = (G.killBar and G.killBar:IsVisible())
+            local baseY = hasKillBar and (l.y + 145) or (l.y + 105)
+            local centerY = hasBossAnn and (baseY + 45) or baseY
             -- 淡出时上飘
             if progress > 0.75 then
                 centerY = centerY - (progress - 0.75) / 0.25 * 25

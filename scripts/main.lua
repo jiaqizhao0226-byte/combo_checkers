@@ -11,6 +11,7 @@ local MenuSystem = require "MenuSystem"
 local MenuPages = require "MenuPages"
 local AM = require "AudioManager"
 local Battle = require "Battle"
+-- local TestPanel = require "TestPanel"  -- 发布时关闭
 
 -- ============================================================================
 -- 注册模块间回调（解耦 UI 按钮 → 流程函数）
@@ -57,6 +58,9 @@ function Start()
     if G.playerData._chapterMigrated then
         PlayerData.Save(G.playerData)
     end
+
+    -- 启动时上报一次进度（确保 adventure_rank 字段存在，兼容老玩家）
+    TurnFlow.UploadProgress(G.playerData)
 
     G.selectedLevel = G.highestLevel
     G.selectedChapter = math.min(4, math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER))
@@ -107,6 +111,7 @@ end
 ---@param eventData KeyDownEventData
 function HandleKeyDown(eventType, eventData)
     local key = eventData["Key"]:GetInt()
+    -- T 键：测试面板（发布时已关闭）
     if G.gamePhase == "MENU" then return end
     TurnFlow.HandleKeyDown(key)
 end

@@ -23,7 +23,7 @@ PlayerData.TALENTS = {
         name = "生命强化",
         icon = "❤️",
         desc = "基础生命值",
-        bonusPerLevel = 5,   -- 满级+50 (基础110的45%)
+        bonusPerLevel = 3,   -- 满级+30 (基础110的27%)
         maxLevel = 10,
         stat = "hp",
     },
@@ -32,7 +32,7 @@ PlayerData.TALENTS = {
         name = "攻击强化",
         icon = "⚔️",
         desc = "基础攻击力",
-        bonusPerLevel = 1,   -- 满级+10 (基础20的50%)
+        bonusPerLevel = 0.5, -- 满级+5 (基础20的25%)
         maxLevel = 10,
         stat = "atk",
     },
@@ -41,7 +41,7 @@ PlayerData.TALENTS = {
         name = "防御强化",
         icon = "🛡️",
         desc = "基础防御力",
-        bonusPerLevel = 0.5, -- 满级+5 (绝对值克制)
+        bonusPerLevel = 0.3, -- 满级+3
         maxLevel = 10,
         stat = "def",
     },
@@ -50,7 +50,7 @@ PlayerData.TALENTS = {
         name = "暴击直觉",
         icon = "💥",
         desc = "暴击率",
-        bonusPerLevel = 1.5, -- 满级+15% (原+30%减半)
+        bonusPerLevel = 1,   -- 满级+10%
         maxLevel = 10,
         stat = "crit",       -- 特殊: 百分比
     },
@@ -59,7 +59,7 @@ PlayerData.TALENTS = {
         name = "点金手",
         icon = "💰",
         desc = "金币加成",
-        bonusPerLevel = 3,   -- 满级+30% (原+50%缩减)
+        bonusPerLevel = 2,   -- 满级+20%
         maxLevel = 10,
         stat = "gold",       -- 特殊: 百分比
     },
@@ -356,7 +356,7 @@ end
 --- 获取装备基础属性加成（含稀有度倍率）
 function PlayerData.GetEquipmentBonus(data)
     local Equipment = require "Equipment"
-    local bonus = { atk = 0, def = 0, hp = 0 }
+    local bonus = { atk = 0, def = 0, hp = 0, crit = 0 }
     for _, slot in ipairs(Equipment.SLOT_ORDER) do
         local item = data.equipment[slot]
         if item then
@@ -390,7 +390,8 @@ end
 --- 获取暴击率（百分比整数，如 15 表示 15%）
 function PlayerData.GetCritRate(data)
     local talent = PlayerData.GetTalentBonus(data)
-    return talent.crit or 0
+    local equip = PlayerData.GetEquipmentBonus(data)
+    return (talent.crit or 0) + (equip.crit or 0)
 end
 
 --- 获取金币加成（百分比整数，如 25 表示 25%）

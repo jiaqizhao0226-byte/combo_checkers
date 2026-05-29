@@ -61,6 +61,16 @@ local CHAPTER_THEMES = {
         isoImage = "image/chapter3_coral_simple_v3_20260523130954.png",
     },
     [4] = {
+        icon = "🏜️",
+        glowColor = {200, 160, 50},
+        gradTop = {45, 35, 15, 245},
+        gradBot = {55, 42, 18, 245},
+        accentColor = {240, 190, 80},
+        borderColor = {200, 160, 50, 140},
+        isoImage = "image/edited_chapter4_desert_v3_nobg_20260529052411.png",
+        isoOffsetY = 0,  -- 与前三章底缘比例一致(94.6%)
+    },
+    [0] = {
         icon = "🌀",
         glowColor = {140, 80, 220},
         gradTop = {18, 10, 38, 245},
@@ -102,9 +112,10 @@ local function DrawChapterCardIso(nvg, chapter, cardX, cardY, cardW, cardH, isUn
     -- 用 isoImage 直接铺满整个卡片（cover 模式，无边框）
     -- 图片是正方形，卡片是竖屏矩形，取 max 保证完全覆盖
     if isoHandle and isoHandle >= 0 then
-        local coverSize = math.max(cardW, cardH) * 1.25
+        local coverSize = math.max(cardW, cardH) * 1.25 * (theme.isoScale or 1.0)
         local coverX = cardX + (cardW - coverSize) / 2
-        local coverY = cardY + (cardH - coverSize) * 0.35  -- 偏上，让建筑主体居中偏上
+        local baseOffsetY = 0.35 + (theme.isoOffsetY or 0)  -- 支持每章微调
+        local coverY = cardY + (cardH - coverSize) * baseOffsetY  -- 偏上，让建筑主体居中偏上
         local imgPat = nvgImagePattern(nvg, coverX, coverY, coverSize, coverSize, 0, isoHandle, 1.0)
         nvgBeginPath(nvg)
         nvgRect(nvg, coverX, coverY, coverSize, coverSize)  -- 完整显示，不裁切
@@ -246,7 +257,135 @@ local function DrawChapterCardIso(nvg, chapter, cardX, cardY, cardW, cardH, isUn
         end
 
     elseif chapter == 4 then
-        -- ── 第四章：迷幻深渊粒子 ──
+        -- ── 第四章：沙尘风暴粒子（加强版） ──
+
+        -- 0. 底部扬沙雾气层（大面积氛围）
+        local dustWaveT = G.time * 0.3
+        for i = 1, 3 do
+            local seed = i * 311.7
+            local waveX = cardX + cardW * (((dustWaveT * 0.4 + seed) % 2.0) - 0.3)
+            local waveY = cardY + cardH * (0.72 + i * 0.07)
+            local waveW = cardW * (0.35 + ((seed * 2.3) % 47) / 47 * 0.25)
+            local waveH = cardH * 0.18
+            local waveA = math.floor(35 + math.sin(G.time * 0.8 + seed) * 15)
+            nvgBeginPath(nvg)
+            nvgRect(nvg, waveX, waveY, waveW, waveH)
+            local dustFog = nvgLinearGradient(nvg, waveX, waveY, waveX, waveY + waveH,
+                nvgRGBA(230, 190, 90, waveA),
+                nvgRGBA(200, 160, 60, 0))
+            nvgFillPaint(nvg, dustFog)
+            nvgFill(nvg)
+        end
+
+        -- 1. 横向飘动的沙粒（从右向左飘）— 数量加倍，尺寸加大
+        for i = 1, 35 do
+            local seed = i * 157.31
+            local rndSpeed = ((seed * 8.23) % 79) / 79
+            local rndPhase = ((seed * 6.41) % 83) / 83
+            local rndSize  = ((seed * 12.07) % 71) / 71
+            local rndY     = ((seed * 4.59) % 91) / 91
+
+            -- 水平移动：从右到左循环
+            local lifeT = ((G.time * (0.06 + rndSpeed * 0.08) + rndPhase * 6.28) % 1.0)
+            local sx = cardX + cardW * (1.12 - lifeT * 1.3)
+            local sy = cardY + cardH * (0.06 + rndY * 0.88)
+            -- 上下摆动加强
+            sy = sy + math.sin(G.time * 2.0 + seed) * 12
+
+            local sandR = 1.5 + rndSize * 3.5  -- 半径 1.5~5（缩小）
+            local fadeA = math.sin(lifeT * math.pi) * 0.9
+            local alpha = math.floor(fadeA * 200)
+
+            if alpha > 5 then
+                -- 沙色颗粒：橙黄到暗褐
+                local warmth = ((seed * 9.3) % 100) / 100
+                local cr = math.floor(220 + warmth * 35)
+                local cg = math.floor(160 + warmth * 40)
+                local cb = math.floor(50 + warmth * 30)
+                -- 核心粒子
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx, sy, sandR)
+                nvgFillColor(nvg, nvgRGBA(cr, cg, cb, alpha))
+                nvgFill(nvg)
+                -- 拖尾光晕（缩小）
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx + sandR * 1.5, sy, sandR * 2.0)
+                local sandGlow = nvgRadialGradient(nvg, sx + sandR * 1.5, sy, sandR * 0.2, sandR * 2.0,
+                    nvgRGBA(cr, cg, cb, math.floor(alpha * 0.3)),
+                    nvgRGBA(cr, cg, cb, 0))
+                nvgFillPaint(nvg, sandGlow)
+                nvgFill(nvg)
+            end
+        end
+
+        -- 2. 旋涡沙粒（中心螺旋上升）
+        local cx2 = cardX + cardW * 0.5
+        local cy2 = cardY + cardH * 0.5
+        for i = 1, 12 do
+            local seed = i * 201.53
+            local angle = G.time * (0.8 + ((seed * 3.1) % 50) / 50 * 0.6) + i * (math.pi * 2 / 12)
+            local radius = cardW * (0.08 + ((seed * 7.2) % 60) / 60 * 0.28)
+            local vx = cx2 + math.cos(angle) * radius
+            local vy = cy2 + math.sin(angle) * radius * 0.5 - math.sin(G.time * 1.2 + seed) * 20
+            local vR = 1 + ((seed * 5.7) % 40) / 40 * 2.5
+            local vAlpha = math.floor(100 + math.sin(angle + G.time) * 60)
+
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, vx, vy, vR)
+            nvgFillColor(nvg, nvgRGBA(240, 200, 80, vAlpha))
+            nvgFill(nvg)
+            -- 小光晕
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, vx, vy, vR * 2.5)
+            local vGlow = nvgRadialGradient(nvg, vx, vy, vR * 0.3, vR * 2.5,
+                nvgRGBA(240, 190, 60, math.floor(vAlpha * 0.3)),
+                nvgRGBA(240, 190, 60, 0))
+            nvgFillPaint(nvg, vGlow)
+            nvgFill(nvg)
+        end
+
+        -- 3. 闪烁的金色光点（流沙反射的阳光）— 数量增加
+        for i = 1, 15 do
+            local seed = i * 263.17
+            local blinkPhase = G.time * (1.2 + ((seed * 3.7) % 67) / 67 * 1.6) + seed
+            local blinkVal = math.max(0, math.sin(blinkPhase))
+            blinkVal = blinkVal * blinkVal * blinkVal  -- 三次方，锐利闪烁
+            local sx = cardX + cardW * (0.06 + (((seed * 5.91) % 88) / 100))
+            local sy = cardY + cardH * (0.08 + (((seed * 3.47) % 84) / 100))
+            local alpha = math.floor(blinkVal * 240)
+            local starR = 1.5 + ((seed * 7.1) % 59) / 59 * 3
+
+            if alpha > 12 then
+                -- 金色核心
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx, sy, starR * 0.6)
+                nvgFillColor(nvg, nvgRGBA(255, 230, 100, alpha))
+                nvgFill(nvg)
+                -- 十字光芒（缩小）
+                local crossLen = starR * 2.0 * blinkVal
+                nvgStrokeWidth(nvg, 1.5)
+                nvgStrokeColor(nvg, nvgRGBA(255, 210, 60, math.floor(alpha * 0.7)))
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, sx - crossLen, sy)
+                nvgLineTo(nvg, sx + crossLen, sy)
+                nvgStroke(nvg)
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, sx, sy - crossLen * 0.6)
+                nvgLineTo(nvg, sx, sy + crossLen * 0.6)
+                nvgStroke(nvg)
+                -- 暖色光晕（缩小）
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx, sy, starR * 2.5)
+                local goldGlow = nvgRadialGradient(nvg, sx, sy, starR * 0.2, starR * 2.5,
+                    nvgRGBA(255, 200, 50, math.floor(alpha * 0.25)),
+                    nvgRGBA(255, 180, 30, 0))
+                nvgFillPaint(nvg, goldGlow)
+                nvgFill(nvg)
+            end
+        end
+
+    elseif chapter == 0 then
+        -- ── 无尽模式：迷幻深渊粒子 ──
         -- 1. 漂浮紫蓝幽灵光点（慢速螺旋上升）
         for i = 1, 18 do
             local seed = i * 173.91
@@ -875,6 +1014,32 @@ function MenuHeroWidget:Render(nvg)
     end
     nvgText(nvg, cx, titleY, displayTitle)
 
+    -- === 1.5 "研发中"标识（第四章专属，醒目大字）===
+    if ch == 4 then
+        local badgeText = "🚧 研发中"
+        local badgeFontSize = math.max(18, titleFontSize * 0.6)
+        local badgeY = titleY + titleFontSize + 6
+        -- 背景胶囊（更大更醒目）
+        nvgFontSize(nvg, badgeFontSize)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
+        local tw = nvgTextBounds(nvg, 0, 0, badgeText)
+        local bw = tw + 24
+        local bh = badgeFontSize + 12
+        nvgBeginPath(nvg)
+        nvgRoundedRect(nvg, cx - bw / 2, badgeY, bw, bh, bh / 2)
+        nvgFillColor(nvg, nvgRGBA(180, 110, 10, 210))
+        nvgFill(nvg)
+        -- 边框（更粗更亮）
+        nvgBeginPath(nvg)
+        nvgRoundedRect(nvg, cx - bw / 2, badgeY, bw, bh, bh / 2)
+        nvgStrokeColor(nvg, nvgRGBA(255, 200, 50, 200))
+        nvgStrokeWidth(nvg, 2.0)
+        nvgStroke(nvg)
+        -- 文字（更亮更清晰）
+        nvgFillColor(nvg, nvgRGBA(255, 255, 230, 255))
+        nvgText(nvg, cx, badgeY + 6, badgeText)
+    end
+
     -- === 2. 章节卡片 ===
     DrawChapterCard(nvg, ch, cardX, cardY, cardW, cardH,
         isUnlocked, isCleared, progress, Battle.LEVELS_PER_CHAPTER)
@@ -928,30 +1093,31 @@ function MenuHeroWidget:Render(nvg)
         nvgText(nvg, cx, chestY + chestIconSize * 0.5 + 8, "通关奖励")
     end
 
-    -- === 4. 底部圆点指示器（4章）===
+    -- === 4. 底部圆点指示器（5页：0=无尽, 1-4=主线）===
     local dotR = 5
     local dotGap = 24
-    local totalChapters = 4
-    local dotsW = (totalChapters - 1) * dotGap
+    local totalDots = 5  -- 页面 0,1,2,3,4
+    local dotsW = (totalDots - 1) * dotGap
     local dotStartX = cx - dotsW / 2
     local dotY = l.y + l.h - l.h * 0.02 - 6
 
-    for i = 1, totalChapters do
-        local dx = dotStartX + (i - 1) * dotGap
-        local iUnlocked = true
-        local iCleared = G.highestLevel > i * Battle.LEVELS_PER_CHAPTER
+    for idx = 0, 4 do
+        local dx = dotStartX + idx * dotGap
+        local iCleared
+        if idx == 0 then
+            iCleared = G.highestLevel > 4 * Battle.LEVELS_PER_CHAPTER
+        else
+            iCleared = G.highestLevel > idx * Battle.LEVELS_PER_CHAPTER
+        end
         nvgBeginPath(nvg)
-        if i == ch then
+        if idx == ch then
             nvgCircle(nvg, dx, dotY, dotR + 1.5)
             nvgFillColor(nvg, nvgRGBA(255, 220, 80, 255))
         elseif iCleared then
             nvgCircle(nvg, dx, dotY, dotR)
             nvgFillColor(nvg, nvgRGBA(100, 160, 255, 200))
-        elseif iUnlocked then
-            nvgCircle(nvg, dx, dotY, dotR)
-            nvgFillColor(nvg, nvgRGBA(100, 160, 255, 200))
         else
-            nvgCircle(nvg, dx, dotY, dotR - 1)
+            nvgCircle(nvg, dx, dotY, dotR)
             nvgFillColor(nvg, nvgRGBA(60, 60, 80, 150))
         end
         nvgFill(nvg)

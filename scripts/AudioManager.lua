@@ -34,6 +34,8 @@ AM.BGM = {
     boss_lava      = "audio/bgm_boss_lava.ogg",       -- 熔岩领主专属（史诗管弦+战鼓）
     boss_abyss     = "audio/bgm_boss_abyss.ogg",      -- 深渊海妖专属（深海压迫恐惧）
     boss_coral     = "audio/music_1779514990986.ogg",  -- 珊瑚守卫专属（海洋宫殿决战）
+    battle_desert  = "audio/music_1779955577605.ogg", -- 第四章沙漠战斗（阿拉伯风打击乐）
+    boss_sand      = "audio/music_1779956688332.ogg", -- 沙丘巨虫专属（史诗战鼓）
 }
 
 -- ============================================================================
@@ -108,6 +110,10 @@ AM.SFX = {
     flame_bolt_impact    = "audio/sfx/flame_bolt_impact.ogg",
     -- 珊瑚守卫新技能专属音效
     coral_spike_pierce   = "audio/sfx/coral_spike_pierce.ogg",
+    -- 沙丘巨虫Boss专属音效
+    boss_aoe             = "audio/sfx/boss_aoe.ogg",
+    boss_stomp           = "audio/sfx/boss_stomp.ogg",
+    quicksand_spawn      = "audio/sfx/quicksand_spawn.ogg",
     -- 未注册补录
     combo_shield_gain    = "audio/sfx/combo_shield_gain.ogg",
     vampiric_drain       = "audio/sfx/vampiric_drain.ogg",
@@ -290,7 +296,8 @@ end
 local BOSS_BGM_MAP = {
     lava_lord      = "boss_lava",   -- 熔岩领主：史诗管弦战鼓
     abyss_kraken   = "boss_abyss",  -- 深渊海妖：深海压迫恐惧
-    coral_guardian = "boss_coral",  -- 珊瑚守卫：海洋宫殿决战
+    coral_guardian = "boss_coral",   -- 珊瑚守卫：海洋宫殿决战
+    sand_worm      = "boss_sand",    -- 沙丘巨虫：史诗沙漠战鼓
 }
 
 --- 根据关卡自动切换 BGM
@@ -298,9 +305,9 @@ function AM.UpdateBattleBGM(level)
     local Battle = require "Battle"
     local chapter = math.ceil(level / Battle.LEVELS_PER_CHAPTER)
 
-    -- 第4章及以上 = 无尽模式，专属BGM
-    if chapter >= 4 then
-        AM.PlayBGM("battle_endless")
+    -- 第5章及以上 fallback 到战斗BGM（无尽模式由 EnterEndless 单独设置）
+    if chapter >= 5 then
+        AM.PlayBGM("battle")
         return
     end
 
@@ -312,9 +319,11 @@ function AM.UpdateBattleBGM(level)
             level, chapter, tostring(bossType), bgmKey, tostring(currentBGM)))
         AM.PlayBGM(bgmKey)
     else
-        -- 第1章（关卡1~10）用舒缓BGM，第2章起用激烈BGM
+        -- 按章节选择战斗BGM
         if chapter <= 1 then
             AM.PlayBGM("battle_calm")
+        elseif chapter == 4 then
+            AM.PlayBGM("battle_desert")
         else
             AM.PlayBGM("battle")
         end

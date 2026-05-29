@@ -14,8 +14,12 @@ local AM = require "AudioManager"
 
 local TurnFlow = {}
 
--- 前向声明：上报进度到云端（定义在文件底部，但 ReturnToMenu 较早调用）
-local UploadProgressToCloud
+--- 构建 FindValidJumps 的 opts: 所有章节障碍物（岩石、珊瑚、祭坛等）均可作为飞跃先锋支点
+local function buildJumpOpts()
+    return { ch3Rocks = true }
+end
+
+-- TurnFlow.UploadProgress 定义在文件底部
 
 --- 幂等结算：金币 + 进度，最多执行一次（通过 G.battle._rewardsSettled 保护）
 local function SettleBattleRewards()
@@ -43,7 +47,7 @@ local function SettleBattleRewards()
     end
 
     PlayerData.Save(G.playerData)
-    UploadProgressToCloud(G.playerData)
+    TurnFlow.UploadProgress(G.playerData)
 end
 
 -- ============================================================================
@@ -156,9 +160,9 @@ function TurnFlow.ReturnToMenu()
     SettleBattleRewards()
     G.menuTab = "adventure"
     G.selectedLevel = G.highestLevel
-    -- 第4章已开放（无尽模式），允许导航到第4章
+    -- 主线仅3章，无尽模式在 selectedChapter=0
     local maxChapter = math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER)
-    G.selectedChapter = math.min(maxChapter, 4)
+    G.selectedChapter = math.min(maxChapter, 3)
     MenuSystem.CreateMenuUI()
     AM.PlayBGM("menu")
 end
@@ -365,6 +369,9 @@ function TurnFlow.StartPlayerTurn()
 
     if #G.validMoves == 0 and #G.validJumps == 0 then
         GameUI.UpdateLog("无路可走，自动跳过回合")
+        -- 显示醒目"受困"浮动提示
+        Battle.AddFloatingText(G.battle, G.battle.hero.col, G.battle.hero.row,
+            "⛓️受困!", {255, 160, 60, 255}, "combo", 1.5)
         TurnFlow.EndPlayerTurn()
     end
 end
@@ -382,7 +389,7 @@ function TurnFlow.RefreshHighlightsForSelect()
         G.validJumps = {}
     else
         local maxJump = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
-        G.validJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJump)
+        G.validJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJump, buildJumpOpts())
     end
 
     -- 过滤掉稻草人所在格子（稻草人不在 board.pieces 中，IsBlocked 检测不到）
@@ -459,7 +466,7 @@ function TurnFlow.RefreshHighlightsForSelect()
         local maxJumpChain = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
         for _, j in ipairs(G.validJumps) do
             -- 从这个跳跃的落点出发，看能不能再跳（二连跳）
-            local chainJumps = HexGrid.FindValidJumps(G.battle.board, j.col, j.row, maxJumpChain)
+            local chainJumps = HexGrid.FindValidJumps(G.battle.board, j.col, j.row, maxJumpChain, buildJumpOpts())
             -- 过滤：第二跳落点不能是英雄当前位置
             local validChain = nil
             for _, cj in ipairs(chainJumps) do
@@ -491,13 +498,16 @@ end
 function TurnFlow.RefreshHighlightsForPlan()
     G.validMoves = {}
     local maxJumpPlan = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
-    local allJumps = HexGrid.FindValidJumps(G.battle.board, G.planHeroCol, G.planHeroRow, maxJumpPlan)
+    local allJumps = HexGrid.FindValidJumps(G.battle.board, G.planHeroCol, G.planHeroRow, maxJumpPlan, buildJumpOpts())
     G.validJumps = {}
     for _, j in ipairs(allJumps) do
         local jumpKey = j.enemy or j.obstacle
         local alreadyJumped = (jumpKey and G.jumpedEnemySet[jumpKey])
             or (j.enemy2 and G.jumpedEnemySet[j.enemy2])
             or (j.enemy3 and G.jumpedEnemySet[j.enemy3])
+            or (j.jumpedObstacle and G.jumpedEnemySet[j.jumpedObstacle])
+            or (j.jumpedObstacle2 and G.jumpedEnemySet[j.jumpedObstacle2])
+            or (j.jumpedObstacle3 and G.jumpedEnemySet[j.jumpedObstacle3])
         if not alreadyJumped then
             local blocked = false
             for _, pj in ipairs(G.plannedJumps) do
@@ -609,9 +619,12 @@ function TurnFlow.HandleSelectClick(col, row)
             local jumpKey = j.enemy or j.obstacle
             G.jumpedEnemySet = {}
             if jumpKey then G.jumpedEnemySet[jumpKey] = true end
-            -- 飞跃先锋: 第一跳是双敌跳/三敌跳时也标记额外敌人
+            -- 飞跃先锋: 第一跳是双敌跳/三敌跳时也标记额外敌人/石头
             if j.enemy2 then G.jumpedEnemySet[j.enemy2] = true end
             if j.enemy3 then G.jumpedEnemySet[j.enemy3] = true end
+            if j.jumpedObstacle then G.jumpedEnemySet[j.jumpedObstacle] = true end
+            if j.jumpedObstacle2 then G.jumpedEnemySet[j.jumpedObstacle2] = true end
+            if j.jumpedObstacle3 then G.jumpedEnemySet[j.jumpedObstacle3] = true end
             TurnFlow.RefreshHighlightsForPlan()
             TurnFlow.UpdateThreatPreview(j.col, j.row)
             if #G.validJumps == 0 then
@@ -644,9 +657,12 @@ function TurnFlow.HandlePlanClick(col, row)
             G.plannedJumps[#G.plannedJumps + 1] = j
             local jumpKey = j.enemy or j.obstacle
             if jumpKey then G.jumpedEnemySet[jumpKey] = true end
-            -- 飞跃先锋: 双敌跳/三敌跳时标记额外敌人
+            -- 飞跃先锋: 双敌跳/三敌跳时标记额外敌人/石头
             if j.enemy2 then G.jumpedEnemySet[j.enemy2] = true end
             if j.enemy3 then G.jumpedEnemySet[j.enemy3] = true end
+            if j.jumpedObstacle then G.jumpedEnemySet[j.jumpedObstacle] = true end
+            if j.jumpedObstacle2 then G.jumpedEnemySet[j.jumpedObstacle2] = true end
+            if j.jumpedObstacle3 then G.jumpedEnemySet[j.jumpedObstacle3] = true end
             G.planHeroCol = j.col
             G.planHeroRow = j.row
             TurnFlow.RefreshHighlightsForPlan()
@@ -680,9 +696,12 @@ function TurnFlow.UndoLastJump()
     local removed = table.remove(G.plannedJumps)
     local removedKey = removed.enemy or removed.obstacle
     if removedKey then G.jumpedEnemySet[removedKey] = nil end
-    -- 飞跃先锋: 撤销时同步移除多敌跳跃的额外标记
+    -- 飞跃先锋: 撤销时同步移除多敌跳跃的额外标记（含石头）
     if removed.enemy2 then G.jumpedEnemySet[removed.enemy2] = nil end
     if removed.enemy3 then G.jumpedEnemySet[removed.enemy3] = nil end
+    if removed.jumpedObstacle then G.jumpedEnemySet[removed.jumpedObstacle] = nil end
+    if removed.jumpedObstacle2 then G.jumpedEnemySet[removed.jumpedObstacle2] = nil end
+    if removed.jumpedObstacle3 then G.jumpedEnemySet[removed.jumpedObstacle3] = nil end
 
     if #G.plannedJumps == 0 then
         G.battle.phase = "PLAYER_SELECT"
@@ -829,6 +848,17 @@ function TurnFlow.ExecuteOneJump()
     Battle.ExecuteJump(G.battle, jumpInfo, isLastStep)
     GameUI.UpdateHUD()
 
+    -- 第四章: 流沙冲击中断连跳——主角被推到新位置，后续跳跃作废
+    if G.battle.quicksandInterrupted then
+        G.battle.quicksandInterrupted = nil
+        -- 显示醒目的"连跳被打断"提示
+        Battle.AddFloatingText(G.battle, G.battle.hero.col, G.battle.hero.row,
+            "⚠️连跳被打断!", {255, 180, 50, 255}, "combo", 2.0)
+        TurnFlow.ClearPlan()
+        TurnFlow.FinishExecution()
+        return
+    end
+
     -- 跳跃中途只检查失败（英雄死亡），不检查胜利
     -- 胜利判定延迟到所有跳跃+连击奖励结算完毕后再执行
     if G.battle.hero.hp <= 0 then
@@ -873,7 +903,7 @@ function TurnFlow.ProceedWithRewards(rewardsPreTriggered, comboTriggered)
     if result == "WIN" and not killsMetTarget then
         local hero = G.battle.hero
         local maxJumpW = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
-        local remainJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJumpW)
+        local remainJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJumpW, buildJumpOpts())
         if #remainJumps > 0 then
             G.battle.phase = "COMBO_REWARD_WAIT"
             G.comboRewardTimer = comboTriggered and 1.2 or 0.05
@@ -1031,6 +1061,9 @@ end
 
 function TurnFlow.ProcessEnemyTurn()
     local actions = Battle.ProcessEnemyTurn(G.battle)
+
+    -- 第四章: 流沙回合推进（敌方行动后，流沙倒计时）
+    Battle.ProcessQuicksandTurn(G.battle)
 
     pcall(GameUI.UpdateHUD)  -- pcall 保护，防止 HUD 崩溃阻塞胜负检查
 
@@ -1244,17 +1277,24 @@ function TurnFlow.ShowResult(result)
 end
 
 --- 上报玩家进度到云端排行榜（公会排行榜用）
-UploadProgressToCloud = function(pd)
+--- 上报进度到云端（也作为公开接口供启动时调用）
+---@param pd table playerData
+TurnFlow.UploadProgress = function(pd)
     if not clientCloud then return end
     local ok, err = pcall(function()
         local level       = pd.highestLevel or 1
         local runs        = pd.totalRuns or 0
         local endlessWave = pd.highestEndlessWave or 0
+        -- 复合分数：进度高优先，同进度把数少优先（降序排列时自然正确）
+        -- adventure_rank = level * 100000 + (99999 - clamp(runs, 0, 99999))
+        local clampedRuns = math.max(0, math.min(runs, 99999))
+        local adventureRank = level * 100000 + (99999 - clampedRuns)
         -- highest_level 作为冒险排行分数，endless_wave 作为无尽排行分数
         clientCloud:BatchSet()
             :SetInt("highest_level", level)
             :SetInt("total_runs", runs)
             :SetInt("endless_wave", endlessWave)
+            :SetInt("adventure_rank", adventureRank)
             :Save("进度上报")
     end)
     if not ok then
@@ -1272,7 +1312,7 @@ function TurnFlow.ShowChapterClear(chapter)
         G.playerData.highestLevel = nextLevel
     end
     PlayerData.Save(G.playerData)
-    UploadProgressToCloud(G.playerData)
+    TurnFlow.UploadProgress(G.playerData)
 
     -- 播放通关庆祝音效
     AM.PlaySFX("chapter_clear")
@@ -1285,7 +1325,7 @@ function TurnFlow.ShowChapterClear(chapter)
         [1] = { icon = "🐙", name = "深渊海沟", color1 = {60, 140, 255}, color2 = {30, 80, 180} },
         [2] = { icon = "🌋", name = "烈焰山脉", color1 = {255, 140, 40}, color2 = {200, 60, 20} },
         [3] = { icon = "🪸", name = "珊瑚迷宫", color1 = {255, 120, 200}, color2 = {180, 60, 140} },
-        [4] = { icon = "✡️", name = "六芒对抗WIP", color1 = {200, 140, 255}, color2 = {130, 70, 200} },
+        [4] = { icon = "🏜️", name = "流沙荒漠", color1 = {210, 180, 100}, color2 = {160, 120, 50} },
     }
     local theme = CHAPTER_THEME[chapter] or { icon = "⭐", name = "未知领域", color1 = {200, 180, 60}, color2 = {160, 130, 30} }
 
@@ -1322,7 +1362,7 @@ function TurnFlow.ShowChapterClear(chapter)
         TurnFlow._MakeClearStatRow("💥 总伤害", tostring(G.battle.totalDamage)),
     }
     if goldLine then
-        statChildren[#statChildren + 1] = TurnFlow._MakeClearStatRow("💰 Boss奖励", "+" .. G.battle.gold)
+        statChildren[#statChildren + 1] = TurnFlow._MakeClearStatRow("💰 获得金币", "+" .. G.battle.gold)
     end
     if skillLine then
         statChildren[#statChildren + 1] = UI.Label {
@@ -1448,6 +1488,7 @@ function TurnFlow.ShowChapterClear(chapter)
                         text = "🎉 恭喜通关！", fontSize = 32,
                         fontColor = {255, 225, 65, 255}, fontWeight = "bold", marginTop = 8,
                         textShadow = { offsetX = 0, offsetY = 2, blur = 10, color = {200, 160, 0, 100} },
+                        numberOfLines = 1,
                     },
                     -- 章节名
                     UI.Label {
@@ -1643,7 +1684,7 @@ function TurnFlow.Update(dt)
                     G.battle._deferredWin = nil
                     local hero = G.battle.hero
                     local maxJumpD = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
-                    local remainJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJumpD)
+                    local remainJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJumpD, buildJumpOpts())
                     if #remainJumps > 0 then
                         G.battle.combo = 0  -- 重置连击计数，避免跨回合累积导致错误的高连击数
                         G.battle.phase = "PLAYER_SELECT"
@@ -1718,7 +1759,7 @@ function TurnFlow.Update(dt)
                 local stillCanJump = false
                 if hero and hero.hp > 0 then
                     local maxJumpS = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
-                    local rj = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJumpS)
+                    local rj = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJumpS, buildJumpOpts())
                     stillCanJump = #rj > 0
                 end
                 if stillCanJump then

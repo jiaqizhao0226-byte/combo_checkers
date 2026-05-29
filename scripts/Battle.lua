@@ -73,10 +73,12 @@ end
 
 --- 章节名称
 Battle.CHAPTER_NAMES = {
+    [0] = "无尽深渊",   -- 特殊模式：在第1章左边（菜单导航用）
     [1] = "深渊海沟",
     [2] = "烈焰山脉",
     [3] = "珊瑚迷宫",
-    [4] = "无尽深渊",
+    [4] = "流沙荒漠",
+    [5] = "无尽深渊",   -- GetChapterInfo(level>=41) fallback，与 [0] 同义
 }
 
 --- 每章10关的关卡信息（按章节索引）
@@ -120,8 +122,21 @@ Battle.STAGE_INFO = {
         { name = "迷宫核心", icon = "🌀", desc = "最后冲刺" },
         { name = "珊瑚王庭", icon = "👑", desc = "Boss: 珊瑚守卫" },
     },
-    -- 第四章: 无尽深渊（无尽模式，无固定关卡）
+    -- 第四章: 流沙荒漠
     [4] = {
+        { name = "沙丘入口", icon = "🏜️", desc = "流沙初现" },
+        { name = "蝎巢沙地", icon = "🦂", desc = "沙蝎伏击" },
+        { name = "风蚀峡谷", icon = "🌪️", desc = "沙暴来袭" },
+        { name = "流沙陷阱", icon = "⏳", desc = "脚下塌陷" },
+        { name = "沙鹰领地", icon = "🦅", desc = "空中威胁" },
+        { name = "虫巢外围", icon = "🪱", desc = "沙虫出没" },
+        { name = "沙漠绿洲", icon = "🌴", desc = "短暂歇息" },
+        { name = "沙暴核心", icon = "💨", desc = "能见度为零" },
+        { name = "巨虫领地", icon = "🐛", desc = "地面震颤" },
+        { name = "沙丘之王", icon = "👑", desc = "Boss: 沙丘巨虫" },
+    },
+    -- 第五章: 无尽深渊（无尽模式，无固定关卡）
+    [5] = {
         { name = "深渊入口", icon = "🌀", desc = "第1波" },
         { name = "幽暗涌动", icon = "🌑", desc = "第2波" },
         { name = "深渊回响", icon = "🔮", desc = "第3波" },
@@ -217,6 +232,7 @@ Battle.BOSS_PORTRAITS = {
     abyss_kraken    = "image/boss_abyss_kraken_20260423082421.png",
     lava_lord       = "image/boss_lava_lord_20260423082419.png",
     coral_guardian  = "image/boss_coral_guardian_20260523054145.png",
+    sand_worm       = "image/boss_sand_worm_20260528082517.png",
 }
 
 -- 道具类型定义
@@ -574,6 +590,169 @@ function Battle.GenerateTestLevel_LeapPioneer6(state)
     Battle.AddLog(state, "【组B】NW方向: (4,8)→(4,7)→(3,6)，落点(3,5)")
     Battle.AddLog(state, "落地后可续接 D组/E组 或 C组，形成三连跳链路！")
     Battle.AddLog(state, "提示: 需穿戴飞跃先锋6件金色套装才能触发三连跳")
+end
+
+--- 生成飞跃先锋含岩石测试关卡：敌人+岩石混合排列，测试第三章跳2/跳3
+--- 布局说明:
+---   level=21（第三章），启用 ch3Rocks 岩石作为跳跃支点
+---   组A: E+R 双跳 (敌人+岩石)
+---   组B: R+E 双跳 (岩石+敌人)
+---   组C: E+R+E 三连跳 (敌人+岩石+敌人)
+---   组D: R+E+R 三连跳 (岩石+敌人+岩石)
+---   组E: E+E+R 三连跳 (敌人+敌人+岩石)
+function Battle.GenerateTestLevel_LeapPioneerRocks(state)
+    state.level = 21  -- 第三章，启用 ch3Rocks
+    state.testMode = "leap_pioneer"
+    local board = state.board
+
+    board.pieces    = {}
+    board.obstacles = {}
+    board.items     = {}
+    board.poisonTiles = {}
+    board.wards     = {}
+    board.frostTiles = {}
+    board.crabs     = {}
+    board.shells    = {}
+
+    HexGrid.ResetToHexagon()
+    board.cols = HexGrid.COLS
+    board.rows = HexGrid.ROWS
+
+    state.kills          = 0
+    state.killTarget     = 999
+    state.comboKillCount = 0
+    state.comboAtkBonus  = 0
+    state.boss           = nil
+
+    -- 英雄 → 底部中央
+    local heroCol = HexGrid.CENTER_COL   -- 5
+    local heroRow = HexGrid.CENTER_ROW + HexGrid.RADIUS  -- 9
+    if not state.hero then
+        state.hero = Battle.CreatePiece(HERO_TEMPLATE, heroCol, heroRow)
+        local bs = state.bonusStats or {}
+        state.hero.atk    = math.floor(state.hero.atk    + (bs.atk or 0))
+        state.hero.def    = math.floor(state.hero.def    + (bs.def or 0))
+        state.hero.hp     = math.floor(state.hero.hp     + (bs.hp  or 0))
+        state.hero.maxHp  = math.floor(state.hero.maxHp  + (bs.hp  or 0))
+    else
+        state.hero.col = heroCol
+        state.hero.row = heroRow
+    end
+
+    if G.playerData then
+        state.critRate  = PlayerData.GetCritRate(G.playerData)
+        state.goldBonus = PlayerData.GetGoldBonus(G.playerData)
+        state.setEffects = SetEffects.Init(G.playerData.equipment, state.critRate)
+    end
+
+    HexGrid.AddPiece(board, state.hero)
+
+    local tpl = {
+        team = "enemy", enemyType = "slime",
+        hp = 30, maxHp = 30, atk = 1, attackRange = 1,
+        attackLabel = "轻触", name = "岩石靶",
+    }
+
+    --[[
+      英雄(5,9) — odd-row offset 坐标系
+      方向参考(NE = row-1, col按奇偶行调整):
+        奇数行(row=9): NE→(5,8), NW→(4,8), E→(6,9), W→(4,9)
+        偶数行(row=8): NE→(6,7), NW→(5,7)
+
+      ===== 跳2组 (4/6套装即可) =====
+
+      【组A】E+R: hero(5,9) → NE方向
+        位置1: 敌人(5,8)
+        位置2: 岩石(6,7)
+        落点: (6,6)
+
+      【组B】R+E: hero(5,9) → NW方向
+        位置1: 岩石(4,8)  ← 石头开头
+        位置2: 敌人(4,7)
+        落点: (3,6)
+
+      ===== 跳3组 (6/6套装) =====
+
+      【组C】E+R+E: 从落点(6,6)出发 → NW方向
+        位置1: 敌人(5,5)
+        位置2: 岩石(5,4)
+        位置3: 敌人(4,3)
+        落点: (4,2)
+
+      【组D】R+E+R: 从落点(3,6)出发 → NE方向
+        位置1: 岩石(3,5)   ← 石头开头
+        位置2: 敌人(4,4)
+        位置3: 岩石(4,3)   ← 与组C共用？不，用独立的(5,3)
+        改：从(3,6) → E方向(偶数行 E = col+1,same row)
+        实际用另一个方向避免冲突:
+        从hero(5,9) → E方向:
+        位置1: 岩石(6,9)
+        位置2: 敌人(7,9)
+        位置3: 岩石(8,9)
+        落点: (9,9) — 可能越界
+
+      改用更安全的布局:
+      【组D】R+E+R: 从(3,6)→ NE方向(偶数行row=6: NE=(4,5))
+        位置1: 岩石(4,5)
+        位置2: 敌人(4,4)
+        位置3: 岩石(5,3)
+        落点: (5,2)
+
+      【组E】E+E+R: hero(5,9)→ 正上方(row-2同列,但hex无正上)
+        改：从hero(5,9)向W: W方向(4,9)
+        hero在奇数行row=9: W=(4,9)
+        位置1: 敌人(4,9) — 但这会挡住其他方向
+        改用独立起点: 从组A落点(6,6) → NE方向(偶数行: NE=(7,5))
+        位置1: 敌人(7,5)
+        位置2: 敌人(7,4)
+        位置3: 岩石(8,3)
+        落点: (8,2) — 检查边界
+    ]]
+
+    -- ===== 跳2测试 =====
+
+    -- 组A: E+R (NE方向) — hero(5,9)向NE
+    local piece_a1 = Battle.CreatePiece(tpl, 5, 8)  -- 敌人
+    HexGrid.AddPiece(board, piece_a1)
+    HexGrid.AddObstacle(board, 6, 7)                 -- 岩石
+
+    -- 组B: R+E (NW方向) — hero(5,9)向NW
+    HexGrid.AddObstacle(board, 4, 8)                 -- 岩石（开头）
+    local piece_b2 = Battle.CreatePiece(tpl, 4, 7)  -- 敌人
+    HexGrid.AddPiece(board, piece_b2)
+
+    -- ===== 跳3测试 =====
+
+    -- 组C: E+R+E — 从组A落点(6,6)向NW方向
+    -- 偶数行row=6: NW = (col-1, row-1) = (5,5)
+    local piece_c1 = Battle.CreatePiece(tpl, 5, 5)  -- 敌人
+    HexGrid.AddPiece(board, piece_c1)
+    HexGrid.AddObstacle(board, 5, 4)                 -- 岩石
+    local piece_c3 = Battle.CreatePiece(tpl, 4, 3)  -- 敌人
+    HexGrid.AddPiece(board, piece_c3)
+
+    -- 组D: R+E+R — 从组B落点(3,6)向NE方向
+    -- 偶数行row=6: NE = (col+1, row-1) = (4,5)
+    HexGrid.AddObstacle(board, 4, 5)                 -- 岩石（开头）
+    local piece_d2 = Battle.CreatePiece(tpl, 4, 4)  -- 敌人
+    HexGrid.AddPiece(board, piece_d2)
+    HexGrid.AddObstacle(board, 5, 3)                 -- 岩石
+
+    -- 组E: E+E+R — 从组A落点(6,6)向NE方向
+    -- 偶数行row=6: NE = (7,5)
+    local piece_e1 = Battle.CreatePiece(tpl, 7, 5)  -- 敌人
+    HexGrid.AddPiece(board, piece_e1)
+    local piece_e2 = Battle.CreatePiece(tpl, 7, 4)  -- 敌人 (奇数行row=5: NE=(7,4))
+    HexGrid.AddPiece(board, piece_e2)
+    HexGrid.AddObstacle(board, 8, 3)                 -- 岩石
+
+    Battle.AddLog(state, "=== 🦅🪨 飞跃先锋 岩石测试关 (第三章) ===")
+    Battle.AddLog(state, "【跳2】组A(NE): 敌(5,8)+石(6,7) → 落(6,6)")
+    Battle.AddLog(state, "【跳2】组B(NW): 石(4,8)+敌(4,7) → 落(3,6)")
+    Battle.AddLog(state, "【跳3】组C(NW): 敌(5,5)+石(5,4)+敌(4,3) → 落(4,2) [从(6,6)出发]")
+    Battle.AddLog(state, "【跳3】组D(NE): 石(4,5)+敌(4,4)+石(5,3) → 落(5,2) [从(3,6)出发]")
+    Battle.AddLog(state, "【跳3】组E(NE): 敌(7,5)+敌(7,4)+石(8,3) → 落(8,2) [从(6,6)出发]")
+    Battle.AddLog(state, "提示: 4/6可跳2(含岩石)，6/6可跳3(含岩石)")
 end
 
 --- 生成连击心得测试关卡：锯齿形敌人链，方便测试连跳combo奖励
@@ -1204,6 +1383,28 @@ function Battle.DestroyAltar(state, altar)
 end
 
 --- 获取剩余活跃祭坛数
+--- 第四章: 流沙区回合推进（每敌方回合结束调用）
+--- 每回合 timer-1，归零自动消失，恢复通行
+function Battle.ProcessQuicksandTurn(state)
+    local board = state.board
+    if not board.quicksandZones or #board.quicksandZones == 0 then return end
+
+    local removed = {}
+    for i = #board.quicksandZones, 1, -1 do
+        local zone = board.quicksandZones[i]
+        zone.timer = zone.timer - 1
+        if zone.timer <= 0 then
+            table.remove(board.quicksandZones, i)
+            removed[#removed + 1] = zone
+        end
+    end
+    for _, zone in ipairs(removed) do
+        Battle.AddFloatingText(state, zone.col, zone.row,
+            "✨流沙消散", {180, 160, 100, 255})
+        Battle.AddLog(state, string.format("(%d,%d) 的流沙区消散了", zone.col, zone.row))
+    end
+end
+
 function Battle.GetActiveAltarCount(board)
     local count = 0
     for _, alt in ipairs(board.altars) do
@@ -1228,11 +1429,13 @@ function Battle.GenerateLevel(state, level)
     board.altars = {}
     board.crabs = {}
     board.shells = {}
+    board.quicksandZones = {}
     board.fogRevealed = nil
     board.hasFog = false
 
     state.rescueTarget = 0
     state.rescueCount = 0
+    state.sandWormSegments = nil
 
     -- 始终使用正六边形棋盘
     do
@@ -1248,8 +1451,6 @@ function Battle.GenerateLevel(state, level)
         if Battle.IsBossLevel(level) then
             state.killTarget = 999  -- Boss关: 击杀Boss即过关
         else
-            -- 普通关: 6 + chapter + floor(stage/2)
-            -- 第1章s1=7, s5=9  第2章s1=8, s5=10  第3章s1=9, s5=11
             state.killTarget = 6 + ch + math.floor(stg / 2)
         end
     end
@@ -1294,10 +1495,6 @@ function Battle.GenerateLevel(state, level)
             state.critRate = PlayerData.GetCritRate(G.playerData)
             state.goldBonus = PlayerData.GetGoldBonus(G.playerData)
             state.setEffects = SetEffects.Init(G.playerData.equipment, state.critRate)
-        end
-        -- 赏金猎人Lv5: 固定+25%，叠加到装备基础值上（不累积）
-        if Skills.Level(state.skills, "bounty_hunter") >= 5 then
-            state.goldBonus = (state.goldBonus or 0) + 25
         end
     else
         state.hero.col = heroCol
@@ -1388,8 +1585,47 @@ function Battle.GenerateLevel(state, level)
         HexGrid.AddPiece(board, boss)
         state.boss = boss
 
-        -- Boss关放少量障碍（第2章熔岩领主不放障碍，用祭坛机制替代）
-        if chapter ~= 2 then
+        -- === 第四章沙虫: 创建6个身体段（head已经是boss本体） ===
+        if bossKey == "sand_worm" then
+            boss.isHead = true
+            boss.segmentIndex = 1
+            state.sandWormSegments = { boss }  -- segments[1] = head
+            -- 从head往下依次放置身体段
+            local prevCol, prevRow = bossCol, bossRow
+            for seg = 2, (bossTemplate.segments or 7) do
+                -- 寻找相邻空位（优先向下/向两侧展开）
+                local neighbors = HexGrid.GetNeighbors(prevCol, prevRow)
+                local placed = false
+                -- 打乱邻居顺序但优先行号更大的（蛇身往下延伸）
+                table.sort(neighbors, function(a, b) return a.row > b.row end)
+                for _, nb in ipairs(neighbors) do
+                    if HexGrid.InBounds(nb.col, nb.row)
+                       and not usedPositions[nb.col .. "," .. nb.row]
+                       and not HexGrid.IsBlocked(board, nb.col, nb.row) then
+                        local segment = Battle.CreatePiece({
+                            team = "enemy", enemyType = "boss",
+                            hp = 99999, maxHp = 99999, atk = 0, attackRange = 0,
+                            attackLabel = "", name = "沙虫身躯",
+                            isBoss = true, bossType = "sand_worm_body",
+                            isSegment = true, segmentIndex = seg,
+                            snakeHead = boss,  -- 伤害路由到头部
+                        }, nb.col, nb.row)
+                        HexGrid.AddPiece(board, segment)
+                        claimPos(nb.col, nb.row)
+                        state.sandWormSegments[seg] = segment
+                        prevCol, prevRow = nb.col, nb.row
+                        placed = true
+                        break
+                    end
+                end
+                if not placed then break end  -- 空间不足则少放
+            end
+            -- 初始化流沙系统
+            board.quicksandZones = {}
+        end
+
+        -- Boss关放少量障碍（第2章熔岩领主不放障碍，用祭坛机制替代；第4章沙虫不放障碍）
+        if chapter ~= 2 and chapter ~= 4 then
             local obstacleCount = 3
             for i = 1, obstacleCount do
                 local c, r = claimRandomPos()
@@ -1405,6 +1641,8 @@ function Battle.GenerateLevel(state, level)
             bossChapterEnemies = { "fire_sprite", "lava_giant" }
         elseif chapter == 3 then
             bossChapterEnemies = { "coral_snapper", "sea_urchin", "reef_starfish", "splitting_urchin" }
+        elseif chapter == 4 then
+            bossChapterEnemies = { "sand_scorpion", "quicksand_worm", "sand_hawk" }
         else
             bossChapterEnemies = { "jellyfish", "iron_turtle" }
         end
@@ -1546,6 +1784,7 @@ function Battle.GenerateLevel(state, level)
             lava_lord = "🌋",
             abyss_kraken = "🐙",
             coral_guardian = "🪸",
+            sand_worm = "🐛",
         }
         state.bossAnnouncement = {
             bossName = boss.name,
@@ -1555,33 +1794,26 @@ function Battle.GenerateLevel(state, level)
             maxTimer = 3.5,
         }
         state.screenShake = 0.6
-    elseif chapter == 4 then
-        -- =============== 第四章 无尽深渊（无尽模式） ===============
-        -- 直接调用无尽模式波次生成，wave = stageInChapter（每次进入时从当前波次开始）
-        -- 无尽模式不走普通关逻辑，由 GenerateEndlessWave 负责刷怪
-        -- 此处仅做初始化，实际波次由 EnterEndless 回调通过 GenerateEndlessWave 接管
-        state.boss = nil
-        state.isEndless = true
-        local wave = state.endlessWave or 1
-        Battle.GenerateEndlessWave(state, wave)
-        return
     else
         -- =============== 普通关 ===============
         state.boss = nil
 
-        -- 难度缩放：第二章缩放更平缓，避免后期敌人过肉
+        -- 难度缩放：基础线性 + 章内加速因子（后期关卡更难，平滑过渡到Boss）
         local hpScale, atkScale
+        -- 章内加速因子：stg 1-3 几乎无加成，stg 7-9 显著加成
+        local stgAccel = (stageInChapter - 1) / 8  -- 0~1 范围
+        local accelBonus = stgAccel * stgAccel      -- 二次方加速：S1=0, S5=0.25, S7=0.56, S9=1.0
         if chapter >= 2 then
-            -- 第二章: HP×(1+0.12×(level-1)), ATK×(1+0.09×(level-1))
-            hpScale = 1.0 + 0.12 * (level - 1)
-            atkScale = 1.0 + 0.09 * (level - 1)
+            -- 第二章+: 基础线性 + 章内加速（最多额外+40% HP, +25% ATK）
+            hpScale = 1.0 + 0.12 * (level - 1) + 0.40 * accelBonus
+            atkScale = 1.0 + 0.09 * (level - 1) + 0.25 * accelBonus
         else
-            -- 第一章: HP×(1+0.18×(level-1)), ATK×(1+0.13×(level-1))
-            hpScale = 1.0 + 0.18 * (level - 1)
-            atkScale = 1.0 + 0.13 * (level - 1)
+            -- 第一章: 基础线性 + 章内加速（最多额外+50% HP, +35% ATK）
+            hpScale = 1.0 + 0.18 * (level - 1) + 0.50 * accelBonus
+            atkScale = 1.0 + 0.13 * (level - 1) + 0.35 * accelBonus
         end
 
-        -- 敌人数量: 基础7 + floor(stageInChapter/2)，最多14
+        -- 敌人数量: 保持平稳（怪多反而容易连击，不加难度）
         local enemyCount = math.min(7 + math.floor(stageInChapter / 2), 14)
 
         -- 按章节选择敌人类型池
@@ -1598,8 +1830,11 @@ function Battle.GenerateLevel(state, level)
                 enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "archerfish" }
             elseif stageInChapter <= 6 then
                 enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "archerfish", "electric_ray" }
-            else
+            elseif stageInChapter <= 7 then
                 enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "archerfish", "electric_ray" }
+            else
+                -- S8-S9: 高威胁怪权重更高（幽灵鲨、电鳐出现概率翻倍）
+                enemyTypes = { "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "ghost_shark", "archerfish", "electric_ray", "electric_ray" }
             end
         elseif chapter == 2 then
             -- 第二章: 火灵、熔岩巨人为主，后期加入蘑菇和裂焰精
@@ -1607,8 +1842,11 @@ function Battle.GenerateLevel(state, level)
             if stageInChapter >= 4 then
                 enemyTypes = { "fire_sprite", "lava_giant", "lava_giant", "fission_flame" }
             end
-            if stageInChapter >= 7 then
+            if stageInChapter >= 7 and stageInChapter <= 7 then
                 enemyTypes = { "fire_sprite", "lava_giant", "fission_flame", "mushroom" }
+            elseif stageInChapter >= 8 then
+                -- S8-S9: 裂焰精和熔岩巨人权重更高
+                enemyTypes = { "lava_giant", "lava_giant", "fission_flame", "fission_flame", "mushroom" }
             end
         elseif chapter == 3 then
             -- 第三章: 珊瑚系敌人，后期加入特殊机制怪
@@ -1616,19 +1854,29 @@ function Battle.GenerateLevel(state, level)
             if stageInChapter >= 4 then
                 enemyTypes = { "coral_snapper", "sea_urchin", "reef_starfish", "spine_anemone", "splitting_urchin" }
             end
-            if stageInChapter >= 7 then
+            if stageInChapter >= 7 and stageInChapter <= 7 then
                 enemyTypes = { "coral_snapper", "sea_urchin", "reef_starfish", "spine_anemone", "coral_priest", "splitting_urchin" }
+            elseif stageInChapter >= 8 then
+                -- S8-S9: 牧师和分裂海胆权重更高（更多治疗和分裂压力）
+                enemyTypes = { "coral_snapper", "spine_anemone", "spine_anemone", "coral_priest", "coral_priest", "splitting_urchin", "splitting_urchin" }
+            end
+        elseif chapter == 4 then
+            -- 第四章: 沙漠系敌人，流沙虫可填坑
+            enemyTypes = { "sand_scorpion", "sand_scorpion", "quicksand_worm", "sand_hawk" }
+            if stageInChapter >= 4 then
+                enemyTypes = { "sand_scorpion", "quicksand_worm", "quicksand_worm", "sand_hawk", "sand_hawk" }
+            end
+            if stageInChapter >= 7 then
+                enemyTypes = { "sand_scorpion", "sand_scorpion", "quicksand_worm", "sand_hawk", "sand_hawk", "sand_hawk" }
             end
         else
             enemyTypes = { "jellyfish", "iron_turtle" }
         end
 
-        -- 障碍物数量（第三章由寄居蟹系统单独放置，普通障碍少一些）
+        -- 障碍物数量：只有第三章放珊瑚/礁石（配合寄居蟹营救机制）
         local obstacleCount = 0
         if chapter == 3 then
             obstacleCount = math.min(math.floor(stageInChapter / 3), 3)
-        elseif stageInChapter >= 2 then
-            obstacleCount = math.min(1 + math.floor(stageInChapter / 2), 6)
         end
 
         -- 1-1 教学关：不预放敌人/障碍，由 TryScriptedSpawn 分阶段刷出（仅首次）
@@ -1884,10 +2132,6 @@ function Battle.GenerateEndlessWave(state, wave)
             state.goldBonus = PlayerData.GetGoldBonus(G.playerData)
             state.setEffects = SetEffects.Init(G.playerData.equipment, state.critRate)
         end
-        -- 赏金猎人Lv5: 固定+25%，叠加到装备基础值上（不累积）
-        if Skills.Level(state.skills, "bounty_hunter") >= 5 then
-            state.goldBonus = (state.goldBonus or 0) + 25
-        end
     else
         -- 后续波：仅重置位置，保留英雄当前血量/ATK/DEF
         state.hero.col = heroCol
@@ -1912,8 +2156,8 @@ function Battle.GenerateEndlessWave(state, wave)
     -- 敌人数量: 9 + floor(wave/3)，最多18
     local enemyCount = math.min(9 + math.floor((wave - 1) / 3), 18)
 
-    -- 障碍数量: wave每2波加1个，最多7个
-    local obstacleCount = math.min(math.floor(wave / 2), 7)
+    -- 无尽模式不放岩石（岩石会让飞跃先锋过于强势）
+    local obstacleCount = 0
 
     -- 获取可用位置（排除英雄格）
     local claimed = {}
@@ -2063,14 +2307,16 @@ function Battle.ContinueLevel(state, nextLevel)
     local aliveEnemies = HexGrid.GetTeamPieces(board, "enemy")
     local aliveCount = #aliveEnemies
 
-    -- 难度缩放
+    -- 难度缩放：基础线性 + 章内加速因子（与 GenerateLevel 一致）
     local hpScale, atkScale
+    local stgAccel = (stageInChapter - 1) / 8
+    local accelBonus = stgAccel * stgAccel
     if chapter >= 2 then
-        hpScale = 1.0 + 0.12 * (nextLevel - 1)
-        atkScale = 1.0 + 0.09 * (nextLevel - 1)
+        hpScale = 1.0 + 0.12 * (nextLevel - 1) + 0.40 * accelBonus
+        atkScale = 1.0 + 0.09 * (nextLevel - 1) + 0.25 * accelBonus
     else
-        hpScale = 1.0 + 0.18 * (nextLevel - 1)
-        atkScale = 1.0 + 0.13 * (nextLevel - 1)
+        hpScale = 1.0 + 0.18 * (nextLevel - 1) + 0.50 * accelBonus
+        atkScale = 1.0 + 0.13 * (nextLevel - 1) + 0.35 * accelBonus
     end
 
     -- 目标敌人总数（和 GenerateLevel 一致）
@@ -2092,7 +2338,6 @@ function Battle.ContinueLevel(state, nextLevel)
     -- 按章节选敌人类型（与GenerateLevel保持一致）
     local enemyTypes
     if chapter == 1 then
-        -- 第一章: 逐步解锁新敌人，第1关只有普通敌人（不触发新敌人教学）
         if stageInChapter <= 1 then
             enemyTypes = { "slime", "slime", "slime" }
         elseif stageInChapter <= 2 then
@@ -2103,24 +2348,30 @@ function Battle.ContinueLevel(state, nextLevel)
             enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "archerfish" }
         elseif stageInChapter <= 6 then
             enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "archerfish", "electric_ray" }
-        else
+        elseif stageInChapter <= 7 then
             enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "archerfish", "electric_ray" }
+        else
+            enemyTypes = { "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "ghost_shark", "archerfish", "electric_ray", "electric_ray" }
         end
     elseif chapter == 2 then
         enemyTypes = { "fire_sprite", "fire_sprite", "lava_giant" }
         if stageInChapter >= 4 then
             enemyTypes = { "fire_sprite", "lava_giant", "lava_giant", "fission_flame" }
         end
-        if stageInChapter >= 7 then
+        if stageInChapter >= 7 and stageInChapter <= 7 then
             enemyTypes = { "fire_sprite", "lava_giant", "fission_flame", "mushroom" }
+        elseif stageInChapter >= 8 then
+            enemyTypes = { "lava_giant", "lava_giant", "fission_flame", "fission_flame", "mushroom" }
         end
     elseif chapter == 3 then
         enemyTypes = { "coral_snapper", "coral_snapper", "sea_urchin", "reef_starfish" }
         if stageInChapter >= 4 then
             enemyTypes = { "coral_snapper", "sea_urchin", "reef_starfish", "spine_anemone", "splitting_urchin" }
         end
-        if stageInChapter >= 7 then
+        if stageInChapter >= 7 and stageInChapter <= 7 then
             enemyTypes = { "coral_snapper", "sea_urchin", "reef_starfish", "spine_anemone", "coral_priest", "splitting_urchin" }
+        elseif stageInChapter >= 8 then
+            enemyTypes = { "coral_snapper", "spine_anemone", "spine_anemone", "coral_priest", "coral_priest", "splitting_urchin", "splitting_urchin" }
         end
     else
         enemyTypes = { "jellyfish", "iron_turtle" }
@@ -2579,6 +2830,8 @@ function Battle.TrySpawnEnemies(state)
         if stageInChapter >= 7 then
             enemyTypes = { "coral_snapper", "sea_urchin", "spine_anemone", "coral_priest", "splitting_urchin" }
         end
+    elseif chapter == 4 then
+        enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk" }
     else
         enemyTypes = { "jellyfish" }
     end
@@ -2599,15 +2852,17 @@ function Battle.TrySpawnEnemies(state)
     if maxSpawn <= 0 then return end
     local spawnCount = math.random(1, maxSpawn)
 
-    -- 难度缩放（与GenerateLevel一致）
-    local spawnChapter = Battle.GetChapterInfo(state.level)
+    -- 难度缩放（与GenerateLevel一致：基础线性 + 章内加速）
+    local spawnChapter, spawnStage = Battle.GetChapterInfo(state.level)
+    local spawnAccel = (spawnStage - 1) / 8
+    local spawnAccelBonus = spawnAccel * spawnAccel
     local hpScale, atkScale
     if spawnChapter >= 2 then
-        hpScale = 1.0 + 0.12 * (state.level - 1)
-        atkScale = 1.0 + 0.09 * (state.level - 1)
+        hpScale = 1.0 + 0.12 * (state.level - 1) + 0.40 * spawnAccelBonus
+        atkScale = 1.0 + 0.09 * (state.level - 1) + 0.25 * spawnAccelBonus
     else
-        hpScale = 1.0 + 0.18 * (state.level - 1)
-        atkScale = 1.0 + 0.13 * (state.level - 1)
+        hpScale = 1.0 + 0.18 * (state.level - 1) + 0.50 * spawnAccelBonus
+        atkScale = 1.0 + 0.13 * (state.level - 1) + 0.35 * spawnAccelBonus
     end
 
     for i = 1, spawnCount do
@@ -2790,8 +3045,8 @@ function Battle.ExecuteMove(state, targetCol, targetRow, isFreeMove)
     hero.col = targetCol
     hero.row = targetRow
     if not keepCombo then
+        Battle.SettlePendingComboShield(state)  -- 连击链结束，结算延迟护盾
         state.combo = 0
-        hero._shield = 0  -- 连击中断清除护盾
     end
     Battle.AddLog(state, "剑士移动到 (" .. targetCol .. "," .. targetRow .. ")")
 
@@ -2940,19 +3195,114 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
                 end
             end
 
-            -- 第三章: 跳过岩石时清除该障碍物
-            local chapter3 = Battle.GetChapterInfo(state.level)
-            if chapter3 == 3 and jumpInfo.obstacle then
-                HexGrid.RemoveObstacle(state.board, jumpInfo.jumpedCol, jumpInfo.jumpedRow)
-                Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
-                    "💥清除!", {255, 200, 100, 255})
-                Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol, row = jumpInfo.jumpedRow, duration = 0.5 })
-                Battle.AddLog(state, string.format("🪸 清除了 (%d,%d) 的障碍物！", jumpInfo.jumpedCol, jumpInfo.jumpedRow))
-                -- 检查是否有寄居蟹的路径被清通了
-                Battle.CheckCrabRescue(state)
+            -- 跳过障碍物/祭坛时：祭坛摧毁、第3章珊瑚清除、其他章岩石保留(永久支点)
+            if jumpInfo.obstacle then
+                if jumpInfo.obstacle.isAltar then
+                    Battle.DestroyAltar(state, jumpInfo.obstacle)
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
+                        "🔥摧毁!", {255, 150, 50, 255})
+                    Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol, row = jumpInfo.jumpedRow, duration = 0.5 })
+                elseif Battle.GetChapterInfo(state.level) == 3 then
+                    HexGrid.RemoveObstacle(state.board, jumpInfo.jumpedCol, jumpInfo.jumpedRow)
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
+                        "💥清除!", {255, 200, 100, 255})
+                    Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol, row = jumpInfo.jumpedRow, duration = 0.5 })
+                    Battle.AddLog(state, string.format("🪸 清除了 (%d,%d) 的珊瑚！", jumpInfo.jumpedCol, jumpInfo.jumpedRow))
+                    Battle.CheckCrabRescue(state)
+                end
             end
         end
 
+        -- === 飞跃先锋: 石头在前的双跳/三跳 — 处理位置2的敌人或石头 ===
+        if jumpInfo.isDoubleJump then
+            -- 位置2是敌人：造成伤害
+            if jumpInfo.enemy2 or (jumpInfo.jumpedCol2 and not jumpInfo.jumpedObstacle2) then
+                local e2 = jumpInfo.enemy2 or (jumpInfo.jumpedCol2 and HexGrid.GetPieceAt(state.board, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2))
+                if e2 and e2.hp and e2.hp > 0 then
+                    local dmg2 = hero.atk + (state.comboAtkBonus or 0)
+                    dmg2 = Battle.ApplyAltarReduction(state, e2, dmg2)
+                    if e2.isBoss then
+                        Battle.ApplyBossDamage(state, e2, dmg2)
+                    else
+                        e2.hp = e2.hp - dmg2
+                    end
+                    e2.hitFlash = 0.2
+                    state.totalDamage = (state.totalDamage or 0) + dmg2
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                        "-" .. dmg2, {255, 180, 50, 255}, "hit")
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                        "🦅飞跃!", {100, 220, 180, 255})
+                    if dmg2 > 0 and e2.hp <= 0 then
+                        Battle.HandleEnemyDeath(state, e2, false)
+                    end
+                end
+            end
+            -- 位置2是障碍物/祭坛：祭坛摧毁、第3章珊瑚清除、其他保留
+            if jumpInfo.jumpedObstacle2 and jumpInfo.jumpedCol2 then
+                if jumpInfo.jumpedObstacle2.isAltar then
+                    Battle.DestroyAltar(state, jumpInfo.jumpedObstacle2)
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                        "🔥摧毁!", {255, 150, 50, 255})
+                    Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol2, row = jumpInfo.jumpedRow2, duration = 0.5 })
+                elseif Battle.GetChapterInfo(state.level) == 3 then
+                    HexGrid.RemoveObstacle(state.board, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2)
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                        "💥清除!", {255, 200, 100, 255})
+                    Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol2, row = jumpInfo.jumpedRow2, duration = 0.5 })
+                    Battle.CheckCrabRescue(state)
+                end
+            end
+            -- 飞跃先锋公告
+            if not state.leapPioneerShownThisChain then
+                state.leapPioneerShownThisChain = true
+                state.leapPioneerAnnouncement = {
+                    timer = 2.2, maxTimer = 2.2, jumpCount = 2,
+                }
+                AM.PlaySFX("gold_set_trigger", 1.5)
+            end
+        end
+
+        -- === 飞跃先锋6/6: 石头在前的三跳 — 处理位置3 ===
+        if jumpInfo.isTripleJump then
+            if jumpInfo.enemy3 or (jumpInfo.jumpedCol3 and not jumpInfo.jumpedObstacle3) then
+                local e3 = jumpInfo.enemy3 or (jumpInfo.jumpedCol3 and HexGrid.GetPieceAt(state.board, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3))
+                if e3 and e3.hp and e3.hp > 0 then
+                    local dmg3 = hero.atk + (state.comboAtkBonus or 0)
+                    dmg3 = Battle.ApplyAltarReduction(state, e3, dmg3)
+                    if e3.isBoss then
+                        Battle.ApplyBossDamage(state, e3, dmg3)
+                    else
+                        e3.hp = e3.hp - dmg3
+                    end
+                    e3.hitFlash = 0.2
+                    state.totalDamage = (state.totalDamage or 0) + dmg3
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                        "-" .. dmg3, {255, 180, 50, 255}, "hit")
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                        "🦅三连!", {100, 255, 180, 255})
+                    if dmg3 > 0 and e3.hp <= 0 then
+                        Battle.HandleEnemyDeath(state, e3, false)
+                    end
+                end
+            end
+            if jumpInfo.jumpedObstacle3 and jumpInfo.jumpedCol3 then
+                if jumpInfo.jumpedObstacle3.isAltar then
+                    Battle.DestroyAltar(state, jumpInfo.jumpedObstacle3)
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                        "🔥摧毁!", {255, 150, 50, 255})
+                    Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol3, row = jumpInfo.jumpedRow3, duration = 0.5 })
+                elseif Battle.GetChapterInfo(state.level) == 3 then
+                    HexGrid.RemoveObstacle(state.board, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3)
+                    Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                        "💥清除!", {255, 200, 100, 255})
+                    Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol3, row = jumpInfo.jumpedRow3, duration = 0.5 })
+                    Battle.CheckCrabRescue(state)
+                end
+            end
+            if state.leapPioneerAnnouncement then
+                state.leapPioneerAnnouncement.jumpCount = 3
+            end
+        end
 
         -- 岩石跳跃：只有最终落点才触发震地落/落地技能
         if isLastStep then
@@ -3218,18 +3568,7 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
                 toCol = jumpInfo.col, toRow = jumpInfo.row,
                 duration = 0.7,
             })
-            -- 赏金猎人Lv4: 溢出治疗转金币(3HP=1金)
-            if Skills.Level(state.skills, "bounty_hunter") >= 4 then
-                local overflow = heal - actualHeal
-                if overflow > 0 then
-                    local bonusGold = math.floor(overflow / 3)
-                    if bonusGold > 0 then
-                        state.gold = state.gold + bonusGold
-                        Battle.AddFloatingText(state, jumpInfo.col, jumpInfo.row,
-                            "+" .. bonusGold .. "💰", {255, 215, 0, 255})
-                    end
-                end
-            end
+
         end
     end
 
@@ -3288,28 +3627,48 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
     if damage > 0 and enemy.hp <= 0 then
         Battle.HandleEnemyDeath(state, enemy, false)
     end
+    -- 沙虫身体段: 伤害路由到头部，检查头部是否死亡
+    if damage > 0 and enemy.snakeHead and enemy.snakeHead.hp <= 0 then
+        Battle.HandleEnemyDeath(state, enemy.snakeHead, false)
+    end
 
-    -- === 飞跃先锋: 双敌跳 — 对第二个敌人也造成伤害 ===
-    if jumpInfo.isDoubleJump and jumpInfo.enemy2 then
-        local enemy2 = jumpInfo.enemy2
-        if enemy2.hp > 0 then
-            local dmg2 = damage  -- 与第一个敌人相同伤害
-            dmg2 = Battle.ApplyAltarReduction(state, enemy2, dmg2)
-            if enemy2.isBoss then
-                Battle.ApplyBossDamage(state, enemy2, dmg2)
-            else
-                enemy2.hp = enemy2.hp - dmg2
+    -- === 飞跃先锋: 双敌跳 — 对第二个敌人造成伤害 / 清除石头 ===
+    if jumpInfo.isDoubleJump then
+        if jumpInfo.enemy2 then
+            local enemy2 = jumpInfo.enemy2
+            if enemy2.hp > 0 then
+                local dmg2 = damage  -- 与第一个敌人相同伤害
+                dmg2 = Battle.ApplyAltarReduction(state, enemy2, dmg2)
+                if enemy2.isBoss then
+                    Battle.ApplyBossDamage(state, enemy2, dmg2)
+                else
+                    enemy2.hp = enemy2.hp - dmg2
+                end
+                enemy2.hitFlash = 0.2
+                state.totalDamage = state.totalDamage + dmg2
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                    "-" .. dmg2, {255, 180, 50, 255}, "hit")
+                local fts3 = state.floatingTexts
+                fts3[#fts3].comboLevel = state.combo
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                    "🦅飞跃!", {100, 220, 180, 255})
+                if dmg2 > 0 and enemy2.hp <= 0 then
+                    Battle.HandleEnemyDeath(state, enemy2, false)
+                end
             end
-            enemy2.hitFlash = 0.2
-            state.totalDamage = state.totalDamage + dmg2
-            Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
-                "-" .. dmg2, {255, 180, 50, 255}, "hit")
-            local fts3 = state.floatingTexts
-            fts3[#fts3].comboLevel = state.combo
-            Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
-                "🦅飞跃!", {100, 220, 180, 255})
-            if dmg2 > 0 and enemy2.hp <= 0 then
-                Battle.HandleEnemyDeath(state, enemy2, false)
+        elseif jumpInfo.jumpedObstacle2 and jumpInfo.jumpedCol2 then
+            -- 位置2是障碍物/祭坛：祭坛摧毁、第3章珊瑚清除、其他保留
+            if jumpInfo.jumpedObstacle2.isAltar then
+                Battle.DestroyAltar(state, jumpInfo.jumpedObstacle2)
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                    "🔥摧毁!", {255, 150, 50, 255})
+                Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol2, row = jumpInfo.jumpedRow2, duration = 0.5 })
+            elseif Battle.GetChapterInfo(state.level) == 3 then
+                HexGrid.RemoveObstacle(state.board, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2)
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol2, jumpInfo.jumpedRow2,
+                    "💥清除!", {255, 200, 100, 255})
+                Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol2, row = jumpInfo.jumpedRow2, duration = 0.5 })
+                Battle.CheckCrabRescue(state)
             end
         end
         -- 飞跃先锋公告横幅（一次跳跃链只触发一次）
@@ -3324,31 +3683,47 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         end
     end
 
-    -- === 飞跃先锋6/6: 三敌跳 — 对第三个敌人也造成伤害 ===
-    if jumpInfo.isTripleJump and jumpInfo.enemy3 then
-        local enemy3 = jumpInfo.enemy3
-        if enemy3.hp > 0 then
-            local dmg3 = damage  -- 与第一个敌人相同伤害
-            dmg3 = Battle.ApplyAltarReduction(state, enemy3, dmg3)
-            if enemy3.isBoss then
-                Battle.ApplyBossDamage(state, enemy3, dmg3)
-            else
-                enemy3.hp = enemy3.hp - dmg3
+    -- === 飞跃先锋6/6: 三敌跳 — 对第三个敌人造成伤害 / 清除石头 ===
+    if jumpInfo.isTripleJump then
+        if jumpInfo.enemy3 then
+            local enemy3 = jumpInfo.enemy3
+            if enemy3.hp > 0 then
+                local dmg3 = damage  -- 与第一个敌人相同伤害
+                dmg3 = Battle.ApplyAltarReduction(state, enemy3, dmg3)
+                if enemy3.isBoss then
+                    Battle.ApplyBossDamage(state, enemy3, dmg3)
+                else
+                    enemy3.hp = enemy3.hp - dmg3
+                end
+                enemy3.hitFlash = 0.2
+                state.totalDamage = state.totalDamage + dmg3
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                    "-" .. dmg3, {255, 180, 50, 255}, "hit")
+                local fts4 = state.floatingTexts
+                fts4[#fts4].comboLevel = state.combo
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                    "🦅三连!", {100, 255, 180, 255})
+                if dmg3 > 0 and enemy3.hp <= 0 then
+                    Battle.HandleEnemyDeath(state, enemy3, false)
+                end
             end
-            enemy3.hitFlash = 0.2
-            state.totalDamage = state.totalDamage + dmg3
-            Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
-                "-" .. dmg3, {255, 180, 50, 255}, "hit")
-            local fts4 = state.floatingTexts
-            fts4[#fts4].comboLevel = state.combo
-            Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
-                "🦅三连!", {100, 255, 180, 255})
-            if state.leapPioneerAnnouncement then
-                state.leapPioneerAnnouncement.jumpCount = 3
+        elseif jumpInfo.jumpedObstacle3 and jumpInfo.jumpedCol3 then
+            -- 位置3是障碍物/祭坛：祭坛摧毁、第3章珊瑚清除、其他保留
+            if jumpInfo.jumpedObstacle3.isAltar then
+                Battle.DestroyAltar(state, jumpInfo.jumpedObstacle3)
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                    "🔥摧毁!", {255, 150, 50, 255})
+                Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol3, row = jumpInfo.jumpedRow3, duration = 0.5 })
+            elseif Battle.GetChapterInfo(state.level) == 3 then
+                HexGrid.RemoveObstacle(state.board, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3)
+                Battle.AddFloatingText(state, jumpInfo.jumpedCol3, jumpInfo.jumpedRow3,
+                    "💥清除!", {255, 200, 100, 255})
+                Battle.AddVFX(state, "spawn_puff", { col = jumpInfo.jumpedCol3, row = jumpInfo.jumpedRow3, duration = 0.5 })
+                Battle.CheckCrabRescue(state)
             end
-            if dmg3 > 0 and enemy3.hp <= 0 then
-                Battle.HandleEnemyDeath(state, enemy3, false)
-            end
+        end
+        if state.leapPioneerAnnouncement then
+            state.leapPioneerAnnouncement.jumpCount = 3
         end
     end
 
@@ -3610,6 +3985,11 @@ end
 --- 处理敌人死亡
 ---@param fromChain boolean 是否由连锁闪电触发（防止无限递归）
 function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDeathSFX)
+    -- 沙虫身体段保护：身体段不可单独死亡，只有头部死亡时才统一清除
+    if enemy.isSegment and enemy.snakeHead and enemy.snakeHead.hp > 0 then
+        enemy.hp = enemy.maxHp  -- 恢复身体段HP，防止后续再次触发死亡
+        return
+    end
     -- 死亡特效（配色匹配敌人类型）
     local deathColors = {
         slime = {120, 220, 80}, skeleton = {220, 210, 190}, mushroom = {160, 80, 200},
@@ -3630,35 +4010,39 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         AM.PlaySFX("enemy_death")
     end
 
+    -- === 沙虫头部死亡: 清除所有身体段 ===
+    if enemy.isHead and state.sandWormSegments then
+        for _, seg in ipairs(state.sandWormSegments) do
+            if seg ~= enemy and seg.hp > 0 then
+                seg.hp = 0
+                Battle.AddVFX(state, "death_puff", {
+                    col = seg.col, row = seg.row, duration = 0.5,
+                    enemyColor = {210, 180, 100},
+                })
+            end
+        end
+        state.sandWormSegments = nil
+        Battle.AddLog(state, "沙丘巨虫全身崩溃！")
+    end
+
     -- 累加击杀计数（碎片不计入击杀目标）
-    if not enemy.isShard then
+    if not enemy.isShard and not enemy.isSegment then
         state.kills = (state.kills or 0) + 1
         Battle.AddLog(state, enemy.name .. " 被击败！(" .. state.kills .. "/" .. state.killTarget .. ")")
     else
         Battle.AddLog(state, enemy.name .. " 消散了！")
     end
 
-    -- === 基础金币 (根据敌人类型) + bounty_hunter / treasure_trap / blood_money ===
+    -- === 基础金币 (根据敌人类型) ===
     -- 防刷机制：击杀数超过目标+5后，不再获得金币（防止故意不完成章节任务拖关刷金）
     local killOverflow = (state.kills or 0) - (state.killTarget or 999)
     local goldBlocked = (killOverflow > 5) and not Battle.IsBossLevel(state.level)
 
     local baseGold = ENEMY_GOLD[enemy.enemyType] or 3
     local killGold = baseGold
-    local btyLv = Skills.Level(state.skills, "bounty_hunter")
-    -- 赏金猎人Lv4: 击杀金翻倍
-    if btyLv >= 4 then
-        killGold = killGold * 2
-    end
-    -- 赏金猎人: 连击中每次击杀叠加金币 (3+lv*2)，上限50
     state.comboKillCount = state.comboKillCount + 1
-    local bountyBonus = 0
-    if btyLv >= 1 then
-        local perKill = 3 + btyLv * 2  -- Lv1=5, Lv2=7, ..., Lv5=13
-        bountyBonus = math.min((state.comboKillCount - 1) * perKill, 50)
-    end
     -- v4.0 金币加成(天赋: 点金手)
-    local totalKillGold = killGold + bountyBonus
+    local totalKillGold = killGold
     if (state.goldBonus or 0) > 0 then
         local bonusAmt = math.floor(totalKillGold * state.goldBonus / 100)
         totalKillGold = totalKillGold + bonusAmt
@@ -3670,10 +4054,6 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
     end
 
     state.gold = state.gold + totalKillGold
-    if bountyBonus > 0 and not goldBlocked then
-        Battle.AddFloatingText(state, enemy.col, enemy.row,
-            "+" .. bountyBonus .. "💎", {150, 220, 255, 255})
-    end
 
     -- 吸血跳Lv3: 击杀+5临时ATK（单链上限+30）+ 回复12HP
     if Skills.Level(state.skills, "vampiric_jump") >= 3 then
@@ -3686,15 +4066,7 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         AM.PlaySFX("vampiric_drain", 0.6)
     end
 
-    -- 赏金猎人Lv3: 每3次连击击杀必定掉落金袋
-    if btyLv >= 3 and state.comboKillCount % 3 == 0 then
-        if not HexGrid.GetItemAt(state.board, enemy.col, enemy.row) and
-           not HexGrid.IsBlocked(state.board, enemy.col, enemy.row) then
-            HexGrid.AddItem(state.board, { col = enemy.col, row = enemy.row, type = "gold_bag" })
-            Battle.AddFloatingText(state, enemy.col, enemy.row,
-                "💰赏金!", {255, 215, 0, 255})
-        end
-    end
+
 
     -- 毒蘑菇死亡时对周围敌方造成伤害（不伤害英雄）
     if enemy.deathDamage and enemy.deathDamage > 0 then
@@ -3788,6 +4160,82 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
             Battle.AddFloatingText(state, enemy.col, enemy.row,
                 "💥分裂!", {255, 140, 30, 255}, "combo")
             Battle.AddLog(state, string.format("%s 分裂为 %d 个焰碎片！", enemy.name, spawnCount))
+        end
+    end
+
+    -- === 第四章: 敌人死亡有 70% 概率产生大流沙区（7格，5回合后消失，最多5个） ===
+    local ch4 = Battle.GetChapterInfo(state.level)
+    local zoneCount = state.board.quicksandZones and #state.board.quicksandZones or 0
+    if ch4 == 4 and not enemy.isSegment and not enemy.isBoss and zoneCount < 5 then
+        if math.random() < 0.7 then
+            local zoneCenter = { col = enemy.col, row = enemy.row }
+            HexGrid.AddQuicksandZone(state.board, zoneCenter.col, zoneCenter.row)
+            AM.PlaySFX("quicksand_spawn", 0.8)
+            Battle.AddFloatingText(state, zoneCenter.col, zoneCenter.row,
+                "⏳流沙区!", {210, 180, 100, 255})
+            Battle.AddLog(state, enemy.name .. " 死亡处涌出大片流沙！(5回合后消散)")
+
+            -- 推走流沙区内的所有角色（主角受伤）
+            local zoneTiles = {{ col = zoneCenter.col, row = zoneCenter.row }}
+            local zoneNeighbors = HexGrid.GetNeighbors(zoneCenter.col, zoneCenter.row)
+            for _, n in ipairs(zoneNeighbors) do
+                zoneTiles[#zoneTiles + 1] = n
+            end
+            for _, tile in ipairs(zoneTiles) do
+                local piece = HexGrid.GetPieceAt(state.board, tile.col, tile.row)
+                if piece and piece ~= enemy and not piece.isBoss and not piece.isSegment then
+                    local safeCol, safeRow = HexGrid.FindNearestSafeCell(state.board, tile.col, tile.row)
+                    if safeCol then
+                        local oldCol, oldRow = piece.col, piece.row
+                        piece.col, piece.row = safeCol, safeRow
+                        if piece.isHero then
+                            -- 主角被流沙推走时受到伤害并中断连跳
+                            local pushDmg = 8
+                            piece.hp = math.max(1, piece.hp - pushDmg)
+                            state.quicksandInterrupted = true
+                            -- 受击闪红动画（加长）
+                            state.hitFlash = 0.6
+                            -- 推开滑动动画（更慢，体现被沙流冲走的感觉）
+                            piece.animFromCol = oldCol
+                            piece.animFromRow = oldRow
+                            piece.animTimer = 1.2
+                            piece.animMaxTimer = 1.2
+                            piece.animIsJump = false
+                            piece.sandPushed = true  -- 标记：被流沙推开（用于渲染抖动+沙尘）
+                            piece.sandPushTime = 1.2  -- 沙尘包裹特效计时
+                            -- 起点警示圈（标记企鹅被推离此处）
+                            Battle.AddVFX(state, "quicksand_warn", {
+                                col = oldCol, row = oldRow,
+                                duration = 1.0,
+                            })
+                            -- 沙尘冲击波特效（从旧位置到新位置，持续时间与动画匹配）
+                            Battle.AddVFX(state, "sand_push", {
+                                fromCol = oldCol, fromRow = oldRow,
+                                toCol = safeCol, toRow = safeRow,
+                                duration = 2.0,
+                            })
+                            -- 落点冲击波
+                            Battle.AddVFX(state, "quicksand_land", {
+                                col = safeCol, row = safeRow,
+                                duration = 0.8,
+                            })
+                            -- 屏幕震动（更强）
+                            state.screenShake = (state.screenShake or 0) + 1.2
+                            -- 伤害浮动数字（更大更明显）
+                            Battle.AddFloatingText(state, safeCol, safeRow,
+                                "💨 -" .. pushDmg .. " 流沙冲击!", {255, 140, 30, 255}, "combo", 2.0)
+                            -- 起点也弹出提示
+                            Battle.AddFloatingText(state, oldCol, oldRow,
+                                "⚠️被推开!", {255, 200, 50, 255}, "damage", 1.5)
+                            AM.PlaySFX("combo_doomsday_blast", 0.7)
+                            Battle.AddLog(state, "主角被流沙涌出推开，连跳中断！受到 " .. pushDmg .. " 点伤害！")
+                        else
+                            Battle.AddFloatingText(state, safeCol, safeRow,
+                                "被推开", {180, 150, 80, 200})
+                        end
+                    end
+                end
+            end
         end
     end
 
@@ -4055,9 +4503,9 @@ Battle.COMBO_REWARDS = {
     [3] = { name = "稻草人",   icon = "combo_tier2", desc = "吸引全部仇恨，替你挡刀2回合" },
     [4] = { name = "六芒冲击波", icon = "combo_tier3", desc = "6方向射线秒杀小怪，对Boss造成60伤害" },
     [5] = { name = "生命虹吸", icon = "combo_tier4", desc = "吸取全体敌人20%当前生命(Boss固定30)，等量恢复自身血量，溢出转虹吸护盾(上限60)" },
-    [6] = { name = "天罚陨石", icon = "combo_tier5", desc = "主角周围4格内陨石轰炸，造成敌人90%当前生命伤害(Boss上限240)" },
+    [6] = { name = "天罚陨石", icon = "combo_tier5", desc = "主角周围4格内秒杀小怪，对Boss造成240伤害；范围外敌人眩晕1回合" },
     [7] = { name = "末日炸弹", icon = "combo_tier6", desc = "秒杀全部小怪，对Boss造成150伤害" },
-    [8] = { name = "末日炸弹", icon = "combo_tier6", desc = "秒杀全部小怪，对Boss造成150伤害" },
+    [8] = { name = "毁灭重生", icon = "combo_tier6", desc = "秒杀全部小怪，对Boss造成150伤害，回满血+护盾" },
 }
 
 --- 连击奖励颜色配置（按阈值递增的华丽程度）
@@ -4148,6 +4596,7 @@ function Battle.CheckComboRewards(state)
     end
 
     -- 只触发最高阈值的奖励（4连击只触发4连击效果，不触发2、3）
+    -- 8连以上统一为 threshold=8（一次性触发毁灭重生，护盾由实际连击数决定）
     local threshold = math.min(combo, 8)
     if threshold >= 2 and not state.comboRewardsTriggered[threshold] then
         state.comboRewardsTriggered[threshold] = true
@@ -4157,7 +4606,7 @@ function Battle.CheckComboRewards(state)
         end
         local reward = Battle.COMBO_REWARDS[threshold]
         if reward then
-            local colors = COMBO_REWARD_COLORS[threshold] or COMBO_REWARD_COLORS[2]
+            local colors = COMBO_REWARD_COLORS[threshold] or COMBO_REWARD_COLORS[7]
 
             state.comboAnnouncement = {
                 threshold = threshold,
@@ -4525,11 +4974,12 @@ function Battle.ExecuteComboReward(state, threshold)
         Battle.AddLog(state, logMsg)
 
     elseif threshold == 6 then
-        -- === 6连: 天罚陨石（局部范围） ===
-        -- 主角周围4格内的敌人受90%当前HP伤害，Boss上限240
+        -- === 6连: 天罚陨石（秒杀范围内小兵 + 范围外眩晕） ===
+        -- 主角周围4格内秒杀小怪，对Boss造成240伤害；范围外敌人眩晕1回合
         local meteorRange = 4
         local enemies = HexGrid.GetTeamPieces(board, "enemy")
-        local hitCount = 0
+        local killCount = 0
+        local stunCount = 0
         local totalMeteorDmg = 0
         -- 收集范围内的格子用于VFX显示
         local meteorCells = {}
@@ -4549,23 +4999,36 @@ function Battle.ExecuteComboReward(state, threshold)
             if e.hp > 0 then
                 local dist = HexGrid.CubeDistance(hero.col, hero.row, e.col, e.row)
                 if dist <= meteorRange then
-                    local meteorDmg = math.floor(e.hp * 0.90)
-                    if e.isBoss and meteorDmg > 240 then
-                        meteorDmg = 240
-                    end
-                    meteorDmg = Battle.ApplyAltarReduction(state, e, meteorDmg)
+                    -- 范围内：小兵秒杀，Boss造成240伤害
                     if e.isBoss then
+                        local meteorDmg = 240
+                        meteorDmg = Battle.ApplyAltarReduction(state, e, meteorDmg)
                         Battle.ApplyBossDamage(state, e, meteorDmg)
+                        state.totalDamage = state.totalDamage + meteorDmg
+                        totalMeteorDmg = totalMeteorDmg + meteorDmg
+                        Battle.AddFloatingText(state, e.col, e.row,
+                            "-" .. meteorDmg .. "☄️", {255, 100, 0, 255})
+                        if e.hp <= 0 then
+                            killCount = killCount + 1
+                        end
                     else
-                        e.hp = e.hp - meteorDmg
-                    end
-                    state.totalDamage = state.totalDamage + meteorDmg
-                    totalMeteorDmg = totalMeteorDmg + meteorDmg
-                    hitCount = hitCount + 1
-                    Battle.AddFloatingText(state, e.col, e.row,
-                        "-" .. meteorDmg .. "☄️", {255, 100, 0, 255})
-                    if e.hp <= 0 then
+                        -- 秒杀小兵
+                        local meteorDmg = e.hp
+                        state.totalDamage = state.totalDamage + meteorDmg
+                        totalMeteorDmg = totalMeteorDmg + meteorDmg
+                        e.hp = 0
+                        Battle.AddFloatingText(state, e.col, e.row,
+                            "秒杀☄️", {255, 60, 0, 255})
                         Battle.HandleEnemyDeath(state, e, true, true)
+                        killCount = killCount + 1
+                    end
+                else
+                    -- 范围外：眩晕1回合（Boss免疫眩晕）
+                    if not e.isBoss then
+                        e._stunnedTurns = (e._stunnedTurns or 0) + 1
+                        stunCount = stunCount + 1
+                        Battle.AddFloatingText(state, e.col, e.row,
+                            "💫眩晕!", {255, 200, 0, 255})
                     end
                 end
             end
@@ -4577,10 +5040,10 @@ function Battle.ExecuteComboReward(state, threshold)
             cells = meteorCells,
         })
         AM.PlaySFX("combo_meteor")
-        Battle.AddLog(state, string.format("☄️ 天罚陨石降临！%d格范围内命中%d个敌人，共%d伤害！", meteorRange, hitCount, totalMeteorDmg))
+        Battle.AddLog(state, string.format("☄️ 天罚陨石降临！秒杀%d个敌人，眩晕%d个敌人，共%d伤害！", killCount, stunCount, totalMeteorDmg))
 
-    elseif threshold == 7 then
-        -- === 7连+: 末日炸弹 ===
+    elseif threshold >= 7 then
+        -- === 7连+: 末日炸弹 / 8连+: 毁灭重生 ===
         -- 秒杀所有小怪 + 对Boss造成重击伤害（不秒杀）
         local bombEmoji = "💣"
         local enemies = HexGrid.GetTeamPieces(board, "enemy")
@@ -4638,6 +5101,20 @@ function Battle.ExecuteComboReward(state, threshold)
         })
         AM.PlaySFX("combo_doomsday_blast")
         Battle.AddLog(state, string.format("💣💥 末日炸弹！清除%d个小怪，对Boss造成重击！", killCount))
+
+        -- === 8连+: 毁灭重生 — 回满血（立即）+ 护盾（延迟到连击链结束）===
+        if state.combo >= 8 then
+            -- 回满血（立即生效）
+            local healAmt = hero.maxHp - hero.hp
+            hero.hp = hero.maxHp
+            if healAmt > 0 then
+                Battle.AddFloatingText(state, hero.col, hero.row,
+                    "+" .. healAmt .. " 满血!", {80, 255, 80, 255})
+            end
+            -- 护盾延迟：标记待结算，连击链结束时按最终combo数计算
+            state._pendingComboShield = true
+            Battle.AddLog(state, "✨ 毁灭重生！回满血！护盾将在连击结束后结算")
+        end
     end
 end
 
@@ -4645,6 +5122,27 @@ end
 function Battle.ResetComboRewards(state)
     state.comboRewardsTriggered = {}
     state.leapPioneerShownThisChain = false
+end
+
+--- 连击链结束时结算延迟护盾（在 combo 清零前调用）
+function Battle.SettlePendingComboShield(state)
+    if not state._pendingComboShield then return end
+    state._pendingComboShield = nil
+
+    local hero = state.hero
+    local finalCombo = state.combo
+    if finalCombo < 8 then return end  -- 安全检查
+
+    -- 护盾：基础30 + 每多1连+15（8连=30, 9连=45, 10连=60...）
+    local shieldAmt = 30 + (finalCombo - 8) * 15
+    hero._shield = (hero._shield or 0) + shieldAmt
+    Battle.AddFloatingText(state, hero.col, hero.row,
+        "🛡+" .. shieldAmt, {60, 200, 255, 255})
+    Battle.AddVFX(state, "shield_gain", {
+        col = hero.col, row = hero.row, duration = 0.6,
+    })
+    AM.PlaySFX("combo_shield_gain")
+    Battle.AddLog(state, string.format("🛡 连击结束！获得%d护盾（%d连）", shieldAmt, finalCombo))
 end
 
 
@@ -4799,6 +5297,7 @@ function Battle.ProcessEnemyTurn(state)
         if state.isEndless then
             state.endlessTotalTurns = (state.endlessTotalTurns or 0) + 1
         end
+        Battle.SettlePendingComboShield(state)  -- 连击链结束，结算延迟护盾
         state.combo = 0
         state.comboKillCount = 0
         state.comboAtkBonus = 0
@@ -4984,6 +5483,7 @@ function Battle.ProcessEnemyTurn(state)
     if state.isEndless then
         state.endlessTotalTurns = (state.endlessTotalTurns or 0) + 1
     end
+    Battle.SettlePendingComboShield(state)  -- 连击链结束，结算延迟护盾
     state.combo = 0
     state.comboKillCount = 0
     state.comboAtkBonus = 0
@@ -5128,7 +5628,7 @@ function Battle.GetSpikeAt(state, col, row)
     return nil
 end
 
---- 封印减益回合递减（回合结束递减，到0时解除）
+--- 封印/眩晕减益回合递减（回合结束递减，到0时解除）
 function Battle.TickSealDebuff(state)
     local enemies = HexGrid.GetTeamPieces(state.board, "enemy")
     for _, enemy in ipairs(enemies) do
@@ -5139,6 +5639,14 @@ function Battle.TickSealDebuff(state)
                 enemy._sealedDmgReduction = nil
                 Battle.AddFloatingText(state, enemy.col, enemy.row,
                     "🔓封印解除", {200, 200, 100, 255})
+            end
+        end
+        if enemy._stunnedTurns and enemy._stunnedTurns > 0 then
+            enemy._stunnedTurns = enemy._stunnedTurns - 1
+            if enemy._stunnedTurns <= 0 then
+                enemy._stunnedTurns = nil
+                Battle.AddFloatingText(state, enemy.col, enemy.row,
+                    "💫眩晕解除", {200, 200, 100, 255})
             end
         end
     end
@@ -5186,6 +5694,13 @@ function Battle.EnemyAct(state, enemy)
         Battle.AddFloatingText(state, enemy.col, enemy.row,
             "🐚防御中", {180, 140, 100, 255})
         return { type = "shelled", enemy = enemy }
+    end
+
+    -- === 天罚眩晕: 被眩晕的敌人完全跳过行动 ===
+    if enemy._stunnedTurns and enemy._stunnedTurns > 0 then
+        Battle.AddFloatingText(state, enemy.col, enemy.row,
+            "💫眩晕中", {255, 200, 0, 255})
+        return { type = "stunned", enemy = enemy }
     end
 
     -- === 六芒封印: 被封印的敌人无法移动，可攻击但伤害降低 ===
@@ -6403,11 +6918,11 @@ function Battle.CheckEndCondition(state)
     -- 击杀目标达成 → 即使英雄同归于尽也算胜利（同帧击杀+死亡 = 胜利）
     local won = false
     if Battle.IsBossLevel(state.level) then
-        -- Boss关胜利条件: 击杀Boss
+        -- Boss关胜利条件: 击杀Boss（身体段不算）
         local enemies = HexGrid.GetTeamPieces(state.board, "enemy")
         local bossAlive = false
         for _, e in ipairs(enemies) do
-            if e.isBoss and e.hp > 0 then bossAlive = true; break end
+            if e.isBoss and e.hp > 0 and not e.isSegment then bossAlive = true; break end
         end
         if not bossAlive then
             won = true

@@ -90,8 +90,8 @@ function SetEffects.OnComboChainComplete(seState, currentCombo)
             bonus = 1
         end
     else
-        -- 4/6: 30% combo+1
-        if math.random(1, 100) <= 30 then
+        -- 4/6: 50% combo+1
+        if math.random(1, 100) <= 50 then
             bonus = 1
         end
     end

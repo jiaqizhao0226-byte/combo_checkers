@@ -183,6 +183,8 @@ function BattleBoss.BossAct(state, boss)
         return BattleBoss.BossAct_AbyssKraken(state, boss)
     elseif bt == "coral_guardian" then
         return BattleBoss.BossAct_CoralGuardian(state, boss)
+    elseif bt == "sand_worm" then
+        return BattleBoss.BossAct_SandWorm(state, boss)
     else
         return BattleBoss.BossAct_ShadowKnight(state, boss)
     end
@@ -1020,8 +1022,363 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
     return BattleBoss.BossMoveToHero(state, boss)
 end
 
+-- =============================================================================
+-- 第四章: 沙丘巨虫 (sand_worm) — 蛇形移动 + 尾鞭 + 沙暴 + 钻地
+-- =============================================================================
+
+--- 沙虫蛇形移动: 头移动到新格，身体段依次跟随（仅限相邻1格移动）
+local function SandWormSnakeMove(state, boss, targetCol, targetRow)
+    local segments = state.sandWormSegments
+    if not segments or #segments < 2 then
+        boss.col, boss.row = targetCol, targetRow
+        return
+    end
+
+    -- 从尾到头依次移动：每段移到前一段的旧位置
+    for i = #segments, 2, -1 do
+        local seg = segments[i]
+        local prev = segments[i - 1]
+        seg.col, seg.row = prev.col, prev.row
+    end
+    -- 头移到目标位置
+    boss.col, boss.row = targetCol, targetRow
+end
+
+--- 沙虫传送后重排身体：头部已到新位置，身体段依次排列在头后面形成连续蛇形
+local function SandWormReformBody(state, boss)
+    local segments = state.sandWormSegments
+    if not segments or #segments < 2 then return end
+
+    -- 从第2段开始，每段找前一段的相邻空格放置
+    for i = 2, #segments do
+        local prev = segments[i - 1]
+        local seg = segments[i]
+        local neighbors = HexGrid.GetNeighbors(prev.col, prev.row)
+        -- 优先选行号更大的（身体向下延伸）
+        table.sort(neighbors, function(a, b) return a.row > b.row end)
+        local placed = false
+        for _, nb in ipairs(neighbors) do
+            if HexGrid.InBounds(nb.col, nb.row) then
+                -- 不能放在有棋子的格子（排除自己身体段）
+                local occupied = false
+                local pieceAt = HexGrid.GetPieceAt(state.board, nb.col, nb.row)
+                if pieceAt then
+                    -- 检查是否是自己的身体段
+                    local isSelf = false
+                    for k = 1, #segments do
+                        if segments[k] == pieceAt then isSelf = true; break end
+                    end
+                    if not isSelf then occupied = true end
+                end
+                -- 不能放在已排好的前面身体段上
+                if not occupied then
+                    local isEarlierSeg = false
+                    for k = 1, i - 1 do
+                        if segments[k].col == nb.col and segments[k].row == nb.row then
+                            isEarlierSeg = true; break
+                        end
+                    end
+                    if not isEarlierSeg
+                       and not HexGrid.GetObstacleAt(state.board, nb.col, nb.row) then
+                        -- 沙虫不受流沙影响，身体段可放在流沙区上
+                        seg.col, seg.row = nb.col, nb.row
+                        placed = true
+                        break
+                    end
+                end
+            end
+        end
+        -- 如果找不到合适位置，紧贴前一段（容错）
+        if not placed then
+            seg.col, seg.row = prev.col, prev.row
+        end
+    end
+end
+
+--- 沙虫判断某格是否可通行（忽略流沙，Boss不受流沙影响）
+local function SandWormCanPass(state, boss, col, row)
+    if not HexGrid.InBounds(col, row) then return false end
+    if HexGrid.GetObstacleAt(state.board, col, row) then return false end
+    -- 不能移动到英雄所在格
+    if col == state.hero.col and row == state.hero.row then return false end
+    -- 不能移动到其他敌人所在格（排除自己的身体段）
+    local pieceAt = HexGrid.GetPieceAt(state.board, col, row)
+    if pieceAt then
+        local isSelf = false
+        if state.sandWormSegments then
+            for _, seg in ipairs(state.sandWormSegments) do
+                if seg == pieceAt then isSelf = true; break end
+            end
+        end
+        if not isSelf then return false end
+    end
+    -- 不能移动到自己身体段所在格（避免自咬）
+    if state.sandWormSegments then
+        for _, seg in ipairs(state.sandWormSegments) do
+            if seg ~= boss and seg.col == col and seg.row == row then return false end
+        end
+    end
+    return true
+end
+
+--- 沙虫寻找朝英雄方向的最佳移动格（忽略流沙）
+local function SandWormFindMoveTarget(state, boss)
+    local hero = state.hero
+    local neighbors = HexGrid.GetNeighbors(boss.col, boss.row)
+    local best, bestDist = nil, 999
+    for _, nb in ipairs(neighbors) do
+        if SandWormCanPass(state, boss, nb.col, nb.row) then
+            local d = HexGrid.CubeDistance(nb.col, nb.row, hero.col, hero.row)
+            if d < bestDist then
+                bestDist = d
+                best = nb
+            end
+        end
+    end
+    return best
+end
+
+function BattleBoss.BossAct_SandWorm(state, boss)
+    local hero = state.hero
+    BattleBoss.BossEnrageCheck(state, boss, "沙丘巨虫")
+
+    -- 冷却递减
+    boss.burrowCooldown    = (boss.burrowCooldown or 0) - 1
+    boss.tailWhipCooldown  = (boss.tailWhipCooldown or 0) - 1
+    boss.sandstormCooldown = (boss.sandstormCooldown or 0) - 1
+
+    -- ══ 部分露出状态（钻出后第一回合只显示头+2节，本回合结束恢复全部）══════
+    if boss.emerging then
+        boss.emerging = false
+        -- 恢复所有隐藏的身体段
+        if state.sandWormSegments then
+            for _, seg in ipairs(state.sandWormSegments) do
+                seg.hidden = false
+            end
+        end
+        AddFloatingText(state, boss.col, boss.row, "🐛完全钻出!", {210, 180, 100, 255})
+        AddLog(state, "沙丘巨虫完全从地下钻出！")
+        -- 本回合正常行动（继续往下走到移动/攻击逻辑）
+    end
+
+    -- ══ 遁地读条阶段（Boss还在地面，准备钻入地下）══════════════════════
+    if boss.burrowCasting then
+        boss.burrowCasting = false
+        -- 读条结束，正式遁地
+        boss.burrowed = true
+        boss.hidden = true
+        boss.burrowTimer = 2  -- 地下2回合
+        -- 隐藏所有身体段
+        if state.sandWormSegments then
+            for _, seg in ipairs(state.sandWormSegments) do
+                seg.hidden = true
+            end
+        end
+        AddFloatingText(state, boss.col, boss.row, "🕳️遁入地下!", {180, 140, 60, 255})
+        AddVFX(state, "burrow_start", { col = boss.col, row = boss.row, duration = 0.6 })
+        state.screenShake = (state.screenShake or 0) + 0.3
+        AM.PlaySFX("boss_aoe", 0.7)
+        AddLog(state, "沙丘巨虫钻入地下！地面开始震动...")
+        return { type = "skill", enemy = boss, skill = "burrow_dive" }
+    end
+
+    -- ══ 遁地状态处理（Boss在地下，倒计时结束后钻出AOE）══════════════════
+    if boss.burrowed then
+        boss.burrowTimer = (boss.burrowTimer or 0) - 1
+        if boss.burrowTimer <= 0 then
+            -- 钻出！在英雄附近造成大范围AOE
+            boss.burrowed = false
+            boss.hidden = false
+            -- 找英雄附近的空格作为Boss头部钻出点
+            local heroNeighbors = HexGrid.GetNeighbors(hero.col, hero.row)
+            local validSpots = {}
+            for _, nb in ipairs(heroNeighbors) do
+                if SandWormCanPass(state, boss, nb.col, nb.row) then
+                    validSpots[#validSpots + 1] = nb
+                end
+            end
+            if #validSpots > 0 then
+                local dest = validSpots[math.random(1, #validSpots)]
+                boss.col, boss.row = dest.col, dest.row
+            end
+            -- 身体重新排列在头部后面（爬出动画：头先出，身体段延迟逐节显示）
+            SandWormReformBody(state, boss)
+            boss.emerging = true  -- 标记：下回合再完全显示
+            if state.sandWormSegments then
+                for i, seg in ipairs(state.sandWormSegments) do
+                    if i == 1 then
+                        seg.hidden = false  -- 头部立即显示
+                    elseif i == 2 then
+                        seg.hidden = false  -- 第1节紧跟头部
+                        seg.emergeDelay = 0.3  -- 延迟0.3秒显示（爬出效果）
+                    elseif i == 3 then
+                        seg.hidden = false
+                        seg.emergeDelay = 0.6  -- 延迟0.6秒
+                    else
+                        seg.hidden = true   -- 其余隐藏，下回合再露出
+                    end
+                end
+            end
+            -- 对钻出点周围造成AOE伤害（头部+相邻6格范围）
+            local aoeRange = HexGrid.GetNeighbors(boss.col, boss.row)
+            aoeRange[#aoeRange + 1] = { col = boss.col, row = boss.row }
+            local burrowDmg = boss.enraged and math.floor(boss.atk * 1.8) or math.floor(boss.atk * 1.2)
+            -- 检查英雄是否在AOE范围内
+            local heroHit = false
+            for _, tile in ipairs(aoeRange) do
+                if tile.col == hero.col and tile.row == hero.row then
+                    heroHit = true; break
+                end
+            end
+            if heroHit then
+                hero.hp = hero.hp - burrowDmg
+                AddFloatingText(state, hero.col, hero.row,
+                    "🕳️-" .. burrowDmg .. "钻地突袭!", {180, 140, 60, 255}, "hit")
+            end
+            -- AOE范围红光高亮（供BoardWidget渲染）
+            state.sandWormEmergeAOE = {
+                tiles = aoeRange,
+                timer = 1.2,  -- 高亮持续1.2秒
+                maxTimer = 1.2,
+            }
+            BattleBoss.AddBossSkillAnnounce(state, "burrow_emerge", boss.name)
+            AddVFX(state, "burrow_strike", { col = boss.col, row = boss.row, duration = 0.8 })
+            state.screenShake = (state.screenShake or 0) + 1.2  -- 更强烈的屏幕震动
+            AM.PlaySFX("boss_stomp", 1.0)
+            AddLog(state, string.format("沙丘巨虫从地下钻出！%s",
+                heroHit and ("造成 " .. burrowDmg .. " 伤害！") or "英雄闪避成功！"))
+            return { type = "skill", enemy = boss, skill = "burrow_emerge" }
+        else
+            -- 还在地下，显示提示
+            AddFloatingText(state, hero.col, hero.row,
+                "🌊地面震动..(" .. boss.burrowTimer .. "回合)", {180, 140, 60, 180})
+            AddLog(state, "地面在震动...沙丘巨虫即将钻出！(剩余 " .. boss.burrowTimer .. " 回合)")
+            return { type = "wait", enemy = boss }
+        end
+    end
+
+    local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
+
+    -- ── 优先级0: 遁地读条（1回合准备→下回合正式遁地）─────────────────────
+    if boss.burrowCooldown <= 0 and distToHero >= 3 then
+        boss.burrowCooldown = boss.enraged and 7 or 10
+        boss.burrowCasting = true  -- 进入读条阶段，下回合正式遁地
+        BattleBoss.AddBossSkillAnnounce(state, "burrow_start", boss.name)
+        AddFloatingText(state, boss.col, boss.row, "⏳准备遁地...", {180, 140, 60, 255})
+        AddVFX(state, "burrow_casting", { col = boss.col, row = boss.row, duration = 1.0 })
+        AM.PlaySFX("boss_aoe", 0.5)
+        AddLog(state, "沙丘巨虫身体下沉，准备钻入地下！")
+        return { type = "skill", enemy = boss, skill = "burrow_casting" }
+    end
+
+    -- ── 优先级1: 尾鞭横扫（英雄靠近尾巴时触发，打断连跳弹到附近格）──────────────────
+    local tailSeg = nil
+    if state.sandWormSegments and #state.sandWormSegments > 1 then
+        tailSeg = state.sandWormSegments[#state.sandWormSegments]
+    end
+    local distToTail = tailSeg and HexGrid.CubeDistance(tailSeg.col, tailSeg.row, hero.col, hero.row) or distToHero
+    if boss.tailWhipCooldown <= 0 and distToTail <= 2 then
+        boss.tailWhipCooldown = boss.enraged and 2 or 4
+        local whipDmg = boss.enraged and math.floor(boss.atk * 1.4) or boss.atk
+        hero.hp = hero.hp - whipDmg
+        -- 弹到Boss附近的安全格（不是全场随机）
+        local knockNeighbors = HexGrid.GetNeighbors(hero.col, hero.row)
+        local safeSpots = {}
+        for _, nb in ipairs(knockNeighbors) do
+            if HexGrid.InBounds(nb.col, nb.row)
+               and not HexGrid.GetPieceAt(state.board, nb.col, nb.row)
+               and not HexGrid.GetObstacleAt(state.board, nb.col, nb.row)
+               and (nb.col ~= boss.col or nb.row ~= boss.row) then
+                safeSpots[#safeSpots + 1] = nb
+            end
+        end
+        if #safeSpots > 0 then
+            local dest = safeSpots[math.random(1, #safeSpots)]
+            hero.col, hero.row = dest.col, dest.row
+        end
+        -- 强制中断连跳
+        state.combo = 0
+        state.isChaining = false
+        AddFloatingText(state, hero.col, hero.row,
+            "🌊-" .. whipDmg .. "尾鞭!", {210, 180, 100, 255}, "hit")
+        AddFloatingText(state, hero.col, hero.row,
+            "💫连跳中断!", {255, 100, 100, 255})
+        BattleBoss.AddBossSkillAnnounce(state, "tail_whip", boss.name)
+        state.screenShake = (state.screenShake or 0) + 0.4
+        AM.PlaySFX("boss_stomp", 0.9)
+        AddLog(state, string.format("沙丘巨虫尾鞭横扫！造成 %d 伤害并中断连跳！", whipDmg))
+        return { type = "skill", enemy = boss, skill = "tail_whip" }
+    end
+
+    -- ── 优先级2: 沙暴（全场AOE，伤害较低）─────────────────────────────
+    if boss.sandstormCooldown <= 0 then
+        boss.sandstormCooldown = boss.enraged and 3 or 6
+        local stormDmg = boss.enraged and math.floor(boss.atk * 0.8) or math.floor(boss.atk * 0.5)
+        hero.hp = hero.hp - stormDmg
+        -- 沙暴还会在随机空格生成流沙
+        local allCells = HexGrid.GetAllValidCells()
+        local sandCount = boss.enraged and 3 or 2
+        local shuffled = {}
+        for _, c in ipairs(allCells) do
+            if not HexGrid.IsBlocked(state.board, c.col, c.row)
+               and (c.col ~= hero.col or c.row ~= hero.row)
+               and not HexGrid.GetQuicksandAt(state.board, c.col, c.row) then
+                shuffled[#shuffled + 1] = c
+            end
+        end
+        for i = #shuffled, 2, -1 do
+            local j = math.random(1, i)
+            shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+        end
+        for i = 1, math.min(sandCount, #shuffled) do
+            HexGrid.AddQuicksand(state.board, shuffled[i].col, shuffled[i].row)
+        end
+        AddFloatingText(state, hero.col, hero.row,
+            "🏜️-" .. stormDmg .. "沙暴!", {210, 180, 100, 255}, "hit")
+        BattleBoss.AddBossSkillAnnounce(state, "sandstorm", boss.name)
+        AddVFX(state, "sandstorm", { col = boss.col, row = boss.row, duration = 1.0 })
+        state.screenShake = (state.screenShake or 0) + 0.3
+        AM.PlaySFX("boss_aoe", 0.8)
+        AddLog(state, string.format("沙丘巨虫掀起沙暴！全场 %d 伤害并制造流沙！", stormDmg))
+        return { type = "skill", enemy = boss, skill = "sandstorm" }
+    end
+
+    -- ── 蛇形移动 + 普通攻击 ─────────────────────────────────────────
+    -- 先移动一步靠近英雄
+    local moveTarget = SandWormFindMoveTarget(state, boss)
+    if moveTarget then
+        SandWormSnakeMove(state, boss, moveTarget.col, moveTarget.row)
+    end
+
+    -- 移动后检查是否能攻击
+    local newDist = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
+    if newDist <= (boss.attackRange or 1) then
+        local dmg = math.max(1, boss.atk - (hero.def or 0))
+        hero.hp = hero.hp - dmg
+        AddFloatingText(state, hero.col, hero.row,
+            "🐛-" .. dmg, {210, 180, 100, 255}, "hit")
+        boss.skillAnimTimer    = 0.35
+        boss.skillAnimDuration = 0.35
+        boss.skillAnimType     = "bite"
+        AM.PlaySFX("attack_hit", 1.0)
+        AddLog(state, string.format("沙丘巨虫撕咬！造成 %d 伤害！", dmg))
+        return { type = "attack", enemy = boss, damage = dmg }
+    end
+
+    return { type = "move", enemy = boss }
+end
+
 --- 对Boss造成伤害（考虑护盾）
 function BattleBoss.ApplyBossDamage(state, boss, damage)
+    -- 沙虫身体段: 伤害路由到头部
+    if boss.snakeHead then
+        boss = boss.snakeHead
+    end
+    -- 遁地状态免疫伤害
+    if boss.burrowed then
+        AddFloatingText(state, boss.col, boss.row, "遁地中!", {150, 150, 150, 180})
+        return
+    end
     if boss.shieldHp and boss.shieldHp > 0 then
         local shieldAbsorb = math.min(boss.shieldHp, damage)
         boss.shieldHp = boss.shieldHp - shieldAbsorb

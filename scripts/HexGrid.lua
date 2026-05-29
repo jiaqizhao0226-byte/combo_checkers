@@ -320,6 +320,23 @@ function HexGrid.GetObstacleAt(board, col, row)
     return nil
 end
 
+--- 获取指定位置的"可跳跃支点"（障碍物 OR 活跃祭坛），用于飞跃先锋
+function HexGrid.GetJumpSupportAt(board, col, row)
+    -- 先检查障碍物
+    local obs = HexGrid.GetObstacleAt(board, col, row)
+    if obs then return obs end
+    -- 再检查祭坛（第二章火焰祭坛）
+    if board.altars then
+        for _, alt in ipairs(board.altars) do
+            if alt.active and alt.col == col and alt.row == row then
+                alt.isAltar = true  -- 标记为祭坛，跳跃处理时区分
+                return alt
+            end
+        end
+    end
+    return nil
+end
+
 --- 移除指定位置的障碍物
 function HexGrid.RemoveObstacle(board, col, row)
     for i = #board.obstacles, 1, -1 do
@@ -336,6 +353,26 @@ function HexGrid.IsBlocked(board, col, row)
     if HexGrid.GetPieceAt(board, col, row) then return true end
     if HexGrid.GetObstacleAt(board, col, row) then return true end
     -- 第三章: 寄居蟹和贝壳占据格子，不可通行
+    if board.crabs then
+        for _, crab in ipairs(board.crabs) do
+            if not crab.rescued and crab.col == col and crab.row == row then return true end
+        end
+    end
+    if board.shells then
+        for _, shell in ipairs(board.shells) do
+            if shell.col == col and shell.row == row then return true end
+        end
+    end
+    -- 第四章: 流沙区不可通行
+    if HexGrid.IsInQuicksandZone(board, col, row) then return true end
+    return false
+end
+
+--- 检查位置是否被阻挡（忽略石头/障碍物）
+--- 用于第三章先锋飞跃落点检查：石头可被突破，不视为阻挡
+function HexGrid.IsBlockedIgnoreRocks(board, col, row)
+    if HexGrid.GetPieceAt(board, col, row) then return true end
+    -- 不检查 obstacles（石头），先锋飞跃可突破
     if board.crabs then
         for _, crab in ipairs(board.crabs) do
             if not crab.rescued and crab.col == col and crab.row == row then return true end
@@ -592,8 +629,10 @@ end
 --- 障碍物会阻断路径（和棋子一样）
 --- 迷雾中的敌人不可见，扫描遇到迷雾格时视为阻断（看不见对面）
 --- @param maxJumpOver number|nil 可跳过的最大连续敌人数(默认1, 飞跃先锋=2)
-function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
+--- @param opts {ch3Rocks: boolean}|nil  ch3Rocks=true时，先锋飞跃落点/路径的石头不视为阻挡
+function HexGrid.FindValidJumps(board, col, row, maxJumpOver, opts)
     maxJumpOver = maxJumpOver or 1
+    local ch3Rocks = opts and opts.ch3Rocks  -- 第三章：先锋飞跃落点石头可被突破
     local jumps = {}
     local hx, hy, hz = HexGrid.OffsetToCube(col, row)
 
@@ -612,8 +651,8 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                 break
             end
 
-            -- 检查障碍物: 可以跳过岩石（无伤害跳跃）
-            local obstacle = HexGrid.GetObstacleAt(board, ec, er)
+            -- 检查障碍物/祭坛: 可以跳过（无伤害跳跃）
+            local obstacle = HexGrid.GetJumpSupportAt(board, ec, er)
             if obstacle then
                 -- 岩石也可作为跳跃支点，计算对称落点
                 local lx = ex + dir[1] * dist
@@ -629,7 +668,7 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                             local my = ey + dir[2] * step
                             local mz = ez + dir[3] * step
                             local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
-                            if HexGrid.IsBlocked(board, mc, mr) then
+                            if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
                                 landingClear = false
                                 break
                             end
@@ -646,6 +685,105 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                         end
                     end
                 end
+
+                -- 飞跃先锋: 石头在前的情况（ROCK → E/ROCK → ...）
+                if ch3Rocks and maxJumpOver >= 2 then
+                    -- 检查石头正后方1格（位置2）是否有敌人或石头
+                    local adj_x = ex + dir[1]
+                    local adj_y = ey + dir[2]
+                    local adj_z = ez + dir[3]
+                    local adj_c, adj_r = HexGrid.CubeToOffset(adj_x, adj_y, adj_z)
+                    if HexGrid.InBounds(adj_c, adj_r) then
+                        local piece2 = HexGrid.GetPieceAt(board, adj_c, adj_r)
+                        local isEnemy2 = piece2 and piece2.team == "enemy"
+                        local obs2 = (not isEnemy2) and HexGrid.GetJumpSupportAt(board, adj_c, adj_r) or nil
+                        if isEnemy2 or obs2 then
+                            -- 飞跃先锋6/6: 石头在前 → 检查位置3
+                            if maxJumpOver >= 3 then
+                                local adj2_x = adj_x + dir[1]
+                                local adj2_y = adj_y + dir[2]
+                                local adj2_z = adj_z + dir[3]
+                                local adj2_c, adj2_r = HexGrid.CubeToOffset(adj2_x, adj2_y, adj2_z)
+                                if HexGrid.InBounds(adj2_c, adj2_r) then
+                                    local piece3 = HexGrid.GetPieceAt(board, adj2_c, adj2_r)
+                                    local isEnemy3 = piece3 and piece3.team == "enemy"
+                                    local obs3 = (not isEnemy3) and HexGrid.GetJumpSupportAt(board, adj2_c, adj2_r) or nil
+                                    if isEnemy3 or obs3 then
+                                        -- 三连跳落点: 位置3后方 dist 步
+                                        local l3x = adj2_x + dir[1] * dist
+                                        local l3y = adj2_y + dir[2] * dist
+                                        local l3z = adj2_z + dir[3] * dist
+                                        local l3c, l3r = HexGrid.CubeToOffset(l3x, l3y, l3z)
+                                        if HexGrid.InBounds(l3c, l3r) and not HexGrid.IsBlocked(board, l3c, l3r) then
+                                            local path3Clear = true
+                                            for step = 1, dist - 1 do
+                                                local mx = adj2_x + dir[1] * step
+                                                local my = adj2_y + dir[2] * step
+                                                local mz = adj2_z + dir[3] * step
+                                                local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
+                                                if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
+                                                    path3Clear = false
+                                                    break
+                                                end
+                                            end
+                                            if path3Clear then
+                                                jumps[#jumps + 1] = {
+                                                    col = l3c, row = l3r,
+                                                    enemy = isEnemy2 and piece2 or (isEnemy3 and piece3 or nil),
+                                                    enemy2 = isEnemy2 and piece2 or nil,
+                                                    enemy3 = isEnemy3 and piece3 or nil,
+                                                    jumpedCol = ec, jumpedRow = er,
+                                                    jumpedCol2 = adj_c, jumpedRow2 = adj_r,
+                                                    jumpedCol3 = adj2_c, jumpedRow3 = adj2_r,
+                                                    jumpedObstacle = obstacle,
+                                                    jumpedObstacle2 = obs2,
+                                                    jumpedObstacle3 = obs3,
+                                                    isRockJump = true,
+                                                    dist = dist,
+                                                    isDoubleJump = true,
+                                                    isTripleJump = true,
+                                                }
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+
+                            -- 双跳落点: 位置2后方 dist 步
+                            local l2x = adj_x + dir[1] * dist
+                            local l2y = adj_y + dir[2] * dist
+                            local l2z = adj_z + dir[3] * dist
+                            local l2c, l2r = HexGrid.CubeToOffset(l2x, l2y, l2z)
+                            if HexGrid.InBounds(l2c, l2r) and not HexGrid.IsBlocked(board, l2c, l2r) then
+                                local pathClear = true
+                                for step = 1, dist - 1 do
+                                    local mx = adj_x + dir[1] * step
+                                    local my = adj_y + dir[2] * step
+                                    local mz = adj_z + dir[3] * step
+                                    local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
+                                    if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
+                                        pathClear = false
+                                        break
+                                    end
+                                end
+                                if pathClear then
+                                    jumps[#jumps + 1] = {
+                                        col = l2c, row = l2r,
+                                        enemy = isEnemy2 and piece2 or nil,
+                                        jumpedCol = ec, jumpedRow = er,
+                                        jumpedCol2 = adj_c, jumpedRow2 = adj_r,
+                                        jumpedObstacle = obstacle,
+                                        jumpedObstacle2 = obs2,
+                                        isRockJump = true,
+                                        dist = dist,
+                                        isDoubleJump = true,
+                                    }
+                                end
+                            end
+                        end
+                    end
+                end
+
                 break  -- 此方向被岩石阻断
             end
 
@@ -678,7 +816,7 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                                     local my = ey + dir[2] * step
                                     local mz = ez + dir[3] * step
                                     local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
-                                    if HexGrid.IsBlocked(board, mc, mr) then
+                                    if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
                                         landingClear = false
                                         break
                                     end
@@ -701,7 +839,14 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
             end
             if shellBlocked then break end
 
+            -- 第四章: 流沙区阻断方向扫描（不可飞越）
+            if HexGrid.IsInQuicksandZone(board, ec, er) then break end
+
+            -- 道具阻断方向扫描（路途上有道具不可跳过，但落点可以有道具）
+            if HexGrid.GetItemAt(board, ec, er) then break end
+
             local piece = HexGrid.GetPieceAt(board, ec, er)
+            if piece and piece.hidden then break end  -- 遁地/隐藏的棋子不可跳跃，阻断方向
             if piece then
                 -- 找到了一个棋子（已揭示区域，所以可以看到）
                 if piece.team == "enemy" then
@@ -719,7 +864,7 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                                 local my = ey + dir[2] * step
                                 local mz = ez + dir[3] * step
                                 local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
-                                if HexGrid.IsBlocked(board, mc, mr) then
+                                if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
                                     landingClear = false
                                     break
                                 end
@@ -734,23 +879,25 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                             end
                         end
 
-                        -- 飞跃先锋: 检查第一个敌人正后方1格是否有第二个相邻敌人
+                        -- 飞跃先锋: 检查第一个敌人正后方1格是否有第二个可跳目标（敌人或石头）
                         if maxJumpOver >= 2 then
                             local adj_x = ex + dir[1]
                             local adj_y = ey + dir[2]
                             local adj_z = ez + dir[3]
                             local adj_c, adj_r = HexGrid.CubeToOffset(adj_x, adj_y, adj_z)
                             if HexGrid.InBounds(adj_c, adj_r) then
+                                -- 检查位置2是敌人还是石头
                                 local piece2 = HexGrid.GetPieceAt(board, adj_c, adj_r)
-                                if piece2 and piece2.team == "enemy" then
-                                    -- 两个敌人相邻！计算第二个敌人后方 dist 步的对称落点
+                                local isEnemy2 = piece2 and piece2.team == "enemy"
+                                local obs2 = (not isEnemy2) and ch3Rocks and HexGrid.GetJumpSupportAt(board, adj_c, adj_r) or nil
+                                if isEnemy2 or obs2 then
+                                    -- 位置2有可跳目标！计算其后方 dist 步的对称落点
                                     local l2x = adj_x + dir[1] * dist
                                     local l2y = adj_y + dir[2] * dist
                                     local l2z = adj_z + dir[3] * dist
                                     local l2c, l2r = HexGrid.CubeToOffset(l2x, l2y, l2z)
 
-                                    -- 飞跃先锋6/6: 优先检查第三个相邻敌人（必须在双跳落点检查之前，
-                                    -- 因为双跳落点可能恰好落在E3身上导致IsBlocked=true而漏检）
+                                    -- 飞跃先锋6/6: 优先检查第三个相邻目标（敌人或石头）
                                     if maxJumpOver >= 3 then
                                         local adj2_x = adj_x + dir[1]
                                         local adj2_y = adj_y + dir[2]
@@ -758,21 +905,22 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                                         local adj2_c, adj2_r = HexGrid.CubeToOffset(adj2_x, adj2_y, adj2_z)
                                         if HexGrid.InBounds(adj2_c, adj2_r) then
                                             local piece3 = HexGrid.GetPieceAt(board, adj2_c, adj2_r)
-                                            if piece3 and piece3.team == "enemy" then
-                                                -- 三个敌人相邻！计算第三个敌人后方 dist 步的落点
+                                            local isEnemy3 = piece3 and piece3.team == "enemy"
+                                            local obs3 = (not isEnemy3) and ch3Rocks and HexGrid.GetJumpSupportAt(board, adj2_c, adj2_r) or nil
+                                            if isEnemy3 or obs3 then
+                                                -- 三个目标相邻！计算第三个后方 dist 步的落点
                                                 local l3x = adj2_x + dir[1] * dist
                                                 local l3y = adj2_y + dir[2] * dist
                                                 local l3z = adj2_z + dir[3] * dist
                                                 local l3c, l3r = HexGrid.CubeToOffset(l3x, l3y, l3z)
                                                 if HexGrid.InBounds(l3c, l3r) and not HexGrid.IsBlocked(board, l3c, l3r) then
-                                                    -- 检查中间路径是否畅通（第三敌人到落点之间）
                                                     local path3Clear = true
                                                     for step = 1, dist - 1 do
                                                         local mx = adj2_x + dir[1] * step
                                                         local my = adj2_y + dir[2] * step
                                                         local mz = adj2_z + dir[3] * step
                                                         local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
-                                                        if HexGrid.IsBlocked(board, mc, mr) then
+                                                        if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
                                                             path3Clear = false
                                                             break
                                                         end
@@ -780,15 +928,17 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                                                     if path3Clear then
                                                         jumps[#jumps + 1] = {
                                                             col = l3c, row = l3r,
-                                                            enemy = piece,            -- 第一个被跳过的敌人
-                                                            enemy2 = piece2,          -- 第二个被跳过的敌人
-                                                            enemy3 = piece3,          -- 第三个被跳过的敌人
+                                                            enemy = piece,
+                                                            enemy2 = isEnemy2 and piece2 or nil,
+                                                            enemy3 = isEnemy3 and piece3 or nil,
                                                             jumpedCol = ec, jumpedRow = er,
                                                             jumpedCol2 = adj_c, jumpedRow2 = adj_r,
                                                             jumpedCol3 = adj2_c, jumpedRow3 = adj2_r,
+                                                            jumpedObstacle2 = obs2,
+                                                            jumpedObstacle3 = obs3,
                                                             dist = dist,
-                                                            isDoubleJump = true,      -- 包含双跳
-                                                            isTripleJump = true,      -- 标记为三敌跳
+                                                            isDoubleJump = true,
+                                                            isTripleJump = true,
                                                         }
                                                     end
                                                 end
@@ -796,16 +946,15 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                                         end
                                     end
 
-                                    -- 双跳落点检查（仅当落点未被占据时才添加双跳选项）
+                                    -- 双跳落点检查
                                     if HexGrid.InBounds(l2c, l2r) and not HexGrid.IsBlocked(board, l2c, l2r) then
-                                        -- 检查中间路径是否畅通（第二敌人到落点之间）
                                         local pathClear = true
                                         for step = 1, dist - 1 do
                                             local mx = adj_x + dir[1] * step
                                             local my = adj_y + dir[2] * step
                                             local mz = adj_z + dir[3] * step
                                             local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
-                                            if HexGrid.IsBlocked(board, mc, mr) then
+                                            if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
                                                 pathClear = false
                                                 break
                                             end
@@ -813,12 +962,13 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver)
                                         if pathClear then
                                             jumps[#jumps + 1] = {
                                                 col = l2c, row = l2r,
-                                                enemy = piece,           -- 第一个被跳过的敌人
-                                                enemy2 = piece2,         -- 第二个被跳过的敌人
+                                                enemy = piece,
+                                                enemy2 = isEnemy2 and piece2 or nil,
                                                 jumpedCol = ec, jumpedRow = er,
                                                 jumpedCol2 = adj_c, jumpedRow2 = adj_r,
+                                                jumpedObstacle2 = obs2,
                                                 dist = dist,
-                                                isDoubleJump = true,     -- 标记为双敌跳
+                                                isDoubleJump = true,
                                             }
                                         end
                                     end
@@ -1007,6 +1157,10 @@ local ENEMY_FRAMES = {
     coral_priest     = "image/enemy_coral_priest_idle_20260509064003.png",
     fission_flame    = "image/enemy_fission_flame_idle_20260509063931.png",
     flame_shard      = "image/enemy_flame_shard_idle_20260509063946.png",
+    -- 第四章: 流沙荒漠
+    sand_scorpion    = "image/enemy_sand_scorpion_idle_20260528082515.png",
+    quicksand_worm   = "image/enemy_quicksand_worm_idle_20260528082519.png",
+    sand_hawk        = "image/enemy_sand_hawk_idle_20260528082518.png",
 }
 
 --- Boss 精灵图资源路径 (bossType → {normal, enraged})
@@ -1026,6 +1180,11 @@ local BOSS_FRAMES = {
     coral_guardian = {
         normal  = "image/edited_boss_coral_guardian_normal_transparent_20260523133331.png",
         enraged = "image/edited_boss_coral_guardian_enraged_transparent_20260523133406.png",
+    },
+    sand_worm = {
+        normal  = "image/sandworm_head_20260529063646.png",
+        enraged = "image/sandworm_head_20260529063646.png",  -- 暂用同一张，后续可替换狂暴版
+        body    = "image/sandworm_body_20260529063642.png",
     },
 }
 
@@ -1328,6 +1487,90 @@ local function DrawEnemyNVG(nvg, cx, cy, r, enemyType, gameTime)
             nvgFill(nvg)
         end
 
+    elseif enemyType == "sand_scorpion" then
+        -- 沙蝎：深金色椭圆体 + 双钳 + 尾刺
+        nvgBeginPath(nvg)
+        nvgEllipse(nvg, cx, cy, r * 0.45, r * 0.35)
+        nvgFillColor(nvg, nvgRGBA(180, 130, 40, 255))
+        nvgFill(nvg)
+        -- 双钳
+        for side = -1, 1, 2 do
+            local px = cx + side * r * 0.5
+            local py = cy - r * 0.1
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, px, py, r * 0.15)
+            nvgFillColor(nvg, nvgRGBA(200, 150, 50, 255))
+            nvgFill(nvg)
+        end
+        -- 尾刺（向上弧线）
+        local tailTip = cy - r * 0.55 + math.sin(t * 3.0) * r * 0.05
+        nvgBeginPath(nvg)
+        nvgMoveTo(nvg, cx, cy + r * 0.2)
+        nvgBezierTo(nvg, cx + r * 0.15, cy - r * 0.1, cx + r * 0.05, cy - r * 0.4, cx, tailTip)
+        nvgStrokeColor(nvg, nvgRGBA(160, 100, 30, 255))
+        nvgStrokeWidth(nvg, 2.5)
+        nvgStroke(nvg)
+        -- 尾尖发光
+        nvgBeginPath(nvg)
+        nvgCircle(nvg, cx, tailTip, r * 0.08)
+        nvgFillColor(nvg, nvgRGBA(255, 200, 60, 220))
+        nvgFill(nvg)
+
+    elseif enemyType == "quicksand_worm" then
+        -- 流沙蠕虫：分段浅黄蠕虫体 + 波动
+        local segCount = 4
+        for i = 1, segCount do
+            local segY = cy + (i - 2.5) * r * 0.22
+            local wave = math.sin(t * 2.5 + i * 1.2) * r * 0.08
+            local segSize = r * (0.28 - (math.abs(i - 2.5) * 0.04))
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, cx + wave, segY, segSize, segSize * 0.7)
+            nvgFillColor(nvg, nvgRGBA(180, 150, 80, 240 - i * 15))
+            nvgFill(nvg)
+        end
+        -- 头部圆环（顶部）
+        nvgBeginPath(nvg)
+        nvgCircle(nvg, cx, cy - r * 0.35, r * 0.18)
+        nvgFillColor(nvg, nvgRGBA(200, 170, 90, 255))
+        nvgFill(nvg)
+        nvgStrokeColor(nvg, nvgRGBA(140, 100, 50, 200))
+        nvgStrokeWidth(nvg, 1.5)
+        nvgStroke(nvg)
+
+    elseif enemyType == "sand_hawk" then
+        -- 沙鹰：展翅三角形 + 头部圆
+        -- 翅膀
+        local wingFlap = math.sin(t * 4.0) * r * 0.08
+        nvgBeginPath(nvg)
+        nvgMoveTo(nvg, cx, cy)
+        nvgLineTo(nvg, cx - r * 0.6, cy + r * 0.15 + wingFlap)
+        nvgLineTo(nvg, cx - r * 0.3, cy - r * 0.1)
+        nvgClosePath(nvg)
+        nvgFillColor(nvg, nvgRGBA(200, 160, 80, 240))
+        nvgFill(nvg)
+        nvgBeginPath(nvg)
+        nvgMoveTo(nvg, cx, cy)
+        nvgLineTo(nvg, cx + r * 0.6, cy + r * 0.15 + wingFlap)
+        nvgLineTo(nvg, cx + r * 0.3, cy - r * 0.1)
+        nvgClosePath(nvg)
+        nvgFillColor(nvg, nvgRGBA(200, 160, 80, 240))
+        nvgFill(nvg)
+        -- 身体
+        nvgBeginPath(nvg)
+        nvgEllipse(nvg, cx, cy, r * 0.2, r * 0.3)
+        nvgFillColor(nvg, nvgRGBA(160, 120, 50, 255))
+        nvgFill(nvg)
+        -- 头
+        nvgBeginPath(nvg)
+        nvgCircle(nvg, cx, cy - r * 0.35, r * 0.13)
+        nvgFillColor(nvg, nvgRGBA(220, 180, 100, 255))
+        nvgFill(nvg)
+        -- 眼
+        nvgBeginPath(nvg)
+        nvgCircle(nvg, cx, cy - r * 0.36, r * 0.04)
+        nvgFillColor(nvg, nvgRGBA(40, 20, 10, 255))
+        nvgFill(nvg)
+
     else
         -- 未知类型：画一个简单的带问号圆形
         nvgBeginPath(nvg)
@@ -1374,7 +1617,59 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
         -- ─── Boss 主题色 ───
         local themeR, themeG, themeB = 80, 50, 180   -- 深渊海妖: 紫色
         if bt == "lava_lord" then themeR, themeG, themeB = 220, 60, 20       -- 熔岩领主: 橙红
-        elseif bt == "coral_guardian" then themeR, themeG, themeB = 30, 160, 140 end -- 珊瑚守卫: 青色
+        elseif bt == "coral_guardian" then themeR, themeG, themeB = 30, 160, 140 -- 珊瑚守卫: 青色
+        elseif bt == "sand_worm" or bt == "sand_worm_body" then themeR, themeG, themeB = 190, 150, 50 end -- 沙虫: 金沙
+
+        -- ─── 沙虫身体段渲染（NanoVG 程序化，与头部风格统一）───
+        if piece.isSegment then
+            local segIdx = piece.segmentIndex or 2
+            local segScale = math.max(0.6, 1.0 - (segIdx - 1) * 0.05)
+            local segR = drawRadius * segScale
+            local segCy = cy + breathOffset
+
+            -- 投影
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, cx + 1, segCy + segR * 0.7, segR * 0.65, segR * 0.18)
+            nvgFillColor(nvg, nvgRGBA(0, 0, 0, 45))
+            nvgFill(nvg)
+
+            -- 身体主体（沙金色渐变球体，与头部色调一致）
+            local dimFactor = math.max(0.6, 1.0 - (segIdx - 1) * 0.06)
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, segCy, segR)
+            local bodyGrad = nvgRadialGradient(nvg, cx - segR * 0.2, segCy - segR * 0.25,
+                segR * 0.1, segR,
+                nvgRGBA(math.floor(240 * dimFactor), math.floor(200 * dimFactor), math.floor(100 * dimFactor), 255),
+                nvgRGBA(math.floor(160 * dimFactor), math.floor(110 * dimFactor), math.floor(40 * dimFactor), 255))
+            nvgFillPaint(nvg, bodyGrad)
+            nvgFill(nvg)
+
+            -- 环状鳞片纹理（2-3道弧线）
+            local ringCount = segIdx <= 2 and 3 or 2
+            for ri = 1, ringCount do
+                local rFrac = ri / (ringCount + 1)
+                local rY = segCy - segR + segR * 2 * rFrac
+                local halfW = segR * math.sin(math.acos(math.abs(rFrac - 0.5) * 2)) * 0.8
+                if halfW > 2 then
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx - halfW, rY)
+                    nvgQuadTo(nvg, cx, rY + segR * 0.05, cx + halfW, rY)
+                    nvgStrokeColor(nvg, nvgRGBA(math.floor(130 * dimFactor), math.floor(85 * dimFactor), 30, 110))
+                    nvgStrokeWidth(nvg, 1.5)
+                    nvgStroke(nvg)
+                end
+            end
+
+            -- 外描边（与头部风格一致）
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, segCy, segR)
+            nvgStrokeColor(nvg, nvgRGBA(120, 80, 25, math.floor(160 * dimFactor)))
+            nvgStrokeWidth(nvg, 2.0)
+            nvgStroke(nvg)
+
+            -- segment 完成，跳过后续 Boss 特效
+            goto boss_render_done
+        end
 
         -- ─── 1. 暗能量扩散波纹 (双层) ───
         for ri = 0, 1 do
@@ -1554,6 +1849,132 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
             nvgFill(nvg)
         end
 
+        -- ─── 沙虫头部：NanoVG 程序化绘制 ───
+        if bt == "sand_worm" and not piece.isSegment then
+            local hx = cx + finalOffX
+            local hy = cy + finalOffY + bossYOff
+            local hr = drawRadius * 0.85 * (1.0 + skillScaleBonus)
+
+            -- 头部主体（圆润的沙金色球体）
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, hx, hy, hr)
+            local headGrad = nvgRadialGradient(nvg, hx - hr * 0.25, hy - hr * 0.3,
+                hr * 0.1, hr * 1.1,
+                nvgRGBA(240, 200, 100, 255),
+                nvgRGBA(160, 110, 40, 255))
+            nvgFillPaint(nvg, headGrad)
+            nvgFill(nvg)
+
+            -- 环状鳞片纹理（3道弧线）
+            for ri = 1, 3 do
+                local rFrac = 0.25 + ri * 0.2
+                local rY = hy - hr + hr * 2 * rFrac
+                local halfW = hr * math.sin(math.acos(math.abs(rFrac - 0.5) * 2)) * 0.8
+                if halfW > 2 then
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, hx - halfW, rY)
+                    nvgQuadTo(nvg, hx, rY + hr * 0.05, hx + halfW, rY)
+                    nvgStrokeColor(nvg, nvgRGBA(130, 85, 30, 100))
+                    nvgStrokeWidth(nvg, 1.5)
+                    nvgStroke(nvg)
+                end
+            end
+
+            -- 大嘴（下半部弧形）
+            local mouthY = hy + hr * 0.25
+            local mouthW = hr * 0.6
+            local mouthH = hr * 0.35
+            local mouthOpen = 1.0 + math.sin(gameTime * 2.5) * 0.15
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, hx, mouthY, mouthW, mouthH * mouthOpen)
+            nvgFillColor(nvg, nvgRGBA(60, 20, 10, 240))
+            nvgFill(nvg)
+            -- 嘴内深色
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, hx, mouthY + mouthH * 0.1, mouthW * 0.7, mouthH * 0.6 * mouthOpen)
+            nvgFillColor(nvg, nvgRGBA(30, 10, 5, 255))
+            nvgFill(nvg)
+            -- 上排牙齿（锯齿三角）
+            local toothCount = 5
+            for ti = 1, toothCount do
+                local tFrac = (ti - 0.5) / toothCount
+                local tx = hx - mouthW + mouthW * 2 * tFrac
+                local tSize = hr * 0.1
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, tx - tSize * 0.4, mouthY - mouthH * 0.5)
+                nvgLineTo(nvg, tx, mouthY - mouthH * 0.1)
+                nvgLineTo(nvg, tx + tSize * 0.4, mouthY - mouthH * 0.5)
+                nvgClosePath(nvg)
+                nvgFillColor(nvg, nvgRGBA(245, 235, 200, 255))
+                nvgFill(nvg)
+            end
+
+            -- 眼睛（两颗小圆眼，偏上方）
+            local eyeY = hy - hr * 0.3
+            local eyeSpacing = hr * 0.35
+            local eyeR = hr * 0.14
+            for ei = -1, 1, 2 do
+                local ex = hx + ei * eyeSpacing
+                -- 眼白
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, ex, eyeY, eyeR)
+                nvgFillColor(nvg, nvgRGBA(255, 220, 80, 255))
+                nvgFill(nvg)
+                -- 瞳孔
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, ex, eyeY + eyeR * 0.1, eyeR * 0.55)
+                nvgFillColor(nvg, nvgRGBA(40, 15, 5, 255))
+                nvgFill(nvg)
+                -- 高光
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, ex - eyeR * 0.2, eyeY - eyeR * 0.2, eyeR * 0.22)
+                nvgFillColor(nvg, nvgRGBA(255, 255, 255, 180))
+                nvgFill(nvg)
+            end
+
+            -- 头顶小角/触角（2个小凸起）
+            for ai = -1, 1, 2 do
+                local ax = hx + ai * hr * 0.3
+                local ay = hy - hr * 0.85
+                local sway = math.sin(gameTime * 2.0 + ai * 1.5) * hr * 0.05
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, ax - hr * 0.06, hy - hr * 0.6)
+                nvgQuadTo(nvg, ax + sway, ay - hr * 0.15, ax + hr * 0.02, ay)
+                nvgStrokeColor(nvg, nvgRGBA(200, 150, 50, 220))
+                nvgStrokeWidth(nvg, hr * 0.1)
+                nvgLineCap(nvg, NVG_ROUND)
+                nvgStroke(nvg)
+                -- 触角顶端小球
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, ax + sway, ay - hr * 0.08, hr * 0.06)
+                nvgFillColor(nvg, nvgRGBA(255, 180, 50, 240))
+                nvgFill(nvg)
+            end
+
+            -- 外描边
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, hx, hy, hr)
+            nvgStrokeColor(nvg, nvgRGBA(120, 80, 25, 180))
+            nvgStrokeWidth(nvg, 2.5)
+            nvgStroke(nvg)
+
+            -- 受击闪白
+            if piece._hitFlash and piece._hitFlash > 0 then
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, hx, hy, hr)
+                nvgFillColor(nvg, nvgRGBA(255, 255, 255, math.floor(piece._hitFlash * 180)))
+                nvgFill(nvg)
+            end
+
+            -- 技能闪光
+            if skillFlashA > 10 then
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, hx, hy, hr * 1.1)
+                nvgFillColor(nvg, nvgRGBA(skillFlashR, skillFlashG, skillFlashB, math.floor(skillFlashA * 0.4)))
+                nvgFill(nvg)
+            end
+        else
+        -- ─── 非沙虫Boss：精灵图渲染 ───
         local spritePath = GetBossSpritePath(piece)
         local imgHandle = EnsureSpriteImage(nvg, spritePath)
         if imgHandle then
@@ -1581,6 +2002,7 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
             nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
             nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255))
             nvgText(nvg, cx + finalOffX, cy + finalOffY - 1, label)
+        end
         end
 
         -- ─── 6. 内层能量光芒 ───
@@ -1762,6 +2184,8 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
             -- 震颤偏移（用于上层图标，在 BoardWidget 中用同一字段读取）
             -- DrawPiece 本身不移位精灵，震颤由BoardWidget的图标偏移体现
         end
+
+        ::boss_render_done::
 
     elseif isEnemy then
         -- 脚底投影
@@ -1970,7 +2394,8 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
         end
     end
 
-    -- HP条
+    -- HP条（沙虫身体段不显示独立血条）
+    if piece.isSegment then return end
     local barW = drawRadius * 1.8
     local barH = isBoss and 6 or 4
     local barX = cx - barW / 2
@@ -2009,6 +2434,89 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
             nvgFill(nvg)
         end
     end
+end
+
+-- ============================================================================
+-- 流沙系统 (quicksand zones) - 第四章
+-- ============================================================================
+-- 简化版：敌人死亡有概率产生大流沙区（中心+6邻居=7格），
+-- 流沙区不可通行、不可飞越，5回合后自动消失。
+
+--- 检查某格是否在任何流沙区内（中心1格+周围6格）
+function HexGrid.IsInQuicksandZone(board, col, row)
+    if not board.quicksandZones then return false end
+    for _, zone in ipairs(board.quicksandZones) do
+        if HexGrid.CubeDistance(col, row, zone.col, zone.row) <= 1 then
+            return true
+        end
+    end
+    return false
+end
+
+--- 添加流沙区（以 col,row 为中心的7格区域）
+function HexGrid.AddQuicksandZone(board, col, row)
+    if not board.quicksandZones then board.quicksandZones = {} end
+    -- 避免中心点重复
+    for _, zone in ipairs(board.quicksandZones) do
+        if zone.col == col and zone.row == row then return zone end
+    end
+    local zone = { col = col, row = row, timer = 5, spawnTime = -1 }
+    board.quicksandZones[#board.quicksandZones + 1] = zone
+    return zone
+end
+
+--- 流沙区回合推进：timer-1，归零则移除
+function HexGrid.TickQuicksandZones(board)
+    if not board.quicksandZones then return end
+    for i = #board.quicksandZones, 1, -1 do
+        local zone = board.quicksandZones[i]
+        zone.timer = zone.timer - 1
+        if zone.timer <= 0 then
+            table.remove(board.quicksandZones, i)
+        end
+    end
+end
+
+--- 寻找距离 (col,row) 最近的、不在流沙区内且无阻挡的空格子
+--- 用于流沙区生成时将角色推到安全位置
+---@param board table
+---@param col integer 起始列
+---@param row integer 起始行
+---@return integer|nil, integer|nil 安全格的 col, row；找不到则返回 nil
+function HexGrid.FindNearestSafeCell(board, col, row)
+    -- BFS 向外扩展寻找
+    local visited = {}
+    local key = function(c, r) return c * 100 + r end
+    local queue = {}
+    -- 从当前位置的邻居开始（当前位置本身在流沙区内）
+    local neighbors = HexGrid.GetNeighbors(col, row)
+    for _, n in ipairs(neighbors) do
+        queue[#queue + 1] = n
+        visited[key(n.col, n.row)] = true
+    end
+    visited[key(col, row)] = true
+    local idx = 1
+    while idx <= #queue do
+        local cell = queue[idx]
+        idx = idx + 1
+        local c, r = cell.col, cell.row
+        -- 检查是否安全：不在流沙区、没有棋子、没有障碍物
+        if not HexGrid.IsInQuicksandZone(board, c, r)
+           and not HexGrid.GetPieceAt(board, c, r)
+           and not HexGrid.GetObstacleAt(board, c, r) then
+            return c, r
+        end
+        -- 继续扩展
+        local nextN = HexGrid.GetNeighbors(c, r)
+        for _, nn in ipairs(nextN) do
+            local k = key(nn.col, nn.row)
+            if not visited[k] then
+                visited[k] = true
+                queue[#queue + 1] = nn
+            end
+        end
+    end
+    return nil, nil
 end
 
 return HexGrid

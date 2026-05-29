@@ -468,7 +468,47 @@ function TestPanel.Show()
                                     },
                                 },
                             },
-                            -- 第三行：嗜血套装 + 踏步斩
+                            -- 第三行：飞跃先锋 岩石关（第三章，敌人+岩石混合跳2/跳3）
+                            UI.Panel {
+                                width = "100%",
+                                flexDirection = "row", gap = 8,
+                                children = {
+                                    UI.Button {
+                                        text = "🦅🪨 岩石关(Ch3)",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 10,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {60, 70, 50, 255}, to = {40, 90, 70, 255},
+                                        },
+                                        fontColor = {200, 240, 180, 255},
+                                        borderWidth = 1.5,
+                                        borderColor = {120, 160, 100, 180},
+                                        pressedBackgroundColor = {40, 55, 35, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            equipFullGoldSet("leap_pioneer")
+                                            if G.playerData then
+                                                PlayerData.Save(G.playerData)
+                                            end
+                                            TestPanel.Close()
+                                            local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            Battle.GenerateTestLevel_LeapPioneerRocks(G.battle)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            AM.UpdateBattleBGM(21)
+                                            GameUI.UpdateBackground()
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
+                                },
+                            },
+                            -- 第四行：嗜血套装 + 踏步斩
                             UI.Panel {
                                 width = "100%",
                                 flexDirection = "row", gap = 8,
@@ -640,6 +680,36 @@ function TestPanel.Show()
                                             TurnFlow.StartPlayerTurn()
                                         end,
                                     },
+                                    -- 第四章 Boss: 沙虫
+                                    UI.Button {
+                                        text = "🐛 沙虫",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 10,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {90, 65, 20, 255}, to = {60, 45, 15, 255},
+                                        },
+                                        fontColor = {240, 200, 100, 255},
+                                        borderWidth = 1,
+                                        borderColor = {180, 140, 50, 150},
+                                        pressedBackgroundColor = {70, 50, 15, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            TestPanel.Close()
+                                            local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            Battle.GenerateLevel(G.battle, 40)  -- 第4章Boss关
+                                            AM.UpdateBattleBGM(40)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            GameUI.UpdateBackground()
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
                                 },
                             },
                         },
@@ -729,18 +799,18 @@ function TestPanel.Show()
                                     },
                                     -- 第四章
                                     UI.Button {
-                                        text = "🌀 第4章",
+                                        text = "🏜️ 第4章",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
                                         borderRadius = 10,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
-                                            from = {50, 20, 90, 255}, to = {30, 15, 70, 255},
+                                            from = {90, 65, 20, 255}, to = {60, 45, 15, 255},
                                         },
-                                        fontColor = {200, 160, 255, 255},
+                                        fontColor = {240, 200, 100, 255},
                                         borderWidth = 1,
-                                        borderColor = {130, 80, 200, 150},
-                                        pressedBackgroundColor = {35, 15, 65, 255},
+                                        borderColor = {180, 140, 50, 150},
+                                        pressedBackgroundColor = {70, 50, 15, 255},
                                         onClick = function(self)
                                             AM.PlaySFX("ui_click")
                                             if G.playerData then PlayerData.Save(G.playerData) end

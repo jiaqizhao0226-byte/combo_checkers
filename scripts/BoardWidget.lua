@@ -41,6 +41,9 @@ local ENEMY_COLORS = {
     coral_priest    = {255, 180, 120},
     fission_flame   = {255, 100, 30},
     flame_shard     = {255, 160, 60},
+    sand_scorpion   = {200, 160, 60},
+    quicksand_worm  = {180, 140, 80},
+    sand_hawk       = {220, 180, 100},
 }
 local function GetEnemyColor(enemyType)
     return ENEMY_COLORS[enemyType] or {180, 60, 60}
@@ -90,12 +93,26 @@ local BOARD_THEMES = {
         silClr      = {10, 30, 25, 180},
         silType     = "coral",
     },
-    [4] = { -- 六芒对抗（无尽深渊）：调暗降饱和
-        hexFill     = {58, 40, 90, 255},          -- 调暗降饱和：深暗紫
-        hexStroke   = {90, 68, 135, 180},         -- 低调描边：深紫，alpha降低参考ch1风格
+    [4] = { -- 流沙荒漠
+        hexFill     = {65, 50, 28, 255},
+        hexStroke   = {120, 90, 40, 200},
+        hexGlow     = {200, 160, 50},
+        bgTop       = {40, 30, 12, 255},
+        bgBot       = {55, 40, 18, 255},
+        fogColor    = {50, 38, 15, 50},
+        particle    = "ember",
+        particleClr = {{220, 180, 80}, {200, 150, 50}, {240, 200, 100}},
+        shaftClr    = {180, 140, 40},
+        frameClr    = {200, 160, 50},
+        silClr      = {30, 22, 10, 180},
+        silType     = "rocks",
+    },
+    [0] = { -- 无尽深渊：紫色主题
+        hexFill     = {58, 40, 90, 255},
+        hexStroke   = {90, 68, 135, 180},
         hexGlow     = {150, 110, 210},
-        bgTop       = {32, 20, 58, 255},          -- 调暗：深暗紫背景
-        bgBot       = {42, 28, 72, 255},          -- 调暗
+        bgTop       = {32, 20, 58, 255},
+        bgBot       = {42, 28, 72, 255},
         fogColor    = {35, 22, 65, 45},
         particle    = "aurora",
         particleClr = {{200, 160, 255}, {160, 120, 240}, {220, 180, 255}},
@@ -109,9 +126,9 @@ local BOARD_THEMES = {
 --- 获取当前战斗的章节主题
 local function GetCurrentBoardTheme()
     if G.battle then
-        -- 无尽模式始终使用第4章紫色主题
+        -- 无尽模式使用专属紫色主题
         if G.battle.isEndless then
-            return BOARD_THEMES[4]
+            return BOARD_THEMES[0]
         end
         if G.battle.level then
             local chapter = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
@@ -377,7 +394,7 @@ function BoardWidget:Render(nvg)
     if Battle.IsBossLevel(G.battle.level) then
         -- 懒加载Boss肖像纹理（检查bossKey是否变化以支持跨章节切换）
         local chapter = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
-        local CHAPTER_BOSS_MAP = { [1] = "abyss_kraken", [2] = "lava_lord", [3] = "coral_guardian" }
+        local CHAPTER_BOSS_MAP = { [1] = "abyss_kraken", [2] = "lava_lord", [3] = "coral_guardian", [4] = "sand_worm" }
         local bossKey = CHAPTER_BOSS_MAP[chapter]
         if bossKey ~= self.bossKey_ then
             -- Boss 变了，清除旧肖像
@@ -594,7 +611,7 @@ function BoardWidget:Render(nvg)
                     nvgStrokeWidth(nvg, 1.0)
                     nvgStroke(nvg)
                 elseif pType == "aurora" then
-                    -- 六芒对抗：流光溢彩渐变光效
+                    -- 流沙荒漠：流光溢彩渐变光效
                     -- 每个格子一个缓慢漂移的彩虹色光斑
                     local auroraPhase = t * 0.4 + c * 0.7 + r * 1.1
                     local hue = (auroraPhase * 0.1) % 1.0
@@ -995,6 +1012,73 @@ function BoardWidget:Render(nvg)
         ::cull_frost::
     end
 
+    -- 1.57 绘制流沙区（第四章简化版：zone 覆盖中心+6邻居=7格）
+    for _, zone in ipairs(board.quicksandZones or {}) do
+        -- 收集 zone 内所有格子（中心 + 邻居）
+        local zoneTiles = {{ col = zone.col, row = zone.row }}
+        local neighbors = HexGrid.GetNeighbors(zone.col, zone.row)
+        for _, n in ipairs(neighbors) do
+            zoneTiles[#zoneTiles + 1] = n
+        end
+        local gt = G.time or 0
+        -- 懒初始化 spawnTime（HexGrid 中无法访问 G.time）
+        if zone.spawnTime < 0 then zone.spawnTime = gt end
+        -- 淡入动画：生成后 0.6 秒内逐渐显现
+        local spawnElapsed = gt - zone.spawnTime
+        local fadeIn = math.min(1.0, spawnElapsed / 0.6)
+        -- 淡出动画：timer==1 时逐渐消散
+        local fadeOut = (zone.timer == 1) and math.max(0.3, 0.7 + 0.3 * math.sin(gt * 4)) or 1.0
+        local alphaFactor = fadeIn * fadeOut
+        for ti, tile in ipairs(zoneTiles) do
+            local cx, cy = HexGrid.HexToPixel(tile.col, tile.row, hexSize, ox, oy)
+            if IsCellOnScreen(cx, cy, hexSize, l.x, l.y, l.w, l.h) then
+                local seed = tile.col * 2.3 + tile.row * 3.7
+                -- 生成动画：扩展缩放
+                local scaleAnim = fadeIn < 1.0 and (0.5 + 0.5 * fadeIn) or 1.0
+                local drawSize = hexSize * 0.88 * scaleAnim
+                -- 琥珀色流沙底
+                local baseAlpha = math.floor(160 * alphaFactor)
+                local borderAlpha = math.floor(120 * alphaFactor)
+                HexGrid.DrawHex(nvg, cx, cy, drawSize,
+                    nvgRGBA(160, 120, 40, baseAlpha), nvgRGBA(200, 160, 60, borderAlpha))
+                -- 沙面漩涡渐变
+                local vortGlow = nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.45 * scaleAnim,
+                    nvgRGBA(180, 140, 50, math.floor(100 * alphaFactor)),
+                    nvgRGBA(120, 80, 20, 0))
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, hexSize * 0.45 * scaleAnim)
+                nvgFillPaint(nvg, vortGlow)
+                nvgFill(nvg)
+                -- 旋转沙粒（3颗）
+                for i = 1, 3 do
+                    local angle = (gt * 0.6 + seed + i * 2.094) % 6.2832
+                    local dist = hexSize * (0.18 + 0.1 * math.sin(gt * 1.2 + i)) * scaleAnim
+                    local sx = cx + math.cos(angle) * dist
+                    local sy = cy + math.sin(angle) * dist
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, sx, sy, 1.8)
+                    nvgFillColor(nvg, nvgRGBA(220, 180, 80, math.floor(140 * alphaFactor)))
+                    nvgFill(nvg)
+                end
+                -- 仅在中心格显示倒计时（大号 + 描边 + 脉冲）
+                if ti == 1 then
+                    local pulse = 1.0 + 0.08 * math.sin(gt * 3.5)
+                    local fontSize = hexSize * 0.55 * pulse
+                    nvgFontSize(nvg, fontSize)
+                    nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                    -- 深色描边
+                    nvgFontBlur(nvg, 3)
+                    nvgFillColor(nvg, nvgRGBA(60, 30, 0, math.floor(220 * alphaFactor)))
+                    nvgText(nvg, cx, cy, tostring(zone.timer or ""))
+                    -- 亮色正文
+                    nvgFontBlur(nvg, 0)
+                    nvgFillColor(nvg, nvgRGBA(255, 230, 100, math.floor(255 * alphaFactor)))
+                    nvgText(nvg, cx, cy, tostring(zone.timer or ""))
+                end
+            end
+        end
+    end
+
     -- 1.6 绘制障碍物（岩石 / 触手 / 珊瑚）
     local obsChapter = G.battle and math.ceil((G.battle.level or 1) / Battle.LEVELS_PER_CHAPTER) or 1
     for _, obs in ipairs(board.obstacles) do
@@ -1115,39 +1199,81 @@ function BoardWidget:Render(nvg)
             local obsSeed = obs.col * 3.7 + obs.row * 2.1
 
             if isCoral then
-                -- ── 珊瑚障碍：近黑深青 + 珊瑚枝几何纹路 ──
-                -- 1. 完全填充整个格子（近黑底）
-                HexGrid.DrawHex(nvg, cx, cy, hexSize * 0.94,
-                    nvgRGBA(8, 22, 25, 255), nvgRGBA(12, 30, 35, 255))
+                -- ── 第三章障碍物：珊瑚岩（统一青绿色有机风格） ──
+                local rs = hexSize * 0.94
+                local pulse = math.sin(t * 0.8 + obsSeed) * 0.1 + 0.9
 
-                -- 2. 边缘青绿色发光描边（手动画六边形描边以自定义宽度）
-                local edgePulse = math.sin(t * 1.8 + obsSeed) * 0.3 + 0.7
+                -- 1. 底层阴影（加大偏移，明显浮起感）
+                local shadowOff = hexSize * 0.12
+                HexGrid.DrawHex(nvg, cx + shadowOff, cy + shadowOff * 1.2, rs,
+                    nvgRGBA(0, 0, 0, 160), nvgRGBA(0, 0, 0, 80))
+
+                -- 2. 主体：深海深绿渐变
+                local bodyGrad = nvgLinearGradient(nvg, cx, cy - rs * 0.7, cx, cy + rs * 0.9,
+                    nvgRGBA(30, 85, 70, 255), nvgRGBA(8, 25, 22, 255))
                 nvgBeginPath(nvg)
                 for i = 0, 5 do
                     local ang = math.rad(60 * i - 90)
-                    local vx = cx + hexSize * 0.94 * math.cos(ang)
-                    local vy = cy + hexSize * 0.94 * math.sin(ang)
+                    local vx = cx + rs * math.cos(ang)
+                    local vy = cy + rs * math.sin(ang)
                     if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
                 end
                 nvgClosePath(nvg)
-                nvgStrokeColor(nvg, nvgRGBA(40, 160, 140, math.floor(200 * edgePulse)))
-                nvgStrokeWidth(nvg, 2.5)
-                nvgStroke(nvg)
+                nvgFillPaint(nvg, bodyGrad)
+                nvgFill(nvg)
 
-                -- 3. 珊瑚枝纹路（Y形分叉线，3组，旋转对称）
-                nvgStrokeWidth(nvg, 1.5)
+                -- 3. 凸面高光（大面积，模拟球面弧度）
+                local hlx = cx - hexSize * 0.08
+                local hly = cy - hexSize * 0.18
+                local hlGrad = nvgRadialGradient(nvg, hlx, hly, 0, hexSize * 0.42,
+                    nvgRGBA(120, 230, 200, math.floor(100 * pulse)),
+                    nvgRGBA(50, 130, 110, 0))
+                nvgBeginPath(nvg)
+                nvgEllipse(nvg, hlx, hly, hexSize * 0.40, hexSize * 0.30)
+                nvgFillPaint(nvg, hlGrad)
+                nvgFill(nvg)
+
+                -- 4. 表面有机色块（更亮、更大面积）
+                local patches = {
+                    { ox=-0.14, oy=-0.10, r=0.24, c={60, 150, 125, 100} },
+                    { ox= 0.16, oy=-0.16, r=0.18, c={50, 130, 110, 90} },
+                    { ox=-0.06, oy= 0.20, r=0.20, c={35, 100, 85, 80} },
+                    { ox= 0.22, oy= 0.10, r=0.15, c={45, 120, 100, 70} },
+                }
+                for _, p in ipairs(patches) do
+                    local px = cx + p.ox * hexSize
+                    local py = cy + p.oy * hexSize
+                    local pr = p.r * hexSize
+                    local pGrad = nvgRadialGradient(nvg, px, py, 0, pr,
+                        nvgRGBA(p.c[1], p.c[2], p.c[3], p.c[4]),
+                        nvgRGBA(p.c[1], p.c[2], p.c[3], 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, px, py, pr)
+                    nvgFillPaint(nvg, pGrad)
+                    nvgFill(nvg)
+                end
+
+                -- 5. 珊瑚枝纹路（Y形分叉 + 粗细变化 + 发光描边）
                 for bi = 0, 2 do
-                    local baseAngle = bi * math.pi * 2 / 3 - math.pi / 2
-                    local branchLen = hexSize * 0.38
+                    local baseAngle = bi * math.pi * 2 / 3 - math.pi / 2 + obsSeed * 0.3
+                    local branchLen = hexSize * 0.34
                     local ex = cx + math.cos(baseAngle) * branchLen
                     local ey = cy + math.sin(baseAngle) * branchLen
-                    -- 主干
+                    -- 主干发光底层（宽、半透明）
                     nvgBeginPath(nvg)
                     nvgMoveTo(nvg, cx, cy)
                     nvgLineTo(nvg, ex, ey)
-                    nvgStrokeColor(nvg, nvgRGBA(40, 180, 150, 140))
+                    nvgStrokeColor(nvg, nvgRGBA(80, 240, 200, 50))
+                    nvgStrokeWidth(nvg, 5.0)
                     nvgStroke(nvg)
-                    -- 分叉（两侧小枝）
+                    -- 主干实体（粗）
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx, cy)
+                    nvgLineTo(nvg, ex, ey)
+                    nvgStrokeColor(nvg, nvgRGBA(70, 210, 170, 200))
+                    nvgStrokeWidth(nvg, 2.5)
+                    nvgStroke(nvg)
+                    -- 分叉
                     for side = -1, 1, 2 do
                         local forkAngle = baseAngle + side * 0.55
                         local forkLen = hexSize * 0.18
@@ -1156,64 +1282,199 @@ function BoardWidget:Render(nvg)
                         nvgBeginPath(nvg)
                         nvgMoveTo(nvg, ex, ey)
                         nvgLineTo(nvg, fx, fy)
-                        nvgStrokeColor(nvg, nvgRGBA(40, 160, 130, 90))
+                        nvgStrokeColor(nvg, nvgRGBA(60, 190, 155, 150))
+                        nvgStrokeWidth(nvg, 1.5)
                         nvgStroke(nvg)
+                        -- 末端珊瑚息肉（更大更亮）
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, fx, fy, hexSize * 0.035)
+                        nvgFillColor(nvg, nvgRGBA(110, 255, 210, math.floor(160 * pulse)))
+                        nvgFill(nvg)
                     end
                 end
 
-                -- 4. 中心小发光点
-                local centerGlow = nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.22,
-                    nvgRGBA(60, 200, 170, math.floor(120 * edgePulse)), nvgRGBA(0, 0, 0, 0))
+                -- 6. 中心发光核心（更亮更大）
+                local cg = nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.22,
+                    nvgRGBA(100, 255, 210, math.floor(120 * pulse)), nvgRGBA(0, 0, 0, 0))
                 nvgBeginPath(nvg)
                 nvgCircle(nvg, cx, cy, hexSize * 0.22)
-                nvgFillPaint(nvg, centerGlow)
+                nvgFillPaint(nvg, cg)
                 nvgFill(nvg)
 
-            else
-                -- ── 普通岩石障碍：近黑深灰 + 裂缝纹路 ──
-                -- 1. 完全填充整个格子
-                HexGrid.DrawHex(nvg, cx, cy, hexSize * 0.94,
-                    nvgRGBA(15, 14, 13, 255), nvgRGBA(22, 20, 18, 255))
-
-                -- 2. 边缘暗金描边
-                local rockPulse = math.sin(t * 1.2 + obsSeed) * 0.2 + 0.8
+                -- 7. 底部强暗角（增加立体隆起感）
+                local bs = nvgLinearGradient(nvg, cx, cy + rs * 0.1, cx, cy + rs * 0.95,
+                    nvgRGBA(0, 0, 0, 0), nvgRGBA(0, 8, 12, 180))
                 nvgBeginPath(nvg)
                 for i = 0, 5 do
                     local ang = math.rad(60 * i - 90)
-                    local vx = cx + hexSize * 0.94 * math.cos(ang)
-                    local vy = cy + hexSize * 0.94 * math.sin(ang)
+                    nvgLineTo(nvg, cx + rs * math.cos(ang), cy + rs * math.sin(ang))
+                end
+                nvgClosePath(nvg)
+                nvgFillPaint(nvg, bs)
+                nvgFill(nvg)
+
+                -- 8. 外边框（深色）+ 内发光边（更明显的边缘光）
+                nvgBeginPath(nvg)
+                for i = 0, 5 do
+                    local ang = math.rad(60 * i - 90)
+                    local vx = cx + rs * math.cos(ang)
+                    local vy = cy + rs * math.sin(ang)
                     if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
                 end
                 nvgClosePath(nvg)
-                nvgStrokeColor(nvg, nvgRGBA(90, 80, 60, math.floor(180 * rockPulse)))
-                nvgStrokeWidth(nvg, 2.0)
+                nvgStrokeColor(nvg, nvgRGBA(8, 18, 20, 240))
+                nvgStrokeWidth(nvg, 2.8)
                 nvgStroke(nvg)
 
-                -- 3. 裂缝纹路（3条不规则折线）
-                local cracks = {
-                    { {-0.15, -0.38}, {0.05, -0.08}, {-0.05, 0.12}, {0.10, 0.38} },
-                    { {0.30, -0.20}, {0.08, 0.02},  {0.22, 0.30} },
-                    { {-0.35, 0.10}, {-0.10, 0.05}, {-0.18, 0.35} },
+                local innerR = rs * 0.90
+                nvgBeginPath(nvg)
+                for i = 0, 5 do
+                    local ang = math.rad(60 * i - 90)
+                    nvgLineTo(nvg, cx + innerR * math.cos(ang), cy + innerR * math.sin(ang))
+                end
+                nvgClosePath(nvg)
+                nvgStrokeColor(nvg, nvgRGBA(70, 210, 170, math.floor(130 * pulse)))
+                nvgStrokeWidth(nvg, 1.5)
+                nvgStroke(nvg)
+
+            else
+                -- ── 普通岩石障碍：多层立体岩石效果 ──
+                local rs = hexSize * 0.94  -- rock size
+                local rockPulse = math.sin(t * 0.8 + obsSeed) * 0.1 + 0.9
+
+                -- 1. 底层阴影（让岩石有"浮起"感）
+                local shadowOff = hexSize * 0.06
+                HexGrid.DrawHex(nvg, cx + shadowOff, cy + shadowOff, rs,
+                    nvgRGBA(0, 0, 0, 120), nvgRGBA(0, 0, 0, 60))
+
+                -- 2. 岩石主体：深灰渐变（上亮下暗，模拟顶光）
+                local bodyGrad = nvgLinearGradient(nvg, cx, cy - rs * 0.8, cx, cy + rs * 0.8,
+                    nvgRGBA(72, 68, 62, 255), nvgRGBA(28, 25, 22, 255))
+                nvgBeginPath(nvg)
+                for i = 0, 5 do
+                    local ang = math.rad(60 * i - 90)
+                    local vx = cx + rs * math.cos(ang)
+                    local vy = cy + rs * math.sin(ang)
+                    if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgFillPaint(nvg, bodyGrad)
+                nvgFill(nvg)
+
+                -- 3. 岩石表面凹凸纹理层（多个不规则色块模拟石头纹理）
+                local patches = {
+                    { ox=-0.18, oy=-0.25, r=0.22, c={58, 54, 48, 160} },
+                    { ox= 0.20, oy=-0.10, r=0.18, c={48, 44, 38, 140} },
+                    { ox=-0.08, oy= 0.20, r=0.20, c={40, 37, 32, 130} },
+                    { ox= 0.12, oy= 0.28, r=0.15, c={35, 32, 28, 120} },
+                    { ox=-0.30, oy= 0.05, r=0.14, c={52, 48, 42, 100} },
                 }
-                nvgStrokeWidth(nvg, 1.2)
+                for _, p in ipairs(patches) do
+                    local px = cx + p.ox * hexSize
+                    local py = cy + p.oy * hexSize
+                    local pr = p.r * hexSize
+                    local pGrad = nvgRadialGradient(nvg, px, py, 0, pr,
+                        nvgRGBA(p.c[1], p.c[2], p.c[3], p.c[4]),
+                        nvgRGBA(p.c[1], p.c[2], p.c[3], 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, px, py, pr)
+                    nvgFillPaint(nvg, pGrad)
+                    nvgFill(nvg)
+                end
+
+                -- 4. 顶部高光（模拟光滑石面反光）
+                local hlx = cx - hexSize * 0.15
+                local hly = cy - hexSize * 0.22
+                local highlight = nvgRadialGradient(nvg, hlx, hly,
+                    0, hexSize * 0.32,
+                    nvgRGBA(140, 130, 110, math.floor(65 * rockPulse)),
+                    nvgRGBA(80, 75, 65, 0))
+                nvgBeginPath(nvg)
+                nvgEllipse(nvg, hlx, hly, hexSize * 0.30, hexSize * 0.22)
+                nvgFillPaint(nvg, highlight)
+                nvgFill(nvg)
+
+                -- 5. 裂缝纹路（带深色裂缝 + 亮边高光，模拟凹陷效果）
+                local cracks = {
+                    { {-0.12, -0.40}, {0.02, -0.15}, {-0.06, 0.08}, {0.08, 0.35} },
+                    { {0.28, -0.22}, {0.12, -0.02}, {0.20, 0.18}, {0.15, 0.32} },
+                    { {-0.32, 0.08}, {-0.12, 0.00}, {-0.20, 0.22}, {-0.08, 0.38} },
+                }
                 for _, crack in ipairs(cracks) do
+                    -- 暗色裂缝主线
                     nvgBeginPath(nvg)
                     nvgMoveTo(nvg, cx + crack[1][1] * hexSize, cy + crack[1][2] * hexSize)
                     for pi2 = 2, #crack do
                         nvgLineTo(nvg, cx + crack[pi2][1] * hexSize, cy + crack[pi2][2] * hexSize)
                     end
-                    nvgStrokeColor(nvg, nvgRGBA(80, 70, 55, 130))
+                    nvgStrokeColor(nvg, nvgRGBA(12, 10, 8, 200))
+                    nvgStrokeWidth(nvg, 1.8)
+                    nvgStroke(nvg)
+                    -- 裂缝亮边（偏移1px模拟凹陷高光）
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx + crack[1][1] * hexSize + 1, cy + crack[1][2] * hexSize + 1)
+                    for pi2 = 2, #crack do
+                        nvgLineTo(nvg, cx + crack[pi2][1] * hexSize + 1, cy + crack[pi2][2] * hexSize + 1)
+                    end
+                    nvgStrokeColor(nvg, nvgRGBA(100, 92, 78, 70))
+                    nvgStrokeWidth(nvg, 0.8)
                     nvgStroke(nvg)
                 end
 
-                -- 4. 中心微暗光（体积感）
-                local volLight = nvgRadialGradient(nvg, cx - hexSize*0.12, cy - hexSize*0.12,
-                    0, hexSize * 0.4,
-                    nvgRGBA(55, 50, 42, 80), nvgRGBA(0, 0, 0, 0))
+                -- 6. 底部暗角渐变（增强立体感）
+                local bottomShadow = nvgLinearGradient(nvg, cx, cy + rs * 0.3, cx, cy + rs * 0.9,
+                    nvgRGBA(0, 0, 0, 0), nvgRGBA(0, 0, 0, 100))
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, cx, cy, hexSize * 0.4)
-                nvgFillPaint(nvg, volLight)
+                for i = 0, 5 do
+                    local ang = math.rad(60 * i - 90)
+                    local vx = cx + rs * math.cos(ang)
+                    local vy = cy + rs * math.sin(ang)
+                    if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgFillPaint(nvg, bottomShadow)
                 nvgFill(nvg)
+
+                -- 7. 边缘内描边（双层：外深内浅，模拟石头边缘厚度）
+                nvgBeginPath(nvg)
+                for i = 0, 5 do
+                    local ang = math.rad(60 * i - 90)
+                    local vx = cx + rs * math.cos(ang)
+                    local vy = cy + rs * math.sin(ang)
+                    if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgStrokeColor(nvg, nvgRGBA(18, 16, 14, 220))
+                nvgStrokeWidth(nvg, 2.5)
+                nvgStroke(nvg)
+
+                -- 内侧亮边（模拟倒角光）
+                nvgBeginPath(nvg)
+                local innerR = rs * 0.92
+                for i = 0, 5 do
+                    local ang = math.rad(60 * i - 90)
+                    local vx = cx + innerR * math.cos(ang)
+                    local vy = cy + innerR * math.sin(ang)
+                    if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgStrokeColor(nvg, nvgRGBA(95, 88, 75, math.floor(90 * rockPulse)))
+                nvgStrokeWidth(nvg, 1.0)
+                nvgStroke(nvg)
+
+                -- 8. 细小石粒散点（增加表面粗糙感）
+                local grainSeed = obsSeed * 7.3
+                for gi = 1, 8 do
+                    local ga = grainSeed + gi * 2.39996  -- golden angle
+                    local gr = hexSize * (0.15 + 0.45 * ((math.sin(ga * 3.7) + 1) * 0.5))
+                    local gx = cx + gr * math.cos(ga)
+                    local gy = cy + gr * math.sin(ga)
+                    local gSize = hexSize * (0.015 + 0.012 * math.sin(ga * 5.1))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, gx, gy, gSize)
+                    nvgFillColor(nvg, nvgRGBA(90, 82, 70, 80))
+                    nvgFill(nvg)
+                end
             end
             -- 第三章：如果该岩石挡住寄居蟹回家路径，悬浮红色感叹号
             if board.crabs then
@@ -1927,9 +2188,218 @@ function BoardWidget:Render(nvg)
         nvgStroke(nvg)
     end
 
+    -- 7.05 沙虫身体连接管（宽体管道，匹配鳞甲风格）
+    if G.battle.sandWormSegments and #G.battle.sandWormSegments >= 2 then
+        local segs = G.battle.sandWormSegments
+        local bossHead = segs[1]
+        -- 遁地状态不绘制连线
+        if not (bossHead.burrowed or bossHead.hidden) then
+        local gt = G.time or 0
+        for i = 1, #segs - 1 do
+            local s1 = segs[i]
+            local s2 = segs[i + 1]
+            if s1.hp > 0 and s2.hp > 0 and not s1.hidden and not s2.hidden
+               and not (s1.emergeDelay and s1.emergeDelay > 0)
+               and not (s2.emergeDelay and s2.emergeDelay > 0) then
+                local x1, y1 = HexGrid.HexToPixel(s1.col, s1.row, hexSize, ox, oy)
+                local x2, y2 = HexGrid.HexToPixel(s2.col, s2.row, hexSize, ox, oy)
+
+                -- 计算连接管宽度（从头到尾逐渐变细，但比之前更宽）
+                local segScale1 = math.max(0.55, 1.0 - (i - 1) * 0.06)
+                local segScale2 = math.max(0.55, 1.0 - i * 0.06)
+                local drawR = hexSize * 0.5 * 1.25  -- boss draw radius
+                local tubeW1 = drawR * segScale1 * 1.4  -- 起始宽度（接近段体直径）
+                local tubeW2 = drawR * segScale2 * 1.4  -- 结束宽度
+                local tubeW = (tubeW1 + tubeW2) * 0.5   -- 平均宽度
+
+                -- 计算方向向量和法向量
+                local dx = x2 - x1
+                local dy = y2 - y1
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist > 1 then
+                    local nx = -dy / dist  -- 法向量
+                    local ny = dx / dist
+                    local pulse = math.sin(gt * 2.0 + i * 0.8) * 0.08 + 0.92
+
+                    -- 管道外形（用四边形路径绘制梯形管道）
+                    local hw1 = tubeW1 * 0.5 * pulse
+                    local hw2 = tubeW2 * 0.5 * pulse
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1 + nx * hw1, y1 + ny * hw1)
+                    nvgLineTo(nvg, x2 + nx * hw2, y2 + ny * hw2)
+                    nvgLineTo(nvg, x2 - nx * hw2, y2 - ny * hw2)
+                    nvgLineTo(nvg, x1 - nx * hw1, y1 - ny * hw1)
+                    nvgClosePath(nvg)
+
+                    -- 填充：深沙色渐变
+                    local dimFactor = math.max(0.6, 1.0 - (i - 1) * 0.07)
+                    local midX, midY = (x1 + x2) * 0.5, (y1 + y2) * 0.5
+                    local tubeFill = nvgLinearGradient(nvg,
+                        midX + nx * tubeW * 0.4, midY + ny * tubeW * 0.4,
+                        midX - nx * tubeW * 0.4, midY - ny * tubeW * 0.4,
+                        nvgRGBA(math.floor(200 * dimFactor), math.floor(160 * dimFactor), math.floor(65 * dimFactor), 230),
+                        nvgRGBA(math.floor(140 * dimFactor), math.floor(100 * dimFactor), math.floor(35 * dimFactor), 220))
+                    nvgFillPaint(nvg, tubeFill)
+                    nvgFill(nvg)
+
+                    -- 管道描边（深褐色粗边，鳞甲质感）
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1 + nx * hw1, y1 + ny * hw1)
+                    nvgLineTo(nvg, x2 + nx * hw2, y2 + ny * hw2)
+                    nvgStrokeColor(nvg, nvgRGBA(100, 70, 30, 180))
+                    nvgStrokeWidth(nvg, 2.0)
+                    nvgStroke(nvg)
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1 - nx * hw1, y1 - ny * hw1)
+                    nvgLineTo(nvg, x2 - nx * hw2, y2 - ny * hw2)
+                    nvgStrokeColor(nvg, nvgRGBA(100, 70, 30, 180))
+                    nvgStrokeWidth(nvg, 2.0)
+                    nvgStroke(nvg)
+
+                    -- 横向褶皱环纹（2-3条，沿管道长度分布）
+                    local ringCount = (dist > hexSize * 0.8) and 3 or 2
+                    for ri = 1, ringCount do
+                        local t = ri / (ringCount + 1)
+                        local rx = x1 + dx * t
+                        local ry = y1 + dy * t
+                        local rhw = hw1 + (hw2 - hw1) * t  -- 插值宽度
+                        nvgBeginPath(nvg)
+                        nvgMoveTo(nvg, rx + nx * rhw * 0.9, ry + ny * rhw * 0.9)
+                        nvgLineTo(nvg, rx - nx * rhw * 0.9, ry - ny * rhw * 0.9)
+                        nvgStrokeColor(nvg, nvgRGBA(math.floor(130 * dimFactor), math.floor(90 * dimFactor), 25, 130))
+                        nvgStrokeWidth(nvg, 1.5)
+                        nvgStroke(nvg)
+                        -- 褶皱高光
+                        nvgBeginPath(nvg)
+                        local offX = dx / dist * 1.5
+                        local offY = dy / dist * 1.5
+                        nvgMoveTo(nvg, rx + nx * rhw * 0.7 + offX, ry + ny * rhw * 0.7 + offY)
+                        nvgLineTo(nvg, rx - nx * rhw * 0.7 + offX, ry - ny * rhw * 0.7 + offY)
+                        nvgStrokeColor(nvg, nvgRGBA(220, 190, 100, 50))
+                        nvgStrokeWidth(nvg, 1.0)
+                        nvgStroke(nvg)
+                    end
+
+                    -- 中心橙色发光线（模拟裂缝光芒）
+                    local glowPulse = math.sin(gt * 3.0 + i * 1.2) * 0.3 + 0.7
+                    local glowAlpha = math.floor(120 * glowPulse * dimFactor)
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1, y1)
+                    nvgLineTo(nvg, x2, y2)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 150, 30, glowAlpha))
+                    nvgStrokeWidth(nvg, tubeW * 0.12)
+                    nvgLineCap(nvg, NVG_ROUND)
+                    nvgStroke(nvg)
+                    -- 核心亮线
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1, y1)
+                    nvgLineTo(nvg, x2, y2)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 200, 80, math.floor(glowAlpha * 0.5)))
+                    nvgStrokeWidth(nvg, tubeW * 0.04)
+                    nvgLineCap(nvg, NVG_ROUND)
+                    nvgStroke(nvg)
+                end
+            end
+        end
+        end -- if not burrowed/hidden
+    end
+
+    -- 7.06 沙虫遁地中提示（Boss遁地期间显示在左上角，不挡棋盘）
+    if G.battle.sandWormSegments and #G.battle.sandWormSegments >= 1 then
+        local bossHead = G.battle.sandWormSegments[1]
+        if bossHead and (bossHead.burrowed or bossHead.burrowCasting) and bossHead.hp > 0 then
+            local gt = G.time or 0
+            -- 左上角位置（基于屏幕坐标，确保不超出屏幕）
+            local tipX = math.max(8, ox) + 8
+            local tipY = math.max(8, oy) + 8
+            -- 半透明背景条
+            local labelW = hexSize * 4.0
+            local labelH = hexSize * 0.8
+            local lx = tipX
+            local ly = tipY
+            local bgAlpha = math.floor(160 + 40 * math.sin(gt * 3.0))
+            nvgBeginPath(nvg)
+            nvgRoundedRect(nvg, lx, ly, labelW, labelH, 8)
+            nvgFillColor(nvg, nvgRGBA(40, 30, 15, bgAlpha))
+            nvgFill(nvg)
+            -- 文字
+            nvgFontSize(nvg, 16)
+            nvgTextAlign(nvg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
+            local textAlpha = math.floor(200 + 55 * math.sin(gt * 2.5))
+            nvgFillColor(nvg, nvgRGBA(255, 210, 100, textAlpha))
+            local textX = lx + 8
+            local textY = ly + labelH / 2
+            if bossHead.burrowCasting then
+                nvgText(nvg, textX, textY, "⏳ 沙虫正在准备遁地...")
+            else
+                local remain = bossHead.burrowTimer or 0
+                nvgText(nvg, textX, textY, "🕳️ 沙虫遁地中... (" .. remain .. "回合后钻出)")
+            end
+        end
+    end
+
+    -- 7.07 沙虫钻出AOE红光高亮
+    if G.battle.sandWormEmergeAOE and G.battle.sandWormEmergeAOE.timer > 0 then
+        local aoeData = G.battle.sandWormEmergeAOE
+        local progress = aoeData.timer / aoeData.maxTimer  -- 1→0 fade out
+        local pulseAlpha = math.floor(120 * progress * (0.7 + 0.3 * math.sin((G.time or 0) * 12)))
+        for _, tile in ipairs(aoeData.tiles) do
+            if HexGrid.InBounds(tile.col, tile.row) then
+                local tx, ty = HexGrid.HexToPixel(tile.col, tile.row, hexSize, ox, oy)
+                -- 外圈发光边框（更大、更醒目）
+                nvgBeginPath(nvg)
+                local rOuter = hexSize * 0.52
+                for vi = 0, 5 do
+                    local angle = math.pi / 3 * vi - math.pi / 6
+                    local vx = tx + rOuter * math.cos(angle)
+                    local vy = ty + rOuter * math.sin(angle)
+                    if vi == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgStrokeColor(nvg, nvgRGBA(255, 50, 20, math.floor(220 * progress)))
+                nvgStrokeWidth(nvg, 3.5)
+                nvgStroke(nvg)
+                -- 红色六边形填充
+                nvgBeginPath(nvg)
+                local r = hexSize * 0.46
+                for vi = 0, 5 do
+                    local angle = math.pi / 3 * vi - math.pi / 6
+                    local vx = tx + r * math.cos(angle)
+                    local vy = ty + r * math.sin(angle)
+                    if vi == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgFillColor(nvg, nvgRGBA(220, 40, 30, pulseAlpha))
+                nvgFill(nvg)
+                -- 内层亮边
+                nvgStrokeColor(nvg, nvgRGBA(255, 120, 60, math.floor(200 * progress)))
+                nvgStrokeWidth(nvg, 1.5)
+                nvgStroke(nvg)
+            end
+        end
+        -- 递减计时器
+        aoeData.timer = aoeData.timer - (G.dt or 0.016)
+        if aoeData.timer <= 0 then
+            G.battle.sandWormEmergeAOE = nil
+        end
+    end
+
+    -- 7.08 沙虫爬出延迟显示处理（emergeDelay倒计时，到0时取消隐藏）
+    if G.battle.sandWormSegments then
+        for _, seg in ipairs(G.battle.sandWormSegments) do
+            if seg.emergeDelay and seg.emergeDelay > 0 then
+                seg.emergeDelay = seg.emergeDelay - (G.dt or 0.016)
+                if seg.emergeDelay <= 0 then
+                    seg.emergeDelay = nil  -- 延迟结束，正常显示
+                end
+            end
+        end
+    end
+
     -- 7. 绘制所有棋子（支持移动动画插值）
     local pieceRadius = hexSize * 0.42
     for _, p in ipairs(board.pieces) do
+        if p.hidden or (p.emergeDelay and p.emergeDelay > 0) then goto continue_piece end
         if p.hp > 0 or p._dead then
             -- 注入动画状态临时字段供精灵图帧选择 (所有棋子都需要)
             p._gameTime = G.time or 0
@@ -1976,15 +2446,62 @@ function BoardWidget:Render(nvg)
                     nvgFill(nvg)
                 end
             end
+            -- 流沙推开受击效果：抖动 + 沙尘包裹
+            if p.sandPushed and p.animTimer and p.animTimer > 0 then
+                local gt = G.time or 0
+                local pushProgress = 1.0 - p.animTimer / p.animMaxTimer  -- 0→1
+                -- 受击抖动（垂直于运动方向的快速震动，越接近结束越弱）
+                local shakeStrength = (1.0 - pushProgress) * hexSize * 0.12
+                local shakeFreq = 25.0
+                local shakeOff = math.sin(gt * shakeFreq) * shakeStrength
+                -- 计算垂直于运动方向的法线
+                local fromX, fromY = HexGrid.HexToPixel(p.animFromCol, p.animFromRow, hexSize, ox, oy)
+                local toX, toY = HexGrid.HexToPixel(p.col, p.row, hexSize, ox, oy)
+                local dx = toX - fromX
+                local dy = toY - fromY
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist > 0.1 then
+                    local nx = -dy / dist  -- 法线方向
+                    local ny = dx / dist
+                    cx = cx + nx * shakeOff
+                    cy = cy + ny * shakeOff
+                end
+                -- 沙尘包裹（跟随英雄的旋转沙粒群）
+                local wrapAlpha = math.floor((1.0 - pushProgress * 0.7) * 200)
+                if wrapAlpha > 10 then
+                    for si = 1, 12 do
+                        local angle = si * 0.524 + gt * 6.0 + si * 0.8
+                        local sandDist = pieceRadius * (0.6 + 0.4 * math.sin(gt * 4.0 + si * 1.3))
+                        local sx = cx + math.cos(angle) * sandDist
+                        local sy = cy + math.sin(angle) * sandDist
+                        local sAlpha = math.floor(wrapAlpha * (0.5 + 0.5 * math.sin(si * 2.1 + gt * 3.0)))
+                        local sSize = 2.0 + math.sin(si * 1.7) * 1.5
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, sx, sy, sSize)
+                        nvgFillColor(nvg, nvgRGBA(230, 180, 50, sAlpha))
+                        nvgFill(nvg)
+                    end
+                    -- 淡黄色沙尘光晕（半透明圆形底层）
+                    local glowR = pieceRadius * 1.3 * (1.0 - pushProgress * 0.4)
+                    local glowAlpha = math.floor((1.0 - pushProgress) * 60)
+                    local sandGlow = nvgRadialGradient(nvg, cx, cy, pieceRadius * 0.3, glowR,
+                        nvgRGBA(255, 200, 60, glowAlpha), nvgRGBA(200, 150, 30, 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, glowR)
+                    nvgFillPaint(nvg, sandGlow)
+                    nvgFill(nvg)
+                end
+            end
             HexGrid.DrawPiece(nvg, cx, cy, pieceRadius, p)
         end
+        ::continue_piece::
     end
 
     -- 7.15 Boss 技能意图气泡（下回合将释放的技能图标）
     do
         local gt = G.time or 0
         for _, p in ipairs(board.pieces) do
-            if p.isBoss and p.hp > 0 and p.nextSkillKey and p.nextSkillIcon then
+            if p.isBoss and p.hp > 0 and not p.hidden and p.nextSkillKey and p.nextSkillIcon then
                 local bx, by = HexGrid.HexToPixel(p.col, p.row, hexSize, ox, oy)
                 -- 震颤偏移（蓄力时身体微震）
                 local shakeX = math.sin(gt * 18.0) * 2.0
@@ -2046,6 +2563,36 @@ function BoardWidget:Render(nvg)
                 nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
                 nvgFillColor(nvg, nvgRGBA(nr, ng2, nb3, math.floor(bgAlpha * 0.8)))
                 nvgText(nvg, bubbleX, bubbleY - bubbleR - 2, "下回合")
+            end
+        end
+    end
+
+    -- 7.155 沙虫遁地读条进度条（burrowCasting阶段显示）
+    do
+        for _, p in ipairs(board.pieces) do
+            if p.isBoss and p.burrowCasting and p.hp > 0 and not p.hidden then
+                local bx, by = HexGrid.HexToPixel(p.col, p.row, hexSize, ox, oy)
+                local gt = G.time or 0
+                -- 进度条背景
+                local barW = hexSize * 1.6
+                local barH = 8
+                local barX = bx - barW / 2
+                local barY = by - hexSize * 0.9
+                nvgBeginPath(nvg)
+                nvgRoundedRect(nvg, barX, barY, barW, barH, 4)
+                nvgFillColor(nvg, nvgRGBA(30, 20, 10, 200))
+                nvgFill(nvg)
+                -- 进度条填充（脉动动画模拟读条）
+                local progress = math.min(1.0, (math.sin(gt * 4.0) * 0.15 + 0.85))
+                nvgBeginPath(nvg)
+                nvgRoundedRect(nvg, barX + 1, barY + 1, (barW - 2) * progress, barH - 2, 3)
+                nvgFillColor(nvg, nvgRGBA(210, 160, 60, 220))
+                nvgFill(nvg)
+                -- 文字标签
+                nvgFontSize(nvg, 11)
+                nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
+                nvgFillColor(nvg, nvgRGBA(255, 220, 120, 230))
+                nvgText(nvg, bx, barY - 3, "⏳ 准备遁地")
             end
         end
     end
@@ -2214,7 +2761,7 @@ function BoardWidget:Render(nvg)
         -- 6) 敌人→稻草人 嘲讽连线（红色 + 攻击方向箭头）
         local enemies = HexGrid.GetTeamPieces(board, "enemy")
         for _, e in ipairs(enemies) do
-            if e.hp > 0 then
+            if e.hp > 0 and not e.isSegment and not e.hidden then
                 local ex, ey = HexGrid.HexToPixel(e.col, e.row, hexSize, ox, oy)
                 local lineAlpha = math.floor(80 + 40 * tauntPulse)
                 -- 红色连线
@@ -2894,7 +3441,16 @@ function BoardWidget:Update(dt)
     for _, p in ipairs(G.battle.board.pieces) do
         if p.animTimer and p.animTimer > 0 then
             p.animTimer = p.animTimer - dt
-            if p.animTimer < 0 then p.animTimer = 0 end
+            if p.animTimer <= 0 then
+                p.animTimer = 0
+                -- 流沙推开动画结束，清除标记
+                if p.sandPushed then p.sandPushed = nil end
+            end
+        end
+        -- 流沙推开沙尘特效计时（独立于动画，可稍微延后消散）
+        if p.sandPushTime and p.sandPushTime > 0 then
+            p.sandPushTime = p.sandPushTime - dt
+            if p.sandPushTime <= 0 then p.sandPushTime = nil end
         end
         -- 英雄攻击动画计时
         if p._attackAnim and p._attackAnim > 0 then

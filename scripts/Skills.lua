@@ -96,40 +96,9 @@ Skills.SKILLS = {
         end,
     },
 
-    -- 7. 赏金猎人 - 金币经济
-    bounty_hunter = {
-        name = "赏金猎人",
-        icon = "skill_bounty_hunter",
-        color = {255, 215, 0},
-        maxLevel = 5,
-        rarity = {1, 1, 2, 3, 3},
-        desc = function(lv)
-            local gold = 3 + lv * 2          -- Lv1=5, Lv2=7, ..., Lv5=13
-            local extra = ""
-            if lv >= 2 then extra = extra .. "；连击金额随等级提升" end
-            if lv >= 3 then extra = extra .. "；每3次击杀必掉金袋" end
-            if lv >= 4 then extra = extra .. "；击杀金翻倍；溢出治疗转金币" end
-            if lv >= 5 then extra = extra .. "；金币获取+25%" end
-            return string.format("连击击杀额外获得%d金币%s", gold, extra)
-        end,
-    },
+    -- 7. (已删除: bounty_hunter 赏金猎人)
 
-    -- 8. 霜降 - 冰冻控制
-    frost_land = {
-        name = "霜降",
-        icon = "skill_frost_land",
-        color = {150, 220, 255},
-        maxLevel = 5,
-        rarity = {1, 1, 2, 3, 4},  -- Lv4永冻格=史诗, Lv5冰霜新星=传说
-        desc = function(lv)
-            local dur = 2 + lv              -- Lv1=3, Lv2=4, ..., Lv5=7
-            local extra = ""
-            if lv >= 3 then extra = extra .. "；站霜格反弹60%+减伤30%" end
-            if lv >= 4 then extra = extra .. "；永冻格(毒雾+冻结)" end
-            if lv >= 5 then extra = extra .. "；被攻冰霜新星(1圈冻1回合+10伤)" end
-            return string.format("落地留下霜冻格(%d回合)，踩中的敌人被束缚1回合%s", dur, extra)
-        end,
-    },
+    -- 8. (已删除: frost_land 霜降)
 
     -- 9. 地刺陷阱 - 路径布控
     spike_trap = {
@@ -299,14 +268,7 @@ Skills.COMBOS = {
         desc = "反弹50%→治疗；HP<50%反弹+20%",
         requires = {"vampiric_jump", "thorns"},
     },
-    {
-        id = "combo_bounty_blood",
-        name = "血金掠夺",
-        icon = "skill_combo_pirate",
-        color = {200, 150, 30},
-        desc = "击杀回HP→等量金币；金≥100吸血+10%",
-        requires = {"bounty_hunter", "vampiric_jump"},
-    },
+
 }
 
 -- ============================================================================
@@ -399,14 +361,16 @@ function Skills.PickChoices(owned, count)
     count = count or 3
     local pool = {}
     for id, def in pairs(Skills.SKILLS) do
-        local curLv = owned[id] or 0
-        if curLv < def.maxLevel then
-            pool[#pool + 1] = {
-                id = id,
-                skill = def,
-                currentLevel = curLv,
-                nextLevel = curLv + 1,
-            }
+        if not def.disabled then
+            local curLv = owned[id] or 0
+            if curLv < def.maxLevel then
+                pool[#pool + 1] = {
+                    id = id,
+                    skill = def,
+                    currentLevel = curLv,
+                    nextLevel = curLv + 1,
+                }
+            end
         end
     end
     -- Fisher-Yates 洗牌

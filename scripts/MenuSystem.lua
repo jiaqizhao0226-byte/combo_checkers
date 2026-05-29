@@ -190,7 +190,18 @@ function MenuSystem.RebuildMenuPage(tabId)
                 else
                     G._decomposeSelected[idx] = true
                 end
+                -- 保存滚动位置
+                local scrollPanel = G.menuPageContainer and G.menuPageContainer:FindById("equipInvScroll")
+                if scrollPanel and scrollPanel.GetScroll then
+                    local _, sy = scrollPanel:GetScroll()
+                    G._decomposeScrollY = sy
+                end
                 MenuSystem.RebuildMenuPage("equip")
+                -- 恢复滚动位置
+                local newScrollPanel = G.menuPageContainer and G.menuPageContainer:FindById("equipInvScroll")
+                if newScrollPanel and newScrollPanel.SetScrollDirect and G._decomposeScrollY then
+                    newScrollPanel:SetScrollDirect(0, G._decomposeScrollY)
+                end
             end,
             onConfirmDecompose = function()
                 local indices = {}
@@ -240,7 +251,64 @@ function MenuSystem.RebuildMenuPage(tabId)
                         end
                     end
                 end
+                -- 保存滚动位置
+                local scrollPanel = G.menuPageContainer and G.menuPageContainer:FindById("equipInvScroll")
+                if scrollPanel and scrollPanel.GetScroll then
+                    local _, sy = scrollPanel:GetScroll()
+                    G._decomposeScrollY = sy
+                end
                 MenuSystem.RebuildMenuPage("equip")
+                -- 恢复滚动位置
+                local newScrollPanel = G.menuPageContainer and G.menuPageContainer:FindById("equipInvScroll")
+                if newScrollPanel and newScrollPanel.SetScrollDirect and G._decomposeScrollY then
+                    newScrollPanel:SetScrollDirect(0, G._decomposeScrollY)
+                end
+            end,
+            onSelectAllPurple = function()
+                -- 全选/全取消紫色装备
+                local inventory = G.playerData.inventory
+                -- 先检查是否已全选紫色，若是则全取消
+                local allSelected = true
+                local purpleCount = 0
+                for i, item in ipairs(inventory) do
+                    local r = Equipment.RARITY_MIGRATE[item.rarity] or item.rarity
+                    if r == "purple" then
+                        purpleCount = purpleCount + 1
+                        if not G._decomposeSelected[i] then
+                            allSelected = false
+                        end
+                    end
+                end
+                if purpleCount == 0 then return end
+                if allSelected then
+                    -- 已全选 → 取消全部紫色
+                    for i, item in ipairs(inventory) do
+                        local r = Equipment.RARITY_MIGRATE[item.rarity] or item.rarity
+                        if r == "purple" then
+                            G._decomposeSelected[i] = nil
+                        end
+                    end
+                else
+                    -- 未全选 → 选中全部紫色
+                    for i, item in ipairs(inventory) do
+                        local r = Equipment.RARITY_MIGRATE[item.rarity] or item.rarity
+                        if r == "purple" then
+                            G._decomposeSelected[i] = true
+                        end
+                    end
+                end
+                -- 保存滚动位置
+                local scrollPanel = G.menuPageContainer and G.menuPageContainer:FindById("equipInvScroll")
+                if scrollPanel and scrollPanel.GetScroll then
+                    local _, sy = scrollPanel:GetScroll()
+                    G._decomposeScrollY = sy
+                end
+                MenuSystem.RebuildMenuPage("equip")
+                -- 恢复滚动位置
+                local newScrollPanel = G.menuPageContainer and G.menuPageContainer:FindById("equipInvScroll")
+                if newScrollPanel and newScrollPanel.SetScrollDirect and G._decomposeScrollY then
+                    newScrollPanel:SetScrollDirect(0, G._decomposeScrollY)
+                end
             end,
         })
 
@@ -253,26 +321,30 @@ function MenuSystem.RebuildMenuPage(tabId)
         end
 
     elseif tabId == "adventure" then
-        -- 判断章节是否已解锁（第1章始终解锁，后续章节需通关前一章）
+        -- 判断章节是否已解锁
         local function IsChapterUnlocked(ch)
+            if ch == 0 then
+                -- 无尽模式：通关第3章后解锁
+                return (G.playerData.highestLevel or 1) > 3 * Battle.LEVELS_PER_CHAPTER
+            end
             if ch <= 1 then return true end
-            -- 必须通关上一章 Boss（highestLevel > 上一章末尾关卡），
-            -- 仅"到达"Boss关但未通关（highestLevel == 上一章末尾）不算解锁
+            -- 主线章节：必须通关上一章 Boss（highestLevel > 上一章末尾关卡）
             return (G.playerData.highestLevel or 1) > (ch - 1) * Battle.LEVELS_PER_CHAPTER
         end
 
         -- 章节主题色映射（箭头按钮跟随章节变色）
         local arrowThemes = {
+            [0] = { from = {100, 55, 140, 220}, to = {55, 28, 80, 240},  pressed = {140, 80, 190, 240}, border = {180, 120, 255, 100}, glow = {140, 80, 220, 50} },
             [1] = { from = {50, 70, 140, 220},  to = {25, 35, 80, 240},  pressed = {80, 110, 190, 240}, border = {100, 150, 255, 100}, glow = {70, 120, 220, 50} },
             [2] = { from = {140, 60, 40, 220},  to = {80, 30, 20, 240},  pressed = {190, 90, 60, 240},  border = {255, 130, 80, 100},  glow = {220, 90, 40, 50} },
             [3] = { from = {50, 130, 100, 220}, to = {25, 70, 55, 240},  pressed = {80, 180, 140, 240}, border = {120, 220, 180, 100}, glow = {80, 200, 150, 50} },
-            [4] = { from = {100, 55, 140, 220}, to = {55, 28, 80, 240},  pressed = {140, 80, 190, 240}, border = {180, 120, 255, 100}, glow = {140, 80, 220, 50} },
+            [4] = { from = {140, 110, 40, 220}, to = {80, 60, 20, 240},  pressed = {190, 150, 60, 240}, border = {220, 180, 80, 100},  glow = {200, 160, 50, 50} },
         }
         local at = arrowThemes[G.selectedChapter] or arrowThemes[1]
 
         -- 更新箭头按钮可见性 + 主题色
         if G.menuArrowLeft then
-            G.menuArrowLeft:SetVisible(G.selectedChapter > 1)
+            G.menuArrowLeft:SetVisible(G.selectedChapter > 0)
             G.menuArrowLeft:SetStyle({
                 backgroundGradient = { type = "linear", direction = "to-bottom", from = at.from, to = at.to },
                 pressedBackgroundColor = at.pressed,
@@ -302,10 +374,11 @@ function MenuSystem.RebuildMenuPage(tabId)
             local ch = G.selectedChapter
             -- 动态匹配章节底部背景色（与 MenuHeroWidget 渲染保持一致）
             local chapterGlowColors = {
+                [0] = {160, 100, 240},
                 [1] = {40, 120, 220},
                 [2] = {220, 100, 40},
                 [3] = {80, 200, 150},
-                [4] = {160, 100, 240},
+                [4] = {200, 160, 50},
             }
             local gc = chapterGlowColors[ch] or chapterGlowColors[1]
             local botR = math.floor(10 + gc[1] * 0.06)
@@ -323,8 +396,8 @@ function MenuSystem.RebuildMenuPage(tabId)
 
 
             if chapterUnlocked then
-                if ch == 4 then
-                    -- ── 第四章：无尽模式入口 ──
+                if ch == 0 then
+                    -- ── 无尽模式入口（特殊模式，在第1章左边）──
                     local bestWave = G.playerData.highestEndlessWave or 0
                     local bestText = bestWave > 0 and ("历史最高：第 " .. bestWave .. " 波") or "尚未挑战"
                     -- 外壳（紫色暗底）
@@ -453,7 +526,12 @@ function MenuSystem.RebuildMenuPage(tabId)
                 end
             else
                 -- ── 未解锁：橘色 3D 按钮（与"开始冒险"同款视觉，禁用态）+ 测试按钮 ──
-                local prevChapterName = Battle.CHAPTER_NAMES and Battle.CHAPTER_NAMES[ch - 1] or ("第" .. (ch-1) .. "章")
+                local prevChapterName
+                if ch == 0 then
+                    prevChapterName = Battle.CHAPTER_NAMES[3] or "珊瑚迷宫"
+                else
+                    prevChapterName = Battle.CHAPTER_NAMES and Battle.CHAPTER_NAMES[ch - 1] or ("第" .. (ch-1) .. "章")
+                end
                 advBar:AddChild(UI.Panel {
                     width = "75%", maxWidth = 320, height = 72,
                     borderRadius = 16,
@@ -748,7 +826,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                 local endlessLoadingRows = GuildPage.BuildLoading()
                 fillContainer(endlessRankContainer, endlessLoadingRows)
 
-                clientCloud:GetRankList("highest_level", 0, 20, {
+                clientCloud:GetRankList("adventure_rank", 0, 20, {
                     ok = function(rankList)
                         if not rankList or #rankList == 0 then
                             fillContainer(rankContainer, GuildPage.BuildError("暂无排名数据，快去冒险吧！"))
@@ -760,7 +838,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                     error = function()
                         fillContainer(rankContainer, GuildPage.BuildError("加载失败，请稍后再试"))
                     end,
-                }, "total_runs")
+                }, "highest_level", "total_runs")
 
                 clientCloud:GetRankList("endless_wave", 0, 20, {
                     ok = function(rankList)
@@ -1333,7 +1411,7 @@ function MenuSystem.ShowGachaRules()
                                             UI.Label { text = "◆", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
                                             UI.Panel { flexGrow = 1, gap = 2, children = {
                                                 UI.Label { text = "🔥 连击心得", fontSize = 12, fontWeight = "bold", fontColor = {255, 220, 100, 255} },
-                                                UI.Label { text = "4件：30%概率Combo+1\n6件：75%概率Combo+1", fontSize = 11, fontColor = {200, 195, 185, 200}, flexWrap = "wrap" },
+                                                UI.Label { text = "4件：50%概率Combo+1\n6件：75%概率Combo+1", fontSize = 11, fontColor = {200, 195, 185, 200}, flexWrap = "wrap" },
                                             }},
                                         },
                                     },
@@ -2014,7 +2092,7 @@ function MenuSystem.CreateMenuUI()
                     zIndex = 10,
                     onClick = function(self)
                         AM.PlaySFX("ui_click")
-                        if G.selectedChapter > 1 then
+                        if G.selectedChapter > 0 then
                             G.selectedChapter = G.selectedChapter - 1
                             MenuSystem.RebuildMenuPage(G.menuTab)
                         end
@@ -2058,7 +2136,7 @@ function MenuSystem.CreateMenuUI()
                         end
                     end,
                     onSwipeRight = function(event, widget)
-                        if G.selectedChapter > 1 then
+                        if G.selectedChapter > 0 then
                             G.selectedChapter = G.selectedChapter - 1
                             MenuSystem.RebuildMenuPage(G.menuTab)
                         end
@@ -2103,10 +2181,9 @@ function MenuSystem.CreateMenuUI()
                     from = {50, 45, 80, 30}, to = {80, 60, 140, 80},
                 },
             },
-            -- 底部 Tab 栏（含安全区，避开 iOS Home 指示条）
-            UI.SafeAreaView {
+            -- 底部 Tab 栏
+            UI.Panel {
                 width = "100%", flexShrink = 0,
-                edges = { "bottom", "left", "right" },
                 backgroundColor = {18, 14, 36, 255},
                 children = {
                     -- 分割线

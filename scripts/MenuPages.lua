@@ -594,6 +594,24 @@ local function BuildItemCell(item, size, onClick, selected, dragCallbacks)
         }
     end
 
+    -- 防止 ScrollView 抢夺拖拽手势：当格子正在按压时，
+    -- 由格子优先处理 Pan，阻止 ScrollView 的 CancelPointer
+    if dragCallbacks then
+        btn.OnPanStart = function(self, event)
+            if dragState.pressing then
+                self.state = self.state or {}
+                self.state.isDragging = true
+                return true  -- 拦截手势，不让 ScrollView 滚动
+            end
+            return false
+        end
+        btn.OnPanEnd = function(self, event)
+            if self.state then
+                self.state.isDragging = false
+            end
+        end
+    end
+
     return btn
 end
 
@@ -661,6 +679,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
 
     -- ======== 属性 + 套装摘要 ========
     local totalBonus = PlayerData.GetTotalBonus(data)
+    local critRate = PlayerData.GetCritRate(data)
     local setCounts = Equipment.GetActiveSetCount(data.equipment)
 
     -- 套装状态行 (v4.1: 显示效果描述)
@@ -760,7 +779,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     flexDirection = "column", gap = 2,
                     overflow = "hidden",
                     children = {
-                        UI.Panel { backgroundImage = "image/hero_penguin_naked_20260521092630.png", width = 120, height = 120, backgroundFit = "contain" },
+                        UI.Panel { backgroundImage = "image/hero_penguin_pixel_sword.png", width = 150, height = 150, backgroundFit = "contain" },
                         UI.Label {
                             text = "英雄",
                             fontSize = 19, fontColor = {160, 180, 230, 220},
@@ -798,6 +817,11 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     UI.Label { text = tostring(math.floor(totalBonus.hp + 0.5)), fontSize = 21, fontColor = {100, 255, 130, 255},
                         textShadow = { offsetX = 0, offsetY = 1, blur = 3, color = {60, 220, 100, 40} } },
                 }},
+                critRate > 0 and UI.Panel { flexDirection = "row", alignItems = "center", gap = 4, children = {
+                    UI.Label { text = "💥", fontSize = 16 },
+                    UI.Label { text = math.floor(critRate) .. "%", fontSize = 21, fontColor = {255, 200, 60, 255},
+                        textShadow = { offsetX = 0, offsetY = 1, blur = 3, color = {255, 180, 0, 40} } },
+                }} or nil,
             },
         },
     }
@@ -939,6 +963,39 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     UI.Label {
                         text = "全选蓝色",
                         fontSize = 13, fontColor = {200, 220, 255, 255},
+                        fontWeight = "bold",
+                    },
+                },
+            }
+        end
+        -- 检查是否有紫色装备
+        local hasPurple = false
+        for _, item in ipairs(data.inventory) do
+            local r = Equipment.RARITY_MIGRATE[item.rarity] or item.rarity
+            if r == "purple" then hasPurple = true; break end
+        end
+        if hasPurple then
+            titleRightChildren[#titleRightChildren + 1] = UI.Button {
+                backgroundGradient = {
+                    type = "linear", direction = "to-bottom",
+                    from = {140, 60, 200, 240}, to = {100, 40, 160, 240},
+                },
+                pressedBackgroundColor = {160, 80, 220, 255},
+                borderRadius = 10,
+                borderWidth = 1,
+                borderColor = {180, 100, 240, 180},
+                paddingLeft = 10, paddingRight = 10,
+                paddingTop = 4, paddingBottom = 4,
+                onClick = function(self)
+                    AM.PlaySFX("ui_click")
+                    if callbacks and callbacks.onSelectAllPurple then
+                        callbacks.onSelectAllPurple()
+                    end
+                end,
+                children = {
+                    UI.Label {
+                        text = "全选紫色",
+                        fontSize = 13, fontColor = {230, 200, 255, 255},
                         fontWeight = "bold",
                     },
                 },
@@ -1206,6 +1263,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
 
     -- 仓库滚动区域（不含 decomposeBar）
     children[#children + 1] = UI.Panel {
+        id = "equipInvScroll",
         width = "100%", flexGrow = 1, flexShrink = 1,
         minHeight = 180,
         flexDirection = "column",
@@ -1454,27 +1512,36 @@ function MenuPages.BuildTalentPage(data, callbacks)
         if v == math.floor(v) then return tostring(math.floor(v)) end
         return string.format("%.1f", v)
     end
-    if bonus.atk > 0 or bonus.def > 0 or bonus.hp > 0 then
+    if bonus.atk > 0 or bonus.def > 0 or bonus.hp > 0 or bonus.crit > 0 then
+        local statItems = {
+            bonus.atk > 0 and UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
+                UI.Panel { backgroundImage = IconAtlas.GetPath("equip_weapon"), width = 15, height = 15, backgroundFit = "contain" },
+                UI.Label { text = "+" .. fmtBonus(bonus.atk), fontSize = 16, fontColor = {255, 130, 100, 220},
+                    textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {255, 80, 60, 35} } },
+            }} or nil,
+            bonus.def > 0 and UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
+                UI.Panel { backgroundImage = IconAtlas.GetPath("hud_shield"), width = 15, height = 15, backgroundFit = "contain" },
+                UI.Label { text = "+" .. fmtBonus(bonus.def), fontSize = 16, fontColor = {100, 180, 255, 220},
+                    textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {60, 130, 255, 35} } },
+            }} or nil,
+            bonus.hp > 0 and UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
+                UI.Panel { backgroundImage = IconAtlas.GetPath("hud_hp"), width = 15, height = 15, backgroundFit = "contain" },
+                UI.Label { text = "+" .. fmtBonus(bonus.hp), fontSize = 16, fontColor = {100, 255, 130, 220},
+                    textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {60, 220, 100, 35} } },
+            }} or nil,
+            bonus.crit > 0 and UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
+                UI.Label { text = "💥", fontSize = 13 },
+                UI.Label { text = "+" .. fmtBonus(bonus.crit) .. "%", fontSize = 16, fontColor = {255, 200, 60, 220},
+                    textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {255, 180, 0, 35} } },
+            }} or nil,
+        }
+        -- 过滤 nil
+        local filtered = {}
+        for _, v in ipairs(statItems) do if v then filtered[#filtered + 1] = v end end
         children[#children + 1] = UI.Panel {
             width = "100%", paddingTop = 10,
             flexDirection = "row", justifyContent = "center", gap = 14,
-            children = {
-                UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
-                    UI.Panel { backgroundImage = IconAtlas.GetPath("equip_weapon"), width = 15, height = 15, backgroundFit = "contain" },
-                    UI.Label { text = "+" .. fmtBonus(bonus.atk), fontSize = 16, fontColor = {255, 130, 100, 220},
-                        textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {255, 80, 60, 35} } },
-                }},
-                UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
-                    UI.Panel { backgroundImage = IconAtlas.GetPath("hud_shield"), width = 15, height = 15, backgroundFit = "contain" },
-                    UI.Label { text = "+" .. fmtBonus(bonus.def), fontSize = 16, fontColor = {100, 180, 255, 220},
-                        textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {60, 130, 255, 35} } },
-                }},
-                UI.Panel { flexDirection = "row", alignItems = "center", gap = 3, children = {
-                    UI.Panel { backgroundImage = IconAtlas.GetPath("hud_hp"), width = 15, height = 15, backgroundFit = "contain" },
-                    UI.Label { text = "+" .. fmtBonus(bonus.hp), fontSize = 16, fontColor = {100, 255, 130, 220},
-                        textShadow = { offsetX = 0, offsetY = 1, blur = 2, color = {60, 220, 100, 35} } },
-                }},
-            },
+            children = filtered,
         }
     end
 
