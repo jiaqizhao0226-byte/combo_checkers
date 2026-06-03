@@ -48,6 +48,24 @@ end
 _initBattleUtils()
 
 -- ============================================================================
+-- 伤害计算
+-- ============================================================================
+
+--- 计算敌人对目标的实际伤害（防御减免 + 最低伤害保底）
+--- 防御不能完全挡住伤害，至少造成 ATK 的 25%
+---@param atk number 攻击力
+---@param def number 防御力
+---@return number actualDmg
+function Battle.CalcEnemyDmg(atk, def)
+    -- 抗性公式: 减伤率 = def/(def+100), 实际伤害 = atk * 100/(def+100)
+    -- def=0 → 0%减伤, def=100 → 50%减伤, def=200 → 66.7%减伤
+    local d = def or 0
+    local reduction = d / (d + 100)
+    local dmg = math.ceil(atk * (1 - reduction))
+    return math.max(1, dmg)  -- 最低保底1点伤害
+end
+
+-- ============================================================================
 -- 章节配置
 -- ============================================================================
 
@@ -230,7 +248,7 @@ Battle.CHAPTER_BOSS = CHAPTER_BOSS
 --- Boss 肖像资源映射
 Battle.BOSS_PORTRAITS = {
     abyss_kraken    = "image/boss_abyss_kraken_20260423082421.png",
-    lava_lord       = "image/boss_lava_lord_20260423082419.png",
+    lava_lord       = "image/boss_lava_lord_normal_20260424093454.png",
     coral_guardian  = "image/boss_coral_guardian_20260523054145.png",
     sand_worm       = "image/boss_sand_worm_20260528082517.png",
 }
@@ -1383,6 +1401,34 @@ function Battle.DestroyAltar(state, altar)
 end
 
 --- 获取剩余活跃祭坛数
+--- 第四章: 呼唤风沙持续伤害（每敌方回合开始调用）
+--- 每回合对英雄造成全场AOE伤害，持续回合数递减
+function Battle.ProcessSandFury(state)
+    if not state.sandFuryActive then return end
+    local hero = state.hero
+    local dmg = state.sandFuryDmg or 8
+    hero.hp = hero.hp - dmg
+    Battle.AddFloatingText(state, hero.col, hero.row,
+        "🌪️-" .. dmg .. "风沙!", {230, 160, 50, 255}, "hit")
+    state.screenShake = (state.screenShake or 0) + 0.2
+    Battle.AddLog(state, string.format("风沙肆虐！英雄受到 %d 伤害！(剩余%d回合)", dmg, state.sandFuryTurns))
+    -- VFX: 全场风沙粒子（每回合触发）
+    Battle.AddVFX(state, "sand_fury_tick", {
+        col = hero.col, row = hero.row, duration = 0.8,
+    })
+    -- 回合递减
+    state.sandFuryTurns = state.sandFuryTurns - 1
+    if state.sandFuryTurns <= 0 then
+        state.sandFuryActive = false
+        state.sandFuryTurns = nil
+        state.sandFuryDmg = nil
+        state.sandFuryBoss = nil
+        Battle.AddFloatingText(state, hero.col, hero.row,
+            "🌪️风沙消散", {180, 160, 100, 255})
+        Battle.AddLog(state, "风沙逐渐平息...")
+    end
+end
+
 --- 第四章: 流沙区回合推进（每敌方回合结束调用）
 --- 每回合 timer-1，归零自动消失，恢复通行
 function Battle.ProcessQuicksandTurn(state)
@@ -1403,6 +1449,8 @@ function Battle.ProcessQuicksandTurn(state)
             "✨流沙消散", {180, 160, 100, 255})
         Battle.AddLog(state, string.format("(%d,%d) 的流沙区消散了", zone.col, zone.row))
     end
+    -- 停沙格一旦生成就永久存在于棋盘上，不随流沙消散而消失
+    -- （仅在玩家踩上时才触发效果并消除）
 end
 
 function Battle.GetActiveAltarCount(board)
@@ -1436,6 +1484,11 @@ function Battle.GenerateLevel(state, level)
     state.rescueTarget = 0
     state.rescueCount = 0
     state.sandWormSegments = nil
+    -- 清理呼唤风沙持续状态
+    state.sandFuryActive = false
+    state.sandFuryTurns = nil
+    state.sandFuryDmg = nil
+    state.sandFuryBoss = nil
 
     -- 始终使用正六边形棋盘
     do
@@ -1642,9 +1695,9 @@ function Battle.GenerateLevel(state, level)
         elseif chapter == 3 then
             bossChapterEnemies = { "coral_snapper", "sea_urchin", "reef_starfish", "splitting_urchin" }
         elseif chapter == 4 then
-            bossChapterEnemies = { "sand_scorpion", "quicksand_worm", "sand_hawk" }
+            bossChapterEnemies = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
         else
-            bossChapterEnemies = { "jellyfish", "iron_turtle" }
+            bossChapterEnemies = { "sand_scorpion", "sand_hawk", "venom_lizard" }
         end
 
         -- 按距离分散放置：优先离Boss和英雄都有一定距离的位置
@@ -1803,14 +1856,22 @@ function Battle.GenerateLevel(state, level)
         -- 章内加速因子：stg 1-3 几乎无加成，stg 7-9 显著加成
         local stgAccel = (stageInChapter - 1) / 8  -- 0~1 范围
         local accelBonus = stgAccel * stgAccel      -- 二次方加速：S1=0, S5=0.25, S7=0.56, S9=1.0
-        if chapter >= 2 then
-            -- 第二章+: 基础线性 + 章内加速（最多额外+40% HP, +25% ATK）
-            hpScale = 1.0 + 0.12 * (level - 1) + 0.40 * accelBonus
-            atkScale = 1.0 + 0.09 * (level - 1) + 0.25 * accelBonus
+        if chapter == 1 then
+            -- 第一章: 平缓线性 + 章内加速（最多额外+30% HP, +20% ATK）
+            hpScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.30 * accelBonus
+            atkScale = 1.0 + 0.07 * (stageInChapter - 1) + 0.20 * accelBonus
+        elseif chapter == 2 then
+            -- 第二章: 中等线性 + 章内加速（最多额外+35% HP, +25% ATK）
+            hpScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.35 * accelBonus
+            atkScale = 1.0 + 0.08 * (stageInChapter - 1) + 0.25 * accelBonus
+        elseif chapter == 3 then
+            -- 第三章: 较高线性 + 章内加速（最多额外+50% HP, +35% ATK）
+            hpScale = 1.0 + 0.15 * (stageInChapter - 1) + 0.50 * accelBonus
+            atkScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.35 * accelBonus
         else
-            -- 第一章: 基础线性 + 章内加速（最多额外+50% HP, +35% ATK）
-            hpScale = 1.0 + 0.18 * (level - 1) + 0.50 * accelBonus
-            atkScale = 1.0 + 0.13 * (level - 1) + 0.35 * accelBonus
+            -- 第四章: 高线性 + 章内加速（最多额外+60% HP, +40% ATK）
+            hpScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.60 * accelBonus
+            atkScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.40 * accelBonus
         end
 
         -- 敌人数量: 保持平稳（怪多反而容易连击，不加难度）
@@ -1861,16 +1922,19 @@ function Battle.GenerateLevel(state, level)
                 enemyTypes = { "coral_snapper", "spine_anemone", "spine_anemone", "coral_priest", "coral_priest", "splitting_urchin", "splitting_urchin" }
             end
         elseif chapter == 4 then
-            -- 第四章: 沙漠系敌人，流沙虫可填坑
+            -- 第四章: 沙漠系敌人，流沙虫可填坑，后期加入特殊机制怪
             enemyTypes = { "sand_scorpion", "sand_scorpion", "quicksand_worm", "sand_hawk" }
-            if stageInChapter >= 4 then
-                enemyTypes = { "sand_scorpion", "quicksand_worm", "quicksand_worm", "sand_hawk", "sand_hawk" }
+            if stageInChapter >= 3 then
+                enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk", "venom_lizard" }
+            end
+            if stageInChapter >= 5 then
+                enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk", "venom_lizard", "sand_rattler" }
             end
             if stageInChapter >= 7 then
-                enemyTypes = { "sand_scorpion", "sand_scorpion", "quicksand_worm", "sand_hawk", "sand_hawk", "sand_hawk" }
+                enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
             end
         else
-            enemyTypes = { "jellyfish", "iron_turtle" }
+            enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk" }
         end
 
         -- 障碍物数量：只有第三章放珊瑚/礁石（配合寄居蟹营救机制）
@@ -2127,6 +2191,20 @@ function Battle.GenerateEndlessWave(state, wave)
         state.hero.def = math.floor(state.hero.def + (bs.def or 0))
         state.hero.hp  = math.floor(state.hero.hp  + (bs.hp or 0))
         state.hero.maxHp = math.floor(state.hero.maxHp + (bs.hp or 0))
+
+        -- 玻璃大炮: 首波初始化时应用HP减少+ATK提升
+        local gcLv = Skills.Level(state.skills, "glass_cannon")
+        if gcLv >= 1 then
+            local hpRedPct = (10 + gcLv * 5) / 100
+            local atkBoostPct = (15 + gcLv * 5) / 100
+            local hpLoss = math.floor(state.hero.maxHp * hpRedPct)
+            state.hero.maxHp = state.hero.maxHp - hpLoss
+            state.hero.hp = math.min(state.hero.hp, state.hero.maxHp)
+            local atkGain = math.floor(state.hero.atk * atkBoostPct)
+            state.hero.atk = state.hero.atk + atkGain
+            state.hero._glassCannonApplied = gcLv
+        end
+
         if G.playerData then
             state.critRate = PlayerData.GetCritRate(G.playerData)
             state.goldBonus = PlayerData.GetGoldBonus(G.playerData)
@@ -2136,6 +2214,35 @@ function Battle.GenerateEndlessWave(state, wave)
         -- 后续波：仅重置位置，保留英雄当前血量/ATK/DEF
         state.hero.col = heroCol
         state.hero.row = heroRow
+
+        -- 玻璃大炮: 后续波次追加效果（升级或首次获得时）
+        local gcLv = Skills.Level(state.skills, "glass_cannon")
+        local prevGcLv = state.hero._glassCannonApplied or 0
+        if gcLv > prevGcLv and prevGcLv > 0 then
+            local oldHpPct = (10 + prevGcLv * 5) / 100
+            local newHpPct = (10 + gcLv * 5) / 100
+            local oldAtkPct = (15 + prevGcLv * 5) / 100
+            local newAtkPct = (15 + gcLv * 5) / 100
+            local baseMaxHp = math.floor(state.hero.maxHp / (1 - oldHpPct))
+            local extraHpLoss = math.floor(baseMaxHp * (newHpPct - oldHpPct))
+            state.hero.maxHp = math.max(1, state.hero.maxHp - extraHpLoss)
+            state.hero.hp = math.min(state.hero.hp, state.hero.maxHp)
+            local baseAtk = math.floor(state.hero.atk / (1 + oldAtkPct))
+            local extraAtkGain = math.floor(baseAtk * (newAtkPct - oldAtkPct))
+            state.hero.atk = state.hero.atk + extraAtkGain
+            state.hero._glassCannonApplied = gcLv
+        elseif gcLv >= 1 and prevGcLv == 0 then
+            local hpRedPct = (10 + gcLv * 5) / 100
+            local atkBoostPct = (15 + gcLv * 5) / 100
+            local hpLoss = math.floor(state.hero.maxHp * hpRedPct)
+            state.hero.maxHp = math.max(1, state.hero.maxHp - hpLoss)
+            state.hero.hp = math.min(state.hero.hp, state.hero.maxHp)
+            local atkGain = math.floor(state.hero.atk * atkBoostPct)
+            state.hero.atk = state.hero.atk + atkGain
+            state.hero._glassCannonApplied = gcLv
+            Battle.AddLog(state, string.format("🔥 玻璃大炮Lv%d: ATK+%d%%, MaxHP-%d%%",
+                gcLv, 15 + gcLv * 5, 10 + gcLv * 5))
+        end
     end
 
     -- 英雄加入棋盘（每波都必须重新 AddPiece，因为 board.pieces 已清空）
@@ -2307,16 +2414,22 @@ function Battle.ContinueLevel(state, nextLevel)
     local aliveEnemies = HexGrid.GetTeamPieces(board, "enemy")
     local aliveCount = #aliveEnemies
 
-    -- 难度缩放：基础线性 + 章内加速因子（与 GenerateLevel 一致）
+    -- 难度缩放：章内关卡号 + 逐章递增系数（与 GenerateLevel 一致）
     local hpScale, atkScale
     local stgAccel = (stageInChapter - 1) / 8
     local accelBonus = stgAccel * stgAccel
-    if chapter >= 2 then
-        hpScale = 1.0 + 0.12 * (nextLevel - 1) + 0.40 * accelBonus
-        atkScale = 1.0 + 0.09 * (nextLevel - 1) + 0.25 * accelBonus
+    if chapter == 1 then
+        hpScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.30 * accelBonus
+        atkScale = 1.0 + 0.07 * (stageInChapter - 1) + 0.20 * accelBonus
+    elseif chapter == 2 then
+        hpScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.35 * accelBonus
+        atkScale = 1.0 + 0.08 * (stageInChapter - 1) + 0.25 * accelBonus
+    elseif chapter == 3 then
+        hpScale = 1.0 + 0.15 * (stageInChapter - 1) + 0.50 * accelBonus
+        atkScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.35 * accelBonus
     else
-        hpScale = 1.0 + 0.18 * (nextLevel - 1) + 0.50 * accelBonus
-        atkScale = 1.0 + 0.13 * (nextLevel - 1) + 0.35 * accelBonus
+        hpScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.60 * accelBonus
+        atkScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.40 * accelBonus
     end
 
     -- 目标敌人总数（和 GenerateLevel 一致）
@@ -2373,8 +2486,19 @@ function Battle.ContinueLevel(state, nextLevel)
         elseif stageInChapter >= 8 then
             enemyTypes = { "coral_snapper", "spine_anemone", "spine_anemone", "coral_priest", "coral_priest", "splitting_urchin", "splitting_urchin" }
         end
+    elseif chapter == 4 then
+        enemyTypes = { "sand_scorpion", "sand_scorpion", "quicksand_worm", "sand_hawk" }
+        if stageInChapter >= 3 then
+            enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk", "venom_lizard" }
+        end
+        if stageInChapter >= 5 then
+            enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk", "venom_lizard", "sand_rattler" }
+        end
+        if stageInChapter >= 7 then
+            enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
+        end
     else
-        enemyTypes = { "jellyfish", "iron_turtle" }
+        enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk" }
     end
 
     -- 在空位刷新新敌人
@@ -2832,8 +2956,17 @@ function Battle.TrySpawnEnemies(state)
         end
     elseif chapter == 4 then
         enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk" }
+        if stageInChapter >= 3 then
+            enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard" }
+        end
+        if stageInChapter >= 5 then
+            enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler" }
+        end
+        if stageInChapter >= 7 then
+            enemyTypes = { "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
+        end
     else
-        enemyTypes = { "jellyfish" }
+        enemyTypes = { "sand_scorpion", "sand_hawk" }
     end
 
     -- 获取外围空位
@@ -2852,17 +2985,23 @@ function Battle.TrySpawnEnemies(state)
     if maxSpawn <= 0 then return end
     local spawnCount = math.random(1, maxSpawn)
 
-    -- 难度缩放（与GenerateLevel一致：基础线性 + 章内加速）
+    -- 难度缩放（与GenerateLevel一致：章内关卡号 + 逐章递增系数）
     local spawnChapter, spawnStage = Battle.GetChapterInfo(state.level)
     local spawnAccel = (spawnStage - 1) / 8
     local spawnAccelBonus = spawnAccel * spawnAccel
     local hpScale, atkScale
-    if spawnChapter >= 2 then
-        hpScale = 1.0 + 0.12 * (state.level - 1) + 0.40 * spawnAccelBonus
-        atkScale = 1.0 + 0.09 * (state.level - 1) + 0.25 * spawnAccelBonus
+    if spawnChapter == 1 then
+        hpScale = 1.0 + 0.10 * (spawnStage - 1) + 0.30 * spawnAccelBonus
+        atkScale = 1.0 + 0.07 * (spawnStage - 1) + 0.20 * spawnAccelBonus
+    elseif spawnChapter == 2 then
+        hpScale = 1.0 + 0.12 * (spawnStage - 1) + 0.35 * spawnAccelBonus
+        atkScale = 1.0 + 0.08 * (spawnStage - 1) + 0.25 * spawnAccelBonus
+    elseif spawnChapter == 3 then
+        hpScale = 1.0 + 0.15 * (spawnStage - 1) + 0.50 * spawnAccelBonus
+        atkScale = 1.0 + 0.10 * (spawnStage - 1) + 0.35 * spawnAccelBonus
     else
-        hpScale = 1.0 + 0.18 * (state.level - 1) + 0.50 * spawnAccelBonus
-        atkScale = 1.0 + 0.13 * (state.level - 1) + 0.35 * spawnAccelBonus
+        hpScale = 1.0 + 0.18 * (spawnStage - 1) + 0.60 * spawnAccelBonus
+        atkScale = 1.0 + 0.12 * (spawnStage - 1) + 0.40 * spawnAccelBonus
     end
 
     for i = 1, spawnCount do
@@ -3023,6 +3162,54 @@ function Battle.CheckItemPickup(state, col, row)
     HexGrid.RemoveItemAt(state.board, col, row)
 end
 
+--- 停沙格：在随机空格子上生成一个停沙格（玩家踩上后消除全场流沙）
+--- 仅在有流沙且当前没有停沙格时才生成
+function Battle.SpawnSandStopTile(state)
+    local board = state.board
+    -- 已有停沙格则不重复生成
+    if board.sandStopTile then return end
+    -- 没有流沙区则不生成
+    if not board.quicksandZones or #board.quicksandZones == 0 then return end
+    -- 找到所有可用空格
+    local allCells = HexGrid.GetAllValidCells(board)
+    local candidates = {}
+    local hero = state.hero
+    for _, c in ipairs(allCells) do
+        if not HexGrid.IsBlocked(board, c.col, c.row)
+           and not HexGrid.IsInQuicksandZone(board, c.col, c.row)
+           and (c.col ~= hero.col or c.row ~= hero.row) then
+            candidates[#candidates + 1] = c
+        end
+    end
+    if #candidates == 0 then return end
+    local pick = candidates[math.random(1, #candidates)]
+    board.sandStopTile = { col = pick.col, row = pick.row }
+    Battle.AddFloatingText(state, pick.col, pick.row,
+        "🛑停沙格!", {100, 220, 255, 255}, nil, 2.5)
+    Battle.AddVFX(state, "sand_stop_spawn", { col = pick.col, row = pick.row, duration = 1.0 })
+    Battle.AddLog(state, "停沙格出现！踩上去可以消除全场流沙！")
+    AM.PlaySFX("item_spawn", 0.7)
+end
+
+--- 检查英雄是否踩到停沙格，踩到则清除全场流沙
+function Battle.CheckSandStopTile(state, col, row)
+    local board = state.board
+    if not board.sandStopTile then return end
+    local st = board.sandStopTile
+    if st.col == col and st.row == row then
+        -- 消除全场流沙
+        local removedCount = board.quicksandZones and #board.quicksandZones or 0
+        board.quicksandZones = {}
+        board.sandStopTile = nil
+        Battle.AddFloatingText(state, col, row,
+            "✨流沙全消!", {100, 255, 200, 255}, "combo", 3.0)
+        Battle.AddVFX(state, "sand_stop_clear", { col = col, row = row, duration = 1.2 })
+        state.screenShake = (state.screenShake or 0) + 0.3
+        AM.PlaySFX("heal_pickup", 1.0)
+        Battle.AddLog(state, string.format("踩上停沙格！消除全场 %d 片流沙区！", removedCount))
+    end
+end
+
 -- ============================================================================
 -- 行动执行
 -- ============================================================================
@@ -3110,6 +3297,9 @@ function Battle.ExecuteMove(state, targetCol, targetRow, isFreeMove)
 
     -- 检查道具拾取
     Battle.CheckItemPickup(state, targetCol, targetRow)
+
+    -- 检查停沙格
+    Battle.CheckSandStopTile(state, targetCol, targetRow)
 end
 
 --- 执行跳跃 (跳过敌人造成伤害, 或跳过岩石不造成伤害)
@@ -3316,6 +3506,7 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         -- Boss光环检查（跳跃落地到Boss附近）
         Battle.ProcessBossAura(state)
         Battle.CheckItemPickup(state, jumpInfo.col, jumpInfo.row)
+        Battle.CheckSandStopTile(state, jumpInfo.col, jumpInfo.row)
         return nil
     end
 
@@ -3550,6 +3741,16 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         Battle.AddLog(state, string.format("海胆反伤! 英雄受到 %d 点刺伤", math.floor(enemy.atk * 0.6)))
     end
 
+    -- === 沙漠响尾蛇: 被攻击后进入狂怒 ===
+    if enemy.enemyType == "sand_rattler" and damage > 0 and enemy.hp > 0 then
+        if not enemy._enraged then
+            enemy._enraged = true
+            Battle.AddFloatingText(state, enemy.col, enemy.row,
+                "🐍狂怒!", {255, 80, 40, 255})
+            Battle.AddLog(state, enemy.name .. " 被激怒了！下回合攻击力翻倍！")
+        end
+    end
+
     -- === 吸血跳: 等级决定吸血比例 ===
     local vampLv = Skills.Level(state.skills, "vampiric_jump")
     local vampRate = 0
@@ -3622,6 +3823,39 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
 
     Battle.AddLog(state, string.format("跳跃攻击 %s！伤害 %d (%dx连跳)",
         enemy.name, damage, state.combo))
+
+    -- 组合技: 猎杀本能 — 全屏HP≤20%小怪直接处决，每次回复10HP
+    if Skills.HasCombo(state.skills, "combo_hunter_instinct") then
+        local allEnemies = HexGrid.GetTeamPieces(state.board, "enemy")
+        for _, e in ipairs(allEnemies) do
+            if e.hp > 0 and not e.isBoss then
+                local hpPct = e.hp / (e.maxHp or e.hp)
+                if hpPct <= 0.20 and hpPct > 0 then
+                    local overkill = e.hp
+                    e.hp = 0
+                    state.totalDamage = state.totalDamage + overkill
+                    -- 回复10HP
+                    local heal = math.min(10, hero.maxHp - hero.hp)
+                    if heal > 0 then
+                        hero.hp = hero.hp + heal
+                        Battle.AddFloatingText(state, hero.col, hero.row,
+                            "+" .. heal .. "💀", {100, 255, 100, 255})
+                    end
+                    -- 处决文字：用专属样式，更慢更大更显眼
+                    Battle.AddFloatingText(state, e.col, e.row,
+                        "💀 处决", {255, 50, 10, 255}, "execution", 2.5)
+                    -- 处决专属特效
+                    Battle.AddVFX(state, "execution", {
+                        col = e.col, row = e.row, duration = 1.2,
+                    })
+                    Battle.AddLog(state, "💀 猎杀本能！处决 " .. e.name .. "，回复" .. heal .. "HP")
+                    AM.PlaySFX("lightning", 1.0, 0.7)
+                    state.screenShake = (state.screenShake or 0) + 0.4
+                    Battle.HandleEnemyDeath(state, e, true)
+                end
+            end
+        end
+    end
 
     -- 死亡处理（护盾吸收时不触发）
     if damage > 0 and enemy.hp <= 0 then
@@ -3757,6 +3991,9 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
     -- 检查道具拾取
     Battle.CheckItemPickup(state, jumpInfo.col, jumpInfo.row)
 
+    -- 检查停沙格
+    Battle.CheckSandStopTile(state, jumpInfo.col, jumpInfo.row)
+
     -- 地刺陷阱: 在跳跃出发位置周围放置地刺
     Battle.PlaceSpikeTraps(state, jumpFromCol, jumpFromRow)
 
@@ -3881,6 +4118,28 @@ function Battle.ApplyLandingSkills(state, col, row)
         range = aoeRange,
     })
 
+    -- 组合技: 雷震天罚 — 震地落命中敌人50%概率追加闪电(15伤,弹射1次)
+    if hit and Skills.HasCombo(state.skills, "combo_thunder_quake") then
+        -- 落点雷震光环特效（瞬间爆开，短促有力）
+        Battle.AddVFX(state, "combo_thunder_ring", {
+            col = state.hero.col, row = state.hero.row,
+            duration = 0.9,
+        })
+        for _, target in ipairs(hitTargets) do
+            if target.hp > 0 and math.random() < 0.5 then
+                Battle.ApplyChainLightning(state, target, 1, 15)
+                -- 闪电延迟 0.3s 出现，形成"先震后电"节奏
+                Battle.AddVFX(state, "lightning", {
+                    fromCol = state.hero.col, fromRow = state.hero.row,
+                    toCol = target.col, toRow = target.row,
+                    duration = 0.7,
+                    startDelay = 0.25,
+                })
+                Battle.AddLog(state, "⚡ 雷震天罚！追加闪电击中附近敌人")
+            end
+        end
+    end
+
     -- 地震连锁(T2): 每个被击中的敌人触发一次闪电弹射
     if hasSeismic then
         for _, target in ipairs(hitTargets) do
@@ -3963,7 +4222,7 @@ function Battle.FlushSoulHunterAccum(state, col, row)
         local stacks = state.setEffects and state.setEffects.bloodRageStacks or 0
         local txt
         if bloodRage and stacks > 0 then
-            txt = string.format("🩸+%d 血怒×%d!", totalHeal, stacks)
+            txt = string.format("🩸+%d 血怒x%d!", totalHeal, stacks)
         else
             txt = "🩸+" .. totalHeal
         end
@@ -4010,7 +4269,7 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         AM.PlaySFX("enemy_death")
     end
 
-    -- === 沙虫头部死亡: 清除所有身体段 ===
+    -- === 沙虫头部死亡: 清除所有身体段 + 风沙状态 ===
     if enemy.isHead and state.sandWormSegments then
         for _, seg in ipairs(state.sandWormSegments) do
             if seg ~= enemy and seg.hp > 0 then
@@ -4022,6 +4281,16 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
             end
         end
         state.sandWormSegments = nil
+        -- 沙虫死亡：立即解除呼唤风沙
+        if state.sandFuryActive then
+            state.sandFuryActive = false
+            state.sandFuryTurns = nil
+            state.sandFuryDmg = nil
+            state.sandFuryBoss = nil
+            Battle.AddFloatingText(state, enemy.col, enemy.row,
+                "🌪️风沙消散!", {180, 160, 100, 255})
+            Battle.AddLog(state, "巨虫倒下，风沙随之平息！")
+        end
         Battle.AddLog(state, "沙丘巨虫全身崩溃！")
     end
 
@@ -4138,15 +4407,21 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
             for i = 1, spawnCount do
                 local slot = splitSlots[i]
                 local shard = Battle.CreatePiece(shardTemplate, slot.col, slot.row)
-                -- 应用当前关卡难度缩放
+                -- 应用当前关卡难度缩放（章内关卡号 + 逐章递增）
                 local chapter, stageInChapter = Battle.GetChapterInfo(state.level)
                 local hpScale, atkScale
                 if chapter == 1 then
-                    hpScale = 1 + 0.15 * (stageInChapter - 1)
-                    atkScale = 1 + 0.10 * (stageInChapter - 1)
-                else
                     hpScale = 1 + 0.08 * (stageInChapter - 1)
+                    atkScale = 1 + 0.05 * (stageInChapter - 1)
+                elseif chapter == 2 then
+                    hpScale = 1 + 0.10 * (stageInChapter - 1)
                     atkScale = 1 + 0.06 * (stageInChapter - 1)
+                elseif chapter == 3 then
+                    hpScale = 1 + 0.12 * (stageInChapter - 1)
+                    atkScale = 1 + 0.08 * (stageInChapter - 1)
+                else
+                    hpScale = 1 + 0.14 * (stageInChapter - 1)
+                    atkScale = 1 + 0.10 * (stageInChapter - 1)
                 end
                 shard.hp = math.floor(shard.hp * hpScale)
                 shard.maxHp = shard.hp
@@ -4163,11 +4438,13 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         end
     end
 
-    -- === 第四章: 敌人死亡有 70% 概率产生大流沙区（7格，5回合后消失，最多5个） ===
+    -- === 第四章: 敌人死亡有概率产生大流沙区（7格，5回合后消失，最多3个） ===
+    -- Boss关概率50%，普通关50%
     local ch4 = Battle.GetChapterInfo(state.level)
     local zoneCount = state.board.quicksandZones and #state.board.quicksandZones or 0
-    if ch4 == 4 and not enemy.isSegment and not enemy.isBoss and zoneCount < 5 then
-        if math.random() < 0.7 then
+    if ch4 == 4 and not enemy.isSegment and not enemy.isBoss and zoneCount < 3 then
+        local sandProb = 0.5
+        if math.random() < sandProb then
             local zoneCenter = { col = enemy.col, row = enemy.row }
             HexGrid.AddQuicksandZone(state.board, zoneCenter.col, zoneCenter.row)
             AM.PlaySFX("quicksand_spawn", 0.8)
@@ -4229,6 +4506,8 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
                                 "⚠️被推开!", {255, 200, 50, 255}, "damage", 1.5)
                             AM.PlaySFX("combo_doomsday_blast", 0.7)
                             Battle.AddLog(state, "主角被流沙涌出推开，连跳中断！受到 " .. pushDmg .. " 点伤害！")
+                            -- 推到停沙格上也要触发效果
+                            Battle.CheckSandStopTile(state, safeCol, safeRow)
                         else
                             Battle.AddFloatingText(state, safeCol, safeRow,
                                 "被推开", {180, 150, 80, 200})
@@ -4236,6 +4515,8 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
                     end
                 end
             end
+            -- 流沙区产生后，刷新停沙格
+            Battle.SpawnSandStopTile(state)
         end
     end
 
@@ -4440,7 +4721,7 @@ function Battle.PlaceSpikeTraps(state, fromCol, fromRow)
     if spikeLv < 1 then return end
 
     local dmg = 5 + spikeLv * 5           -- Lv1=10, ..., Lv5=30
-    local dur = 2 + math.floor(spikeLv / 2) -- Lv1=2, Lv2=3, Lv3=3, Lv4=4, Lv5=4
+    local dur = 3 + math.floor(spikeLv / 2) -- Lv1=3, Lv2=4, Lv3=4, Lv4=5, Lv5=5
     local maxTraps = math.min(spikeLv, 3)  -- Lv1=1, Lv2=2, Lv3+=3
 
     if not state._spikeTraps then state._spikeTraps = {} end
@@ -5163,6 +5444,22 @@ function Battle.ProcessHeroBurn(state)
     end
 end
 
+--- 处理英雄毒DOT（毒尾蜥施加，每回合开始时调用）
+function Battle.ProcessHeroPoison(state)
+    if state.poisonDot and state.poisonDot.turns > 0 then
+        local dmg = state.poisonDot.damage or 5
+        state.hero.hp = state.hero.hp - dmg
+        state.poisonDot.turns = state.poisonDot.turns - 1
+        Battle.AddFloatingText(state, state.hero.col, state.hero.row,
+            "-" .. dmg .. "🐍中毒", {120, 200, 50, 255})
+        Battle.AddLog(state, string.format("毒液伤害！-%dHP（剩余%d回合）", dmg, state.poisonDot.turns))
+        if state.poisonDot.turns <= 0 then
+            state.poisonDot = nil
+            Battle.AddLog(state, "毒液效果消退")
+        end
+    end
+end
+
 --- 处理Boss光环伤害（英雄靠近Boss时自动受伤）
 --- 触发时机: 每回合敌人行动前 + 英雄移动/跳跃落地后
 function Battle.ProcessBossAura(state)
@@ -5180,7 +5477,7 @@ function Battle.ProcessBossAura(state)
                     local dmg = aura.damage
                     -- 狂暴时光环伤害提升50%
                     if e.enraged then dmg = math.floor(dmg * 1.5) end
-                    local actualDmg = math.max(1, math.floor(dmg - (hero.def or 0)))
+                    local actualDmg = Battle.CalcEnemyDmg(dmg, hero.def or 0)
                     -- 护盾减半
                     if state.hasShield then
                         actualDmg = math.floor(actualDmg / 2)
@@ -5310,6 +5607,9 @@ function Battle.ProcessEnemyTurn(state)
 
     -- 0. 英雄灼烧DOT（第三章火精灵）
     Battle.ProcessHeroBurn(state)
+
+    -- 0.05 英雄毒DOT（第四章毒尾蜥）
+    Battle.ProcessHeroPoison(state)
 
     -- 0.1 Boss光环伤害（英雄靠近Boss时自动受伤）
     Battle.ProcessBossAura(state)
@@ -5719,7 +6019,7 @@ function Battle.EnemyAct(state, enemy)
             -- 在攻击范围内：可以攻击，但伤害降低50%
             local reduction = enemy._sealedDmgReduction or 0.5
             local targetDef = sealTarget.def or 0
-            local baseDmg = math.max(1, enemy.atk - targetDef)
+            local baseDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
             local actualDmg = math.max(1, math.floor(baseDmg * (1 - reduction)))
 
             if sealTargetIsScarecrow then
@@ -5806,6 +6106,17 @@ function Battle.EnemyAct(state, enemy)
         return Battle.CharmJellyAct(state, enemy)
     end
 
+    -- === 第四章特殊机制敌人 ===
+    if enemy.enemyType == "sand_strider" then
+        return Battle.SandStriderAct(state, enemy)
+    end
+    if enemy.enemyType == "sand_rattler" then
+        return Battle.SandRattlerAct(state, enemy)
+    end
+    if enemy.enemyType == "venom_lizard" then
+        return Battle.VenomLizardAct(state, enemy)
+    end
+
     -- === 确定攻击目标：稻草人嘲讽优先 ===
     local target = hero
     local targetIsScarecrow = false
@@ -5822,7 +6133,7 @@ function Battle.EnemyAct(state, enemy)
     if canAttack then
         -- 铁龟防御减伤
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if targetIsScarecrow then
             -- 攻击稻草人
@@ -6036,7 +6347,7 @@ function Battle.GhostSharkAct(state, enemy)
 
         -- 立即攻击
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if target == hero then
             -- 护盾减伤
@@ -6151,7 +6462,7 @@ function Battle.ArcherfishAct(state, enemy)
     -- 在射程内（1~range）→ 远程攻击
     if distToTarget <= range and distToTarget >= 1 then
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if target == hero then
             if state.hasShield then
@@ -6248,7 +6559,7 @@ function Battle.ElectricRayAct(state, enemy)
     -- 在攻击范围内 → 放电攻击（AOE）
     if distToTarget <= 1 and enemy.atk > 0 then
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if target == hero then
             if state.hasShield then
@@ -6383,7 +6694,7 @@ function Battle.SpineAnemoneAct(state, enemy)
     -- 在射程内（2~range）→ 远程攻击（不移动）
     if distToTarget <= range and distToTarget >= 1 then
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if target == hero then
             if state.hasShield then
@@ -6616,7 +6927,7 @@ function Battle.TideCallerAct(state, enemy)
     local dist = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
     if dist <= range and enemy.atk > 0 then
         local def = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - def)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, def)
         if target == state.scarecrow then
             target.hp = target.hp - actualDmg
             target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
@@ -6683,7 +6994,7 @@ function Battle.SwiftBarracudaAct(state, enemy)
     local distAfterMove = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
     if distAfterMove <= range and enemy.atk > 0 then
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if target == state.scarecrow then
             target.hp = target.hp - actualDmg
@@ -6749,7 +7060,7 @@ function Battle.CharmJellyAct(state, enemy)
     -- 在攻击范围内直接攻击
     if distToTarget <= range and enemy.atk > 0 then
         local targetDef = target.def or 0
-        local actualDmg = math.max(1, enemy.atk - targetDef)
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, targetDef)
 
         if target == state.scarecrow then
             target.hp = target.hp - actualDmg
@@ -6807,6 +7118,266 @@ function Battle.CharmJellyAct(state, enemy)
         enemy.col = bestMove.col
         enemy.row = bestMove.row
         return { type = "move", enemy = enemy }
+    end
+    return { type = "idle", enemy = enemy }
+end
+
+-- ============================================================================
+-- 第四章特殊机制敌人 AI
+-- ============================================================================
+
+--- 沙暴行者: 蓄力1回合 → 全图攻击
+function Battle.SandStriderAct(state, enemy)
+    local hero = state.hero
+    local target = hero
+    if state.scarecrowActive and state.scarecrow and state.scarecrow.hp > 0 then
+        target = state.scarecrow
+    end
+
+    -- 蓄力状态判断
+    if enemy._charged then
+        -- 蓄力完成，发动全图攻击
+        enemy._charged = false
+        enemy._chargeCD = enemy.chargeTurns or 1
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, target.def or 0)
+        -- 应用护盾
+        if target == hero then
+            if state.hasShield then
+                actualDmg = math.floor(actualDmg / 2)
+                state.hasShield = false
+                Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+            elseif state.drainShield and state.drainShield > 0 then
+                local absorbed = math.min(state.drainShield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                state.drainShield = state.drainShield - absorbed
+                if state.drainShield <= 0 then state.drainShield = nil end
+            end
+            if (hero._shield or 0) > 0 and actualDmg > 0 then
+                local absorbed = math.min(hero._shield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                hero._shield = hero._shield - absorbed
+                if hero._shield <= 0 then
+                    hero._shield = 0
+                    Battle.AddVFX(state, "shield_break", { col = hero.col, row = hero.row, duration = 0.6 })
+                end
+            end
+            hero.hp = hero.hp - actualDmg
+            state.screenShake = (state.screenShake or 0) + 0.4
+            state.hitFlash = 0.25
+        else
+            target.hp = target.hp - actualDmg
+            target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+            target.hitCount = (target.hitCount or 0) + 1
+            if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+        end
+        Battle.AddVFX(state, "sand_strider_blast", {
+            fromCol = enemy.col, fromRow = enemy.row,
+            toCol = target.col, toRow = target.row,
+            duration = 0.7
+        })
+        AM.PlaySFX("boss_stomp", 0.7)
+        Battle.AddFloatingText(state, target.col, target.row, "🌪️-" .. actualDmg, {200, 160, 60, 255}, "hit")
+        Battle.AddLog(state, string.format("沙暴行者释放沙暴射线！造成 %d 伤害！", actualDmg))
+        return { type = "attack", enemy = enemy, damage = actualDmg }
+    end
+
+    -- 开始蓄力
+    if (enemy._chargeCD or 0) <= 0 then
+        enemy._charged = true
+        enemy._chargeCD = 0
+        Battle.AddFloatingText(state, enemy.col, enemy.row, "⚡蓄力!", {255, 200, 50, 255})
+        Battle.AddLog(state, "沙暴行者开始蓄力——下回合将发动全图攻击！")
+        return { type = "charge", enemy = enemy }
+    end
+
+    -- 冷却中：向英雄移动
+    enemy._chargeCD = (enemy._chargeCD or 0) - 1
+    local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+    if #validMoves > 0 then
+        local bestMove = Battle.FindClosestMove(validMoves, target.col, target.row)
+        if bestMove then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.3
+            enemy.animMaxTimer = 0.3
+            enemy.col = bestMove.col
+            enemy.row = bestMove.row
+            return { type = "move", enemy = enemy }
+        end
+    end
+    return { type = "idle", enemy = enemy }
+end
+
+--- 沙漠响尾蛇: 被攻击/跳过后进入狂怒，下回合双倍伤害
+function Battle.SandRattlerAct(state, enemy)
+    local hero = state.hero
+    local target = hero
+    if state.scarecrowActive and state.scarecrow and state.scarecrow.hp > 0 then
+        target = state.scarecrow
+    end
+
+    local range = enemy.attackRange or 1
+    local distToTarget = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
+
+    -- 狂怒状态下攻击（双倍伤害）
+    if enemy._enraged and distToTarget <= range then
+        local multiplier = enemy.counterMultiplier or 2.0
+        local rawDmg = math.floor(enemy.atk * multiplier)
+        local actualDmg = Battle.CalcEnemyDmg(rawDmg, target.def or 0)
+        enemy._enraged = false
+        if target == hero then
+            if state.hasShield then
+                actualDmg = math.floor(actualDmg / 2)
+                state.hasShield = false
+                Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+            elseif state.drainShield and state.drainShield > 0 then
+                local absorbed = math.min(state.drainShield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                state.drainShield = state.drainShield - absorbed
+                if state.drainShield <= 0 then state.drainShield = nil end
+            end
+            if (hero._shield or 0) > 0 and actualDmg > 0 then
+                local absorbed = math.min(hero._shield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                hero._shield = hero._shield - absorbed
+                if hero._shield <= 0 then
+                    hero._shield = 0
+                    Battle.AddVFX(state, "shield_break", { col = hero.col, row = hero.row, duration = 0.6 })
+                end
+            end
+            hero.hp = hero.hp - actualDmg
+            state.screenShake = (state.screenShake or 0) + 0.5
+            state.hitFlash = 0.3
+        else
+            target.hp = target.hp - actualDmg
+            target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+            target.hitCount = (target.hitCount or 0) + 1
+            if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+        end
+        Battle.AddVFX(state, "rattler_strike", {
+            col = target.col, row = target.row, duration = 0.5
+        })
+        AM.PlaySFX("hero_damage")
+        Battle.AddFloatingText(state, target.col, target.row, "🐍狂怒-" .. actualDmg .. "!", {255, 80, 40, 255}, "hit")
+        Battle.AddLog(state, string.format("响尾蛇怒击！造成 %d 伤害！", actualDmg))
+        return { type = "attack", enemy = enemy, damage = actualDmg }
+    end
+
+    -- 非狂怒：普通攻击
+    if distToTarget <= range and enemy.atk > 0 then
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, target.def or 0)
+        if target == hero then
+            if state.hasShield then
+                actualDmg = math.floor(actualDmg / 2)
+                state.hasShield = false
+            elseif state.drainShield and state.drainShield > 0 then
+                local absorbed = math.min(state.drainShield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                state.drainShield = state.drainShield - absorbed
+                if state.drainShield <= 0 then state.drainShield = nil end
+            end
+            if (hero._shield or 0) > 0 and actualDmg > 0 then
+                local absorbed = math.min(hero._shield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                hero._shield = hero._shield - absorbed
+                if hero._shield <= 0 then hero._shield = 0 end
+            end
+            hero.hp = hero.hp - actualDmg
+            state.hitFlash = 0.2
+        else
+            target.hp = target.hp - actualDmg
+            target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+            target.hitCount = (target.hitCount or 0) + 1
+            if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+        end
+        AM.PlaySFX("hero_damage")
+        Battle.AddFloatingText(state, target.col, target.row, "-" .. actualDmg, {255, 60, 60, 255}, "hit")
+        return { type = "attack", enemy = enemy, damage = actualDmg }
+    end
+
+    -- 移向英雄
+    local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+    if #validMoves > 0 then
+        local bestMove = Battle.FindClosestMove(validMoves, target.col, target.row)
+        if bestMove then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.3
+            enemy.animMaxTimer = 0.3
+            enemy.col = bestMove.col
+            enemy.row = bestMove.row
+            return { type = "move", enemy = enemy }
+        end
+    end
+    return { type = "idle", enemy = enemy }
+end
+
+--- 毒尾蜥: 攻击附带毒DOT
+function Battle.VenomLizardAct(state, enemy)
+    local hero = state.hero
+    local target = hero
+    if state.scarecrowActive and state.scarecrow and state.scarecrow.hp > 0 then
+        target = state.scarecrow
+    end
+
+    local range = enemy.attackRange or 1
+    local distToTarget = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
+
+    if distToTarget <= range and enemy.atk > 0 then
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, target.def or 0)
+        if target == hero then
+            if state.hasShield then
+                actualDmg = math.floor(actualDmg / 2)
+                state.hasShield = false
+                Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+            elseif state.drainShield and state.drainShield > 0 then
+                local absorbed = math.min(state.drainShield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                state.drainShield = state.drainShield - absorbed
+                if state.drainShield <= 0 then state.drainShield = nil end
+            end
+            if (hero._shield or 0) > 0 and actualDmg > 0 then
+                local absorbed = math.min(hero._shield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                hero._shield = hero._shield - absorbed
+                if hero._shield <= 0 then hero._shield = 0 end
+            end
+            hero.hp = hero.hp - actualDmg
+            state.hitFlash = 0.2
+            -- 施加毒DOT（叠加/刷新）
+            state.poisonDot = {
+                damage = enemy.poisonDamage or 5,
+                turns = enemy.poisonDuration or 2,
+                source = "venom_lizard",
+            }
+            Battle.AddFloatingText(state, hero.col, hero.row, "🦎毒-" .. actualDmg, {120, 200, 50, 255}, "hit")
+            Battle.AddLog(state, string.format("毒尾蜥攻击！-%d 并施加剧毒（每回合%d伤害，%d回合）",
+                actualDmg, enemy.poisonDamage or 5, enemy.poisonDuration or 2))
+        else
+            target.hp = target.hp - actualDmg
+            target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+            target.hitCount = (target.hitCount or 0) + 1
+            if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+            Battle.AddFloatingText(state, target.col, target.row, "-" .. actualDmg, {255, 60, 60, 255}, "hit")
+        end
+        AM.PlaySFX("hero_damage")
+        state.screenShake = (state.screenShake or 0) + 0.25
+        return { type = "attack", enemy = enemy, damage = actualDmg }
+    end
+
+    -- 移向英雄
+    local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+    if #validMoves > 0 then
+        local bestMove = Battle.FindClosestMove(validMoves, target.col, target.row)
+        if bestMove then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.3
+            enemy.animMaxTimer = 0.3
+            enemy.col = bestMove.col
+            enemy.row = bestMove.row
+            return { type = "move", enemy = enemy }
+        end
     end
     return { type = "idle", enemy = enemy }
 end

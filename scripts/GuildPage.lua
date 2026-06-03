@@ -63,7 +63,7 @@ local function BuildRankRow(rank, nickname, level, runs, isMe)
         alignItems = "center", gap = 8,
         paddingTop = 9, paddingBottom = 9,
         paddingLeft = 12, paddingRight = 12,
-        borderRadius = 10,
+        borderRadius = 0,
         backgroundGradient = rowBg,
         borderWidth = isMe and 1 or 0,
         borderColor = rowBorderColor,
@@ -192,7 +192,7 @@ function GuildPage.Build(playerData, onRefresh)
                 flexDirection = "row", alignItems = "center", gap = 8,
                 children = {
                     UI.Panel {
-                        width = 4, height = 22, borderRadius = 2,
+                        width = 4, height = 22, borderRadius = 0,
                         backgroundColor = {140, 100, 255, 255},
                     },
                     UI.Label {
@@ -206,7 +206,7 @@ function GuildPage.Build(playerData, onRefresh)
             UI.Panel {
                 paddingTop = 5, paddingBottom = 5,
                 paddingLeft = 12, paddingRight = 12,
-                borderRadius = 14,
+                borderRadius = 0,
                 backgroundColor = {255, 255, 255, 12},
                 borderWidth = 1, borderColor = {255, 255, 255, 30},
                 onClick = function(self)
@@ -227,7 +227,7 @@ function GuildPage.Build(playerData, onRefresh)
             type = "linear", direction = "to-right",
             from = {60, 45, 110, 200}, to = {40, 28, 80, 200},
         },
-        borderRadius = 12,
+        borderRadius = 0,
         borderWidth = 1, borderColor = {130, 100, 220, 100},
         paddingTop = 10, paddingBottom = 10,
         paddingLeft = 14, paddingRight = 14,
@@ -315,7 +315,7 @@ local function BuildEndlessRankRow(rank, nickname, wave, isMe)
         alignItems = "center", gap = 8,
         paddingTop = 9, paddingBottom = 9,
         paddingLeft = 12, paddingRight = 12,
-        borderRadius = 10,
+        borderRadius = 0,
         backgroundGradient = rowBg,
         borderWidth = isMe and 1 or 0,
         borderColor = rowBorderColor,
@@ -394,7 +394,7 @@ function GuildPage.BuildEndlessMyCard(playerData)
             type = "linear", direction = "to-right",
             from = {60, 25, 110, 200}, to = {35, 15, 80, 200},
         },
-        borderRadius = 12,
+        borderRadius = 0,
         borderWidth = 1, borderColor = {160, 80, 255, 100},
         paddingTop = 10, paddingBottom = 10,
         paddingLeft = 14, paddingRight = 14,

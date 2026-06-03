@@ -23,7 +23,7 @@ PlayerData.TALENTS = {
         name = "生命强化",
         icon = "❤️",
         desc = "基础生命值",
-        bonusPerLevel = 3,   -- 满级+30 (基础110的27%)
+        bonusPerLevel = 10,  -- 满级+100
         maxLevel = 10,
         stat = "hp",
     },
@@ -32,7 +32,7 @@ PlayerData.TALENTS = {
         name = "攻击强化",
         icon = "⚔️",
         desc = "基础攻击力",
-        bonusPerLevel = 0.5, -- 满级+5 (基础20的25%)
+        bonusPerLevel = 2,   -- 满级+20 (基础15的133%)
         maxLevel = 10,
         stat = "atk",
     },
@@ -41,7 +41,7 @@ PlayerData.TALENTS = {
         name = "防御强化",
         icon = "🛡️",
         desc = "基础防御力",
-        bonusPerLevel = 0.3, -- 满级+3
+        bonusPerLevel = 1,   -- 满级+10
         maxLevel = 10,
         stat = "def",
     },
@@ -50,7 +50,7 @@ PlayerData.TALENTS = {
         name = "暴击直觉",
         icon = "💥",
         desc = "暴击率",
-        bonusPerLevel = 1,   -- 满级+10%
+        bonusPerLevel = 2,   -- 满级+20%
         maxLevel = 10,
         stat = "crit",       -- 特殊: 百分比
     },
@@ -59,7 +59,7 @@ PlayerData.TALENTS = {
         name = "点金手",
         icon = "💰",
         desc = "金币加成",
-        bonusPerLevel = 2,   -- 满级+20%
+        bonusPerLevel = 3,   -- 满级+30%
         maxLevel = 10,
         stat = "gold",       -- 特殊: 百分比
     },
@@ -98,6 +98,7 @@ function PlayerData.NewDefault()
         multiHopTutorialSeen = false,
         chainJumpTutorialSeen = false,
         tutorialSpawnSeen = false,
+        endlessUnlockSeen = false,
         seenComboTiers = {},
         seenEnemyTypes = {},
         usedCodes = {},
@@ -185,22 +186,59 @@ local function migrateToV4(data)
     return data
 end
 
---- 从本地文件加载
-function PlayerData.Load()
-    if not fileSystem:FileExists("save.json") then
-        return PlayerData.NewDefault()
-    end
-    local file = File("save.json", FILE_READ)
-    if not file:IsOpen() then
-        log:Write(LOG_ERROR, "[PlayerData] Failed to open save file")
-        return PlayerData.NewDefault()
-    end
+--- 尝试从指定文件读取并解码存档，返回 data 或 nil
+local function tryLoadFrom(filename)
+    if not fileSystem:FileExists(filename) then return nil end
+    local file = File(filename, FILE_READ)
+    if not file:IsOpen() then return nil end
     local str = file:ReadString()
     file:Close()
+    if not str or #str < 2 then return nil end
     local ok, data = pcall(cjson.decode, str)
-    if not ok or type(data) ~= "table" then
-        log:Write(LOG_ERROR, "[PlayerData] Failed to decode save: " .. tostring(data))
-        return PlayerData.NewDefault()
+    if ok and type(data) == "table" then
+        return data
+    end
+    return nil
+end
+
+--- 从本地文件加载（带备份恢复机制）
+function PlayerData.Load()
+    -- 1. 尝试读取主存档
+    local data = tryLoadFrom("save.json")
+    if data then
+        -- 主存档有效，正常流程
+    else
+        -- 2. 主存档无效或不存在，尝试备份
+        if fileSystem:FileExists("save.json") then
+            -- 主存档存在但损坏 → 尝试从备份恢复
+            log:Write(LOG_WARNING, "[PlayerData] 主存档损坏，尝试从备份恢复...")
+            data = tryLoadFrom("save.bak.json")
+            if data then
+                log:Write(LOG_INFO, "[PlayerData] 从备份 save.bak.json 恢复成功")
+            else
+                log:Write(LOG_ERROR, "[PlayerData] 备份也不可用，将创建新存档")
+                return PlayerData.NewDefault()
+            end
+        elseif fileSystem:FileExists("save.bak.json") then
+            -- 主存档不存在但备份存在（极端情况：写入主存档时崩溃导致文件为空被删）
+            log:Write(LOG_WARNING, "[PlayerData] 主存档丢失，从备份恢复...")
+            data = tryLoadFrom("save.bak.json")
+            if not data then
+                return PlayerData.NewDefault()
+            end
+        else
+            -- 全新玩家，无任何存档
+            return PlayerData.NewDefault()
+        end
+    end
+
+    -- 3. 尝试从临时文件恢复（如果临时文件比主存档更新，说明上次写入中途崩溃）
+    local tmpData = tryLoadFrom("save.tmp.json")
+    if tmpData and type(tmpData.totalRuns) == "number" and type(data.totalRuns) == "number" then
+        if tmpData.totalRuns > data.totalRuns or (tmpData.gold or 0) > (data.gold or 0) then
+            log:Write(LOG_INFO, "[PlayerData] 检测到临时文件数据更新，使用临时文件恢复")
+            data = tmpData
+        end
     end
     -- 防止 cjson 将整数字段解码为 Lua 浮点数（Lua 5.4 中 %d 不接受浮点数）
     data.gold                = math.floor(data.gold or 0)
@@ -260,15 +298,64 @@ function PlayerData.Load()
     return data
 end
 
---- 保存到本地文件
+--- 保存到本地文件（安全写入：先写临时文件，成功后再替换主文件）
 function PlayerData.Save(data)
-    local file = File("save.json", FILE_WRITE)
-    if not file:IsOpen() then
-        log:Write(LOG_ERROR, "[PlayerData] Failed to write save file")
+    -- 1. 先序列化，确保数据有效
+    local ok, jsonStr = pcall(cjson.encode, data)
+    if not ok or #jsonStr < 2 then
+        log:Write(LOG_ERROR, "[PlayerData] Failed to encode save data: " .. tostring(jsonStr))
         return false
     end
-    file:WriteString(cjson.encode(data))
-    file:Close()
+
+    -- 2. 写入临时文件（即使崩溃也不会破坏主存档）
+    local tmpFile = File("save.tmp.json", FILE_WRITE)
+    if not tmpFile:IsOpen() then
+        log:Write(LOG_ERROR, "[PlayerData] Failed to open temp save file")
+        return false
+    end
+    tmpFile:WriteString(jsonStr)
+    tmpFile:Close()
+
+    -- 3. 验证临时文件可读且内容完整
+    local verifyFile = File("save.tmp.json", FILE_READ)
+    if not verifyFile:IsOpen() then
+        log:Write(LOG_ERROR, "[PlayerData] Failed to verify temp save file")
+        return false
+    end
+    local verifyStr = verifyFile:ReadString()
+    verifyFile:Close()
+    if verifyStr ~= jsonStr then
+        log:Write(LOG_ERROR, "[PlayerData] Temp save file verification failed (length mismatch)")
+        return false
+    end
+
+    -- 4. 将当前主存档备份为 .bak（如果主存档存在且有效）
+    if fileSystem:FileExists("save.json") then
+        local bakFile = File("save.json", FILE_READ)
+        if bakFile:IsOpen() then
+            local bakStr = bakFile:ReadString()
+            bakFile:Close()
+            -- 只有当前主存档是有效 JSON 才备份（避免把损坏文件备份下去）
+            local bakOk, bakData = pcall(cjson.decode, bakStr)
+            if bakOk and type(bakData) == "table" then
+                local bakOut = File("save.bak.json", FILE_WRITE)
+                if bakOut:IsOpen() then
+                    bakOut:WriteString(bakStr)
+                    bakOut:Close()
+                end
+            end
+        end
+    end
+
+    -- 5. 用临时文件内容覆盖主存档
+    local mainFile = File("save.json", FILE_WRITE)
+    if not mainFile:IsOpen() then
+        log:Write(LOG_ERROR, "[PlayerData] Failed to write main save file")
+        return false
+    end
+    mainFile:WriteString(jsonStr)
+    mainFile:Close()
+
     return true
 end
 

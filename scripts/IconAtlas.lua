@@ -14,33 +14,24 @@ local spriteCache_ = {}
 -- ============================================================================
 
 IconAtlas.PATHS = {
-    -- === 技能图标 (18) ===
-    skill_quake_land      = "icons/skills/skill_quake_land_20260427105947.png",
-    skill_chain_lightning  = "icons/skills/skill_chain_lightning_20260427110034.png",
-    skill_vampiric_jump    = "icons/skills/skill_vampiric_jump_20260427105946.png",
-    skill_thorns           = "icons/skills/skill_thorns_20260427105943.png",
-    skill_ghost_step       = "icons/skills/skill_ghost_step_20260427105944.png",
-    skill_bounty_hunter    = "icons/skills/skill_bounty_hunter_20260427105949.png",
-    skill_frost_land       = "icons/skills/skill_frost_land_20260427105950.png",
-    skill_hex_ward         = "icons/skills/skill_hex_ward_20260427105945.png",
-    skill_blood_rage       = "icons/skills/skill_blood_rage_20260427105949.png",
-    skill_gravity_stomp    = "icons/skills/skill_gravity_stomp_20260427110100.png",
-    skill_thunder_strike   = "icons/skills/skill_thunder_strike_20260427110103.png",
-    skill_glass_cannon     = "icons/skills/skill_glass_cannon_20260514060001.png",
-    skill_dawn_herald      = "icons/skills/skill_dawn_herald_20260514060001.png",
-    skill_collector        = "icons/skills/skill_collector_20260514055953.png",
-    skill_spike_trap       = "icons/skills/skill_spike_trap_20260517133429.png",
-    skill_split_shot       = "icons/skills/skill_split_shot_20260517133425.png",
-    skill_hunter_mark      = "icons/skills/skill_hunter_mark_20260517133457.png",
-    skill_combo_shield     = "icons/skills/skill_combo_shield_20260517133500.png",
-    skill_step_strike      = "image/skill_step_strike_20260523134705.png",
+    -- === 技能图标 (14) — 64x64 极简像素风 ===
+    skill_quake_land       = "image/skill_quake_land_20260601034119.png",
+    skill_chain_lightning   = "image/skill_chain_lightning_20260601034121.png",
+    skill_vampiric_jump    = "image/skill_vampiric_jump_20260601035305.png",
+    skill_thorns           = "image/skill_thorns_20260601034124.png",
+    skill_blood_rage       = "image/skill_blood_rage_20260601033158.png",
+    skill_gravity_stomp    = "image/skill_gravity_stomp_20260601033201.png",
+    skill_glass_cannon     = "image/skill_glass_cannon_20260601033313.png",
+    skill_dawn_herald      = "image/skill_dawn_herald_20260601033317.png",
+    skill_collector        = "image/skill_collector_20260601034007.png",
+    skill_spike_trap       = "image/skill_spike_trap_20260601033159.png",
+    skill_split_shot       = "image/skill_split_shot_20260601033209.png",
+    skill_hunter_mark      = "image/skill_hunter_mark_20260601033312.png",
+    skill_combo_shield     = "image/skill_combo_shield_20260601033314.png",
+    skill_step_strike      = "image/skill_step_strike_20260601033527.png",
     -- 组合技能
-    skill_combo_storm      = "icons/skills/skill_combo_storm_20260427110107.png",
-    skill_combo_thorn      = "icons/skills/skill_combo_thorn_20260427110104.png",
-
-    skill_combo_pirate     = "icons/skills/skill_combo_pirate_20260427110105.png",
-    skill_combo_crystal    = "icons/skills/skill_combo_crystal_20260427110102.png",
-    skill_combo_fire       = "icons/skills/skill_combo_fire_20260427110103.png",
+    skill_combo_storm      = "image/skill_combo_thunder_quake_20260601033526.png",
+    skill_combo_thorn      = "image/skill_combo_blood_thorns_20260601033523.png",
 
     -- === HUD 图标 (4) ===
     hud_hp                 = "icons/hud/hud_hp_20260427110233.png",

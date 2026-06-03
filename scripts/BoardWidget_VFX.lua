@@ -62,44 +62,198 @@ function BoardWidget_VFX.Render(ctx)
 
     -- 7.9 绘制视觉特效 (VFX)
     for _, fx in ipairs(G.battle.vfx) do
+        -- startDelay 期间不渲染
+        if fx.startDelay and fx.startDelay > 0 then goto continue_fx end
         local progress = 1.0 - fx.timer / fx.maxTimer  -- 0→1
 
         if fx.type == "lightning" then
-            -- 闪电: 从起点到终点的锯齿线，带分叉
+            -- 雷震天罚闪电: 多重分叉+粗光晕+命中爆发
             local x1, y1 = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
             local x2, y2 = HexGrid.HexToPixel(fx.toCol, fx.toRow, hexSize, ox, oy)
-            local alpha = math.floor(math.max(0, (1.0 - progress * 1.5)) * 255)
-            if alpha > 0 then
-                local segments = 8
-                -- 主干闪电
-                for pass = 1, 2 do
+            -- 前70%全亮，后30%快速淡出
+            local fadeRaw = math.max(0, (progress - 0.7) / 0.3)
+            local alpha = math.floor((1.0 - fadeRaw) * 255)
+            -- 闪烁抖动（模拟电弧不稳定）
+            local flicker = 0.85 + 0.15 * math.sin(progress * 40)
+            alpha = math.floor(alpha * flicker)
+            if alpha > 5 then
+                local segments = 10
+                local dx, dy = x2 - x1, y2 - y1
+                local dist = math.sqrt(dx * dx + dy * dy)
+                -- 法线方向（用于垂直偏移）
+                local nx, ny = -dy / dist, dx / dist
+
+                -- === 底层宽光晕（营造体积感）===
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, x1, y1)
+                for s = 1, segments - 1 do
+                    local t = s / segments
+                    local mx = x1 + dx * t
+                    local my = y1 + dy * t
+                    local offset = (math.random() - 0.5) * hexSize * 0.7
+                    nvgLineTo(nvg, mx + nx * offset, my + ny * offset)
+                end
+                nvgLineTo(nvg, x2, y2)
+                nvgStrokeColor(nvg, nvgRGBA(100, 140, 255, math.floor(alpha * 0.25)))
+                nvgStrokeWidth(nvg, 14)
+                nvgLineCap(nvg, 1) -- round
+                nvgStroke(nvg)
+
+                -- === 主干闪电（3层渐细渐亮）===
+                local layers = {
+                    {w = 8, r = 160, g = 180, b = 255, a = 0.45},  -- 外层蓝紫
+                    {w = 4, r = 220, g = 230, b = 255, a = 0.75},  -- 中层亮蓝白
+                    {w = 2, r = 255, g = 255, b = 140, a = 1.0},   -- 内核亮黄
+                }
+                for _, layer in ipairs(layers) do
                     nvgBeginPath(nvg)
                     nvgMoveTo(nvg, x1, y1)
                     for s = 1, segments - 1 do
                         local t = s / segments
-                        local mx = x1 + (x2 - x1) * t
-                        local my = y1 + (y2 - y1) * t
-                        local perp = (math.random() - 0.5) * hexSize * 0.6
-                        nvgLineTo(nvg, mx + perp * 0.3, my + perp)
+                        local mx = x1 + dx * t
+                        local my = y1 + dy * t
+                        local jitter = (math.random() - 0.5) * hexSize * 0.55
+                        nvgLineTo(nvg, mx + nx * jitter, my + ny * jitter)
                     end
                     nvgLineTo(nvg, x2, y2)
-                    if pass == 1 then
-                        -- 外层光晕（粗+半透明白）
-                        nvgStrokeColor(nvg, nvgRGBA(200, 220, 255, math.floor(alpha * 0.4)))
-                        nvgStrokeWidth(nvg, 6)
-                    else
-                        -- 内核（细+亮黄）
-                        nvgStrokeColor(nvg, nvgRGBA(255, 255, 100, alpha))
-                        nvgStrokeWidth(nvg, 2)
-                    end
+                    nvgStrokeColor(nvg, nvgRGBA(layer.r, layer.g, layer.b, math.floor(alpha * layer.a)))
+                    nvgStrokeWidth(nvg, layer.w)
+                    nvgLineCap(nvg, 1)
                     nvgStroke(nvg)
                 end
-                -- 终点闪光圆
-                local flashR = hexSize * 0.4 * (1.0 - progress)
+
+                -- === 分叉闪电（2条，从主干中段岔出）===
+                for branch = 1, 2 do
+                    local branchStart = 0.25 + branch * 0.2  -- 从45%和65%处分叉
+                    local bx = x1 + dx * branchStart
+                    local by = y1 + dy * branchStart
+                    -- 分叉方向：偏离主干30~60度
+                    local branchAngle = (math.random() - 0.5) * 1.2
+                    local branchLen = dist * (0.25 + math.random() * 0.15)
+                    local bex = bx + (dx / dist * math.cos(branchAngle) - ny * math.sin(branchAngle)) * branchLen
+                    local bey = by + (dy / dist * math.cos(branchAngle) + nx * math.sin(branchAngle)) * branchLen
+                    local bSegs = 5
+                    -- 分叉外层
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, bx, by)
+                    for s = 1, bSegs - 1 do
+                        local t = s / bSegs
+                        local mx2 = bx + (bex - bx) * t
+                        local my2 = by + (bey - by) * t
+                        local jit = (math.random() - 0.5) * hexSize * 0.35
+                        nvgLineTo(nvg, mx2 + jit, my2 + jit)
+                    end
+                    nvgLineTo(nvg, bex, bey)
+                    nvgStrokeColor(nvg, nvgRGBA(180, 200, 255, math.floor(alpha * 0.4)))
+                    nvgStrokeWidth(nvg, 3)
+                    nvgLineCap(nvg, 1)
+                    nvgStroke(nvg)
+                    -- 分叉内核
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, bx, by)
+                    for s = 1, bSegs - 1 do
+                        local t = s / bSegs
+                        local mx2 = bx + (bex - bx) * t
+                        local my2 = by + (bey - by) * t
+                        local jit = (math.random() - 0.5) * hexSize * 0.25
+                        nvgLineTo(nvg, mx2 + jit, my2 + jit)
+                    end
+                    nvgLineTo(nvg, bex, bey)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 255, 180, math.floor(alpha * 0.6)))
+                    nvgStrokeWidth(nvg, 1.5)
+                    nvgLineCap(nvg, 1)
+                    nvgStroke(nvg)
+                end
+
+                -- === 起点电弧光球 ===
+                local srcGlow = hexSize * 0.5 * (1.0 - progress * 0.5)
+                local srcPaint = nvgRadialGradient(nvg, x1, y1, 0, srcGlow,
+                    nvgRGBA(200, 220, 255, math.floor(alpha * 0.7)),
+                    nvgRGBA(100, 140, 255, 0))
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, x2, y2, flashR)
-                nvgFillColor(nvg, nvgRGBA(255, 255, 200, math.floor(alpha * 0.6)))
+                nvgCircle(nvg, x1, y1, srcGlow)
+                nvgFillPaint(nvg, srcPaint)
                 nvgFill(nvg)
+
+                -- === 终点命中爆发（更大更亮）===
+                local hitPhase = math.min(progress * 3.0, 1.0) -- 前33%快速扩大
+                local hitR = hexSize * (0.3 + hitPhase * 0.6) * (1.0 - fadeRaw)
+                local hitPaint = nvgRadialGradient(nvg, x2, y2, 0, hitR,
+                    nvgRGBA(255, 255, 220, math.floor(alpha * 0.9)),
+                    nvgRGBA(255, 200, 80, 0))
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, x2, y2, hitR)
+                nvgFillPaint(nvg, hitPaint)
+                nvgFill(nvg)
+                -- 命中内核白点
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, x2, y2, hitR * 0.3)
+                nvgFillColor(nvg, nvgRGBA(255, 255, 255, math.floor(alpha * 0.8)))
+                nvgFill(nvg)
+            end
+
+        elseif fx.type == "combo_thunder_ring" then
+            -- 雷震天罚组合技: 瞬间爆开的雷电光环 + 持续闪烁
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local maxR = hexSize * 3.5
+            -- 闪烁因子（快速闪烁使其更醒目）
+            local flicker = 0.7 + 0.3 * math.abs(math.sin(progress * 18))
+            -- 前30%时间爆发扩散(easeOutCubic)，后40%停留，最后30%淡出
+            local expandRaw = math.min(progress / 0.3, 1.0)
+            local expandT = 1.0 - (1.0 - expandRaw) * (1.0 - expandRaw) * (1.0 - expandRaw) -- easeOutCubic
+            local fadeT = math.max(0, (progress - 0.7) / 0.3)
+            local baseAlpha = math.floor((1.0 - fadeT) * 255 * flicker)
+            if baseAlpha > 2 then
+                -- 中心强烈闪光（前50%）
+                if progress < 0.5 then
+                    local flashP = progress / 0.5
+                    local flashAlpha = math.floor((1.0 - flashP) * 240 * flicker)
+                    local flashR = hexSize * (1.0 + flashP * 2.0)
+                    local flashPaint = nvgRadialGradient(nvg, cx, cy, 0, flashR,
+                        nvgRGBA(220, 200, 255, flashAlpha), nvgRGBA(100, 80, 255, 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, flashR)
+                    nvgFillPaint(nvg, flashPaint)
+                    nvgFill(nvg)
+                end
+                -- 外层电弧环（紫蓝色，粗线）
+                local ringR = maxR * expandT
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, ringR)
+                nvgStrokeColor(nvg, nvgRGBA(140, 120, 255, baseAlpha))
+                nvgStrokeWidth(nvg, 5.0 * (1.0 - fadeT))
+                nvgStroke(nvg)
+                -- 中层光环（亮白蓝，更粗更亮）
+                local midR = maxR * expandT * 0.65
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, midR)
+                nvgStrokeColor(nvg, nvgRGBA(200, 220, 255, math.floor(baseAlpha * 0.9)))
+                nvgStrokeWidth(nvg, 7.0 * (1.0 - fadeT))
+                nvgStroke(nvg)
+                -- 内层核心（高亮黄白色闪光环）
+                local innerR = maxR * expandT * 0.3
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, innerR)
+                nvgStrokeColor(nvg, nvgRGBA(255, 255, 180, math.floor(baseAlpha * 0.95)))
+                nvgStrokeWidth(nvg, 4.0 * (1.0 - fadeT))
+                nvgStroke(nvg)
+                -- 中心亮点（持续整个动画）
+                local coreR = hexSize * 0.3 * (1.0 - fadeT)
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, coreR)
+                nvgFillColor(nvg, nvgRGBA(255, 255, 255, math.floor(baseAlpha * 0.8)))
+                nvgFill(nvg)
+                -- 随机小电弧粒子（6个方向辐射）
+                for i = 1, 6 do
+                    local angle = (i / 6) * math.pi * 2 + progress * 3
+                    local sparkR = midR + hexSize * 0.3 * math.sin(progress * 12 + i * 2)
+                    local sx = cx + math.cos(angle) * sparkR
+                    local sy = cy + math.sin(angle) * sparkR
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, sx, sy, 3 * (1.0 - fadeT))
+                    nvgFillColor(nvg, nvgRGBA(200, 220, 255, math.floor(baseAlpha * 0.7)))
+                    nvgFill(nvg)
+                end
             end
 
         elseif fx.type == "shockwave" then
@@ -2389,6 +2543,97 @@ function BoardWidget_VFX.Render(ctx)
                 end
             end
 
+        elseif fx.type == "execution" then
+            -- 猎杀本能处决: 暗红X斩 + 骷髅光圈收缩 + 血色粒子爆散
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 255)
+            if alpha > 2 then
+                -- 阶段1(0~30%): 暗红收缩环 + 中心十字闪光
+                if progress < 0.3 then
+                    local p1 = progress / 0.3
+                    -- 收缩环: 从大到小聚拢
+                    local ringR = hexSize * (2.5 - p1 * 2.0)
+                    local ringA = math.floor(p1 * 255)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, ringR)
+                    nvgStrokeColor(nvg, nvgRGBA(200, 20, 20, ringA))
+                    nvgStrokeWidth(nvg, 4.0 * p1)
+                    nvgStroke(nvg)
+                    -- 内圈白色收缩
+                    local innerR = hexSize * (1.5 - p1 * 1.2)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, innerR)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 200, 180, math.floor(ringA * 0.6)))
+                    nvgStrokeWidth(nvg, 2.0)
+                    nvgStroke(nvg)
+                end
+                -- 阶段2(20%~60%): X形斩击（两条交叉线快速展开）
+                if progress >= 0.2 and progress < 0.6 then
+                    local p2 = (progress - 0.2) / 0.4
+                    local slashLen = hexSize * 1.8 * math.min(1.0, p2 * 2.5)
+                    local slashAlpha = math.floor((1.0 - p2) * 255)
+                    local lineW = (5.0 - p2 * 3.0)
+                    -- 斜线1: 左上→右下
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx - slashLen * 0.7, cy - slashLen * 0.7)
+                    nvgLineTo(nvg, cx + slashLen * 0.7, cy + slashLen * 0.7)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 60, 20, slashAlpha))
+                    nvgStrokeWidth(nvg, lineW)
+                    nvgStroke(nvg)
+                    -- 斜线2: 右上→左下
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx + slashLen * 0.7, cy - slashLen * 0.7)
+                    nvgLineTo(nvg, cx - slashLen * 0.7, cy + slashLen * 0.7)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 60, 20, slashAlpha))
+                    nvgStrokeWidth(nvg, lineW)
+                    nvgStroke(nvg)
+                    -- 交叉点闪光
+                    if p2 < 0.4 then
+                        local flashR = hexSize * 0.6 * (1.0 - p2 / 0.4)
+                        local fp = nvgRadialGradient(nvg, cx, cy, 0, flashR,
+                            nvgRGBA(255, 255, 200, math.floor(slashAlpha * 0.8)),
+                            nvgRGBA(255, 80, 0, 0))
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, cx, cy, flashR)
+                        nvgFillPaint(nvg, fp)
+                        nvgFill(nvg)
+                    end
+                end
+                -- 阶段3(50%~100%): 血色粒子爆散 + 暗红能量碎片飞溅
+                if progress >= 0.5 then
+                    local p3 = (progress - 0.5) / 0.5
+                    local burstAlpha = math.floor((1.0 - p3) * 200)
+                    -- 爆散粒子（12颗，红色系）
+                    for i = 1, 12 do
+                        local angle = (i / 12) * math.pi * 2 + i * 0.5
+                        local speed = 0.7 + (i % 4) * 0.2
+                        local dist = hexSize * p3 * 1.8 * speed
+                        local px = cx + math.cos(angle) * dist
+                        local py = cy + math.sin(angle) * dist - p3 * hexSize * 0.2
+                        local pSize = (4.0 - p3 * 3.0) * (1.0 + math.sin(i * 2.1) * 0.3)
+                        if pSize > 0.5 and burstAlpha > 5 then
+                            nvgBeginPath(nvg)
+                            nvgCircle(nvg, px, py, pSize)
+                            local r = 180 + (i % 3) * 30
+                            local g = 20 + (i % 5) * 10
+                            nvgFillColor(nvg, nvgRGBA(r, g, 10, burstAlpha))
+                            nvgFill(nvg)
+                        end
+                    end
+                    -- 外层暗红冲击环
+                    local blastR = hexSize * (0.5 + p3 * 2.0)
+                    local blastA = math.floor((1.0 - p3) * 120)
+                    if blastA > 2 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, cx, cy, blastR)
+                        nvgStrokeColor(nvg, nvgRGBA(160, 10, 10, blastA))
+                        nvgStrokeWidth(nvg, 3.0 * (1.0 - p3))
+                        nvgStroke(nvg)
+                    end
+                end
+            end
+
         elseif fx.type == "death_puff" then
             -- 死亡爆散: 配色匹配敌人类型，多层粒子 + 中心闪光 + 灵魂碎片上升
             local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
@@ -4042,50 +4287,385 @@ function BoardWidget_VFX.Render(ctx)
                 nvgFill(nvg)
             end
 
-        elseif fx.type == "sandstorm" then
-            -- ═══ 沙丘巨虫·沙暴：大范围沙尘暴覆盖，遮蔽视野 + 伤害 ═══
+        elseif fx.type == "burrow_aoe_hit" then
+            -- ═══ 沙虫钻出·范围受击：沙土崩裂冲击波（每格独立） ═══
             local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
-            local fade  = math.max(0, 1.0 - progress)
-            local alpha = math.floor(fade * 220)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 230)
             if alpha > 5 then
-                -- 大范围沙色遮罩（2倍hex范围覆盖）
-                local stormR = hexSize * 2.2
-                nvgBeginPath(nvg)
-                nvgCircle(nvg, cx, cy, stormR)
-                nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, hexSize * 0.3, stormR,
-                    nvgRGBA(200, 170, 90, math.floor(alpha * 0.25)),
-                    nvgRGBA(160, 130, 60, 0)))
-                nvgFill(nvg)
-                -- 旋转沙线（快速旋转弧线模拟狂风）
-                for i = 1, 5 do
-                    local spin = progress * math.pi * 6 + (i / 5) * math.pi * 2
-                    local arcR = hexSize * (0.8 + i * 0.25)
-                    local arcLen = math.pi * 0.6
+                -- 冲击环（向外扩散）
+                local ringP = math.min(1.0, progress / 0.35)
+                local ringR = hexSize * (0.2 + ringP * 0.7)
+                local ringA = math.floor((1.0 - ringP) * 200)
+                if ringA > 5 then
                     nvgBeginPath(nvg)
-                    nvgArc(nvg, cx, cy, arcR, spin, spin + arcLen, 1)
-                    nvgStrokeColor(nvg, nvgRGBA(220, 190, 110, math.floor(alpha * (0.7 - i * 0.08))))
-                    nvgStrokeWidth(nvg, (3.5 - i * 0.4) * fade)
+                    nvgCircle(nvg, cx, cy, ringR)
+                    nvgStrokeColor(nvg, nvgRGBA(240, 200, 80, ringA))
+                    nvgStrokeWidth(nvg, 3.0 * (1.0 - ringP))
                     nvgStroke(nvg)
                 end
-                -- 大量沙粒飞舞（20颗乱序环绕）
-                for i = 1, 20 do
-                    local angle = (i / 20) * math.pi * 2 + progress * 5.0 + i * 0.3
-                    local dist  = hexSize * (0.3 + (i % 7) * 0.25) * (0.8 + 0.2 * math.sin(progress * 4 + i))
+                -- 沙土飞溅（6颗碎片向外）
+                for i = 1, 6 do
+                    local angle = (i / 6) * math.pi * 2 + fx.col * 0.7
+                    local dist = hexSize * 0.6 * progress * (0.7 + (i % 3) * 0.15)
                     local px = cx + math.cos(angle) * dist
-                    local py = cy + math.sin(angle) * dist * 0.8
-                    local pSize = (2.0 + (i % 4)) * fade
+                    local py = cy + math.sin(angle) * dist
+                    local pSize = (2.5 + (i % 2) * 1.5) * fade
+                    if pSize > 0.5 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, px, py, pSize)
+                        nvgFillColor(nvg, nvgRGBA(210, 170, 80, math.floor(alpha * 0.8)))
+                        nvgFill(nvg)
+                    end
+                end
+                -- 地面橙色闪光
+                local coreP = math.max(0, 1.0 - progress / 0.25)
+                if coreP > 0 then
+                    local coreR = hexSize * 0.35 * coreP
                     nvgBeginPath(nvg)
-                    nvgCircle(nvg, px, py, pSize)
-                    nvgFillColor(nvg, nvgRGBA(210, 175, 95, math.floor(alpha * 0.7)))
+                    nvgCircle(nvg, cx, cy, coreR)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, coreR,
+                        nvgRGBA(255, 230, 130, math.floor(coreP * 200)),
+                        nvgRGBA(230, 180, 60, 0)))
                     nvgFill(nvg)
                 end
-                -- 外圈旋风环（半透明轮廓）
-                local outerR = hexSize * 2.0 * (0.9 + 0.1 * math.sin(progress * 8))
+            end
+
+        elseif fx.type == "burrow_hole" then
+            -- ═══ 沙虫钻出·洞口：持续的深色洞穴，沙粒从边缘掉落 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            -- 洞口先扩大再缓慢缩小消失
+            local openPhase = math.min(1.0, progress / 0.15) -- 0.15内开满
+            local closePhase = math.max(0, (progress - 0.7) / 0.3) -- 0.7后开始收缩
+            local holeScale = openPhase * (1.0 - closePhase * closePhase)
+            local alpha = math.floor((1.0 - closePhase) * 255)
+            if alpha > 5 and holeScale > 0.01 then
+                -- 深色洞口
+                local holeR = hexSize * 0.55 * holeScale
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, cx, cy, outerR)
-                nvgStrokeColor(nvg, nvgRGBA(180, 150, 70, math.floor(alpha * 0.4)))
-                nvgStrokeWidth(nvg, 2.5 * fade)
+                nvgCircle(nvg, cx, cy, holeR)
+                nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, holeR,
+                    nvgRGBA(30, 20, 5, alpha),
+                    nvgRGBA(80, 55, 20, math.floor(alpha * 0.6))))
+                nvgFill(nvg)
+                -- 洞口边缘环（沙土色）
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, holeR + 2)
+                nvgStrokeColor(nvg, nvgRGBA(160, 120, 50, math.floor(alpha * 0.7)))
+                nvgStrokeWidth(nvg, 2.5 * holeScale)
                 nvgStroke(nvg)
+                -- 沙粒向洞中掉落动画
+                local time = (G.time or 0)
+                for i = 1, 5 do
+                    local angle = (i / 5) * math.pi * 2 + time * 2.0
+                    local fallP = ((time * 1.5 + i * 0.2) % 1.0) -- 循环掉落
+                    local dist = holeR * (1.2 - fallP * 0.8)
+                    local px = cx + math.cos(angle) * dist
+                    local py = cy + math.sin(angle) * dist
+                    local pSize = 2.0 * (1.0 - fallP) * holeScale
+                    local pAlpha = math.floor(alpha * 0.6 * (1.0 - fallP))
+                    if pSize > 0.3 and pAlpha > 5 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, px, py, pSize)
+                        nvgFillColor(nvg, nvgRGBA(190, 150, 70, pAlpha))
+                        nvgFill(nvg)
+                    end
+                end
+            end
+
+        elseif fx.type == "sand_stop_spawn" then
+            -- ═══ 停沙格出现：青蓝色能量涟漪扩散 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 220)
+            if alpha > 5 then
+                -- 扩散涟漪环（2层）
+                for i = 1, 2 do
+                    local ringP = math.min(1.0, (progress - (i-1) * 0.2) / 0.5)
+                    if ringP > 0 then
+                        local ringR = hexSize * (0.3 + ringP * 0.9)
+                        local ringA = math.floor((1.0 - ringP) * 180)
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, cx, cy, ringR)
+                        nvgStrokeColor(nvg, nvgRGBA(100, 220, 255, ringA))
+                        nvgStrokeWidth(nvg, 2.5 * (1.0 - ringP))
+                        nvgStroke(nvg)
+                    end
+                end
+                -- 中心闪光
+                local coreP = math.max(0, 1.0 - progress / 0.3)
+                if coreP > 0 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, hexSize * 0.3 * coreP)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.3 * coreP,
+                        nvgRGBA(180, 255, 255, math.floor(coreP * 200)),
+                        nvgRGBA(80, 200, 240, 0)))
+                    nvgFill(nvg)
+                end
+            end
+
+        elseif fx.type == "sand_stop_clear" then
+            -- ═══ 停沙格触发：全场流沙消除的清爽冲击波 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 240)
+            if alpha > 5 then
+                -- 大范围清爽冲击波（向外扩散3层）
+                for i = 1, 3 do
+                    local ringP = math.min(1.0, (progress * 1.5 - (i-1) * 0.15))
+                    if ringP > 0 and ringP < 1.0 then
+                        local ringR = hexSize * (0.5 + ringP * 3.0)
+                        local ringA = math.floor((1.0 - ringP) * 200)
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, cx, cy, ringR)
+                        nvgStrokeColor(nvg, nvgRGBA(80, 230, 255, ringA))
+                        nvgStrokeWidth(nvg, (4.0 - i) * (1.0 - ringP))
+                        nvgStroke(nvg)
+                    end
+                end
+                -- 星光粒子（8个向外飞散）
+                for i = 1, 8 do
+                    local angle = (i / 8) * math.pi * 2
+                    local dist = hexSize * 2.5 * progress
+                    local px = cx + math.cos(angle) * dist
+                    local py = cy + math.sin(angle) * dist
+                    local pSize = 3.0 * fade
+                    if pSize > 0.5 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, px, py, pSize)
+                        nvgFillColor(nvg, nvgRGBA(150, 255, 240, math.floor(alpha * 0.7)))
+                        nvgFill(nvg)
+                    end
+                end
+            end
+
+        elseif fx.type == "sand_boulder" then
+            -- ═══ 沙丘巨虫·巨岩投掷：沙块从Boss飞向目标的弹道 ═══
+            local fromX, fromY = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
+            local toX, toY = HexGrid.HexToPixel(fx.toCol, fx.toRow, hexSize, ox, oy)
+            -- 弹道：抛物线插值
+            local t = math.min(progress * 1.5, 1.0)  -- 前2/3时间飞行
+            local bx = fromX + (toX - fromX) * t
+            local by = fromY + (toY - fromY) * t - math.sin(t * math.pi) * hexSize * 2.5  -- 抛物线高度
+            local boulderR = hexSize * (0.35 + 0.1 * math.sin(progress * 12))  -- 旋转感
+            if t < 1.0 then
+                -- 飞行中的巨岩
+                nvgSave(nvg)
+                nvgTranslate(nvg, bx, by)
+                nvgRotate(nvg, progress * 8.0)  -- 旋转
+                -- 岩石主体（不规则多边形模拟）
+                nvgBeginPath(nvg)
+                local sides = 7
+                for i = 1, sides do
+                    local angle = (i / sides) * math.pi * 2
+                    local r = boulderR * (0.85 + 0.15 * math.sin(i * 2.3))
+                    local vx = math.cos(angle) * r
+                    local vy = math.sin(angle) * r
+                    if i == 1 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                nvgFillColor(nvg, nvgRGBA(140, 100, 55, 240))
+                nvgFill(nvg)
+                nvgStrokeColor(nvg, nvgRGBA(90, 60, 30, 200))
+                nvgStrokeWidth(nvg, 2.5)
+                nvgStroke(nvg)
+                -- 岩石高光
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, -boulderR * 0.2, -boulderR * 0.3, boulderR * 0.25)
+                nvgFillColor(nvg, nvgRGBA(200, 170, 110, 120))
+                nvgFill(nvg)
+                nvgRestore(nvg)
+                -- 飞行拖尾（沙粒）
+                for i = 1, 6 do
+                    local tt = math.max(0, t - i * 0.04)
+                    local tx = fromX + (toX - fromX) * tt
+                    local ty = fromY + (toY - fromY) * tt - math.sin(tt * math.pi) * hexSize * 2.5
+                    local pAlpha = math.floor(180 * (1.0 - i / 6))
+                    local pR = hexSize * (0.06 - i * 0.007)
+                    if pR > 0 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, tx, ty, pR)
+                        nvgFillColor(nvg, nvgRGBA(180, 140, 70, pAlpha))
+                        nvgFill(nvg)
+                    end
+                end
+            else
+                -- 落地爆炸效果
+                local impactProgress = (progress * 1.5 - 1.0) / 0.5  -- 后1/3时间
+                local impactAlpha = math.floor(math.max(0, 1.0 - impactProgress) * 255)
+                if impactAlpha > 5 then
+                    -- 冲击波扩散
+                    local impactR = hexSize * (0.5 + impactProgress * 1.2)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, toX, toY, impactR)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, toX, toY, 0, impactR,
+                        nvgRGBA(160, 110, 50, math.floor(impactAlpha * 0.6)),
+                        nvgRGBA(120, 80, 30, 0)))
+                    nvgFill(nvg)
+                    -- 碎石飞溅
+                    for i = 1, 8 do
+                        local angle = (i / 8) * math.pi * 2 + i * 0.5
+                        local dist = hexSize * (0.2 + impactProgress * 0.8) * (0.8 + 0.2 * math.sin(i * 1.7))
+                        local sx = toX + math.cos(angle) * dist
+                        local sy = toY + math.sin(angle) * dist
+                        local sR = hexSize * 0.06 * (1.0 - impactProgress)
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, sx, sy, sR)
+                        nvgFillColor(nvg, nvgRGBA(140, 100, 55, impactAlpha))
+                        nvgFill(nvg)
+                    end
+                    -- 尘土云
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, toX, toY - hexSize * 0.2, hexSize * 0.4 * (1.0 + impactProgress * 0.5))
+                    nvgFillColor(nvg, nvgRGBA(180, 150, 90, math.floor(impactAlpha * 0.3)))
+                    nvgFill(nvg)
+                end
+            end
+
+        elseif fx.type == "sand_fury_start" then
+            -- ═══ 沙丘巨虫·呼唤风沙：全屏沙暴开始，强烈风沙席卷全场 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress * 0.7)
+            local alpha = math.floor(fade * 255)
+            if alpha > 5 then
+                -- 全屏沙色底层渐变（覆盖整个棋盘）
+                local boardW, boardH = canvasW, canvasH
+                nvgBeginPath(nvg)
+                nvgRect(nvg, 0, 0, boardW, boardH)
+                local pulse = 0.15 + 0.1 * math.sin(progress * math.pi * 4)
+                nvgFillColor(nvg, nvgRGBA(200, 160, 60, math.floor(alpha * pulse)))
+                nvgFill(nvg)
+                -- 中心旋涡（从boss位置扩散）
+                local vortexR = hexSize * (1.0 + progress * 4.0)
+                for ring = 1, 3 do
+                    local rr = vortexR * (0.3 + ring * 0.3)
+                    local spin = progress * math.pi * 8 * (ring % 2 == 0 and -1 or 1)
+                    nvgBeginPath(nvg)
+                    nvgArc(nvg, cx, cy, rr, spin, spin + math.pi * 1.2, 1)
+                    nvgStrokeColor(nvg, nvgRGBA(230, 180, 70, math.floor(alpha * (0.6 - ring * 0.1))))
+                    nvgStrokeWidth(nvg, (5 - ring) * fade)
+                    nvgStroke(nvg)
+                end
+                -- 大量高速沙粒从中心向外飞散
+                for i = 1, 30 do
+                    local angle = (i / 30) * math.pi * 2 + progress * 3.0
+                    local dist = hexSize * progress * (2.5 + (i % 5) * 0.8)
+                    local px = cx + math.cos(angle) * dist
+                    local py = cy + math.sin(angle) * dist * 0.7
+                    local pSize = (2.5 + (i % 3)) * fade
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, px, py, pSize)
+                    nvgFillColor(nvg, nvgRGBA(220, 175, 80, math.floor(alpha * 0.8)))
+                    nvgFill(nvg)
+                end
+                -- 文字提示
+                if progress < 0.4 then
+                    nvgFontFace(nvg, "bold")
+                    nvgFontSize(nvg, hexSize * 0.8)
+                    nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                    local txtAlpha = math.floor((1.0 - progress / 0.4) * 255)
+                    nvgFillColor(nvg, nvgRGBA(255, 200, 60, txtAlpha))
+                    nvgText(nvg, cx, cy - hexSize * 1.5, "🌪️ 呼唤风沙!")
+                end
+            end
+
+        elseif fx.type == "sand_fury_tick" then
+            -- ═══ 沙丘巨虫·风沙持续伤害tick：英雄位置沙粒冲击 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 240)
+            if alpha > 5 then
+                -- 冲击圆环
+                local ringR = hexSize * (0.3 + progress * 0.8)
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, ringR)
+                nvgStrokeColor(nvg, nvgRGBA(230, 170, 60, alpha))
+                nvgStrokeWidth(nvg, 3.0 * fade)
+                nvgStroke(nvg)
+                -- 从上方飘落的沙粒打击
+                for i = 1, 12 do
+                    local offX = (i - 6.5) * hexSize * 0.15
+                    local dropY = cy - hexSize * (1.0 - progress) + (i % 3) * hexSize * 0.1
+                    local pSize = (1.5 + (i % 3)) * fade
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx + offX, dropY, pSize)
+                    nvgFillColor(nvg, nvgRGBA(210, 170, 70, math.floor(alpha * 0.7)))
+                    nvgFill(nvg)
+                end
+                -- 碰撞闪光
+                if progress < 0.3 then
+                    local flash = (0.3 - progress) / 0.3
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, hexSize * 0.4 * flash)
+                    nvgFillColor(nvg, nvgRGBA(255, 220, 100, math.floor(flash * 180)))
+                    nvgFill(nvg)
+                end
+            end
+
+        elseif fx.type == "sand_strider_blast" then
+            -- ═══ 沙暴行者·全图射线攻击：从敌人位置射向英雄的紫色光束 ═══
+            local fromCol, fromRow = fx.fromCol or fx.col, fx.fromRow or fx.row
+            local toCol, toRow = fx.toCol or fx.col, fx.toRow or fx.row
+            local sx, sy = HexGrid.HexToPixel(fromCol, fromRow, hexSize, ox, oy)
+            local ex, ey = HexGrid.HexToPixel(toCol, toRow, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 220)
+            if alpha > 5 then
+                -- 主光束
+                local beamWidth = (4.0 + math.sin(progress * 12) * 1.5) * fade
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, sx, sy)
+                nvgLineTo(nvg, ex, ey)
+                nvgStrokeColor(nvg, nvgRGBA(160, 100, 220, alpha))
+                nvgStrokeWidth(nvg, beamWidth)
+                nvgStroke(nvg)
+                -- 外光晕
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, sx, sy)
+                nvgLineTo(nvg, ex, ey)
+                nvgStrokeColor(nvg, nvgRGBA(200, 140, 255, math.floor(alpha * 0.4)))
+                nvgStrokeWidth(nvg, beamWidth * 3)
+                nvgStroke(nvg)
+                -- 命中闪光
+                if progress < 0.3 then
+                    local flash = (0.3 - progress) / 0.3
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, ex, ey, hexSize * 0.5 * flash)
+                    nvgFillColor(nvg, nvgRGBA(220, 160, 255, math.floor(flash * 200)))
+                    nvgFill(nvg)
+                end
+            end
+
+        elseif fx.type == "rattler_strike" then
+            -- ═══ 沙漠响尾蛇·反击/狂怒打击：红色爪痕 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 240)
+            if alpha > 5 then
+                -- 三道爪痕
+                local slashLen = hexSize * 0.6
+                for i = -1, 1 do
+                    local offX = i * hexSize * 0.2
+                    local startY = cy - slashLen * 0.5
+                    local endY = cy + slashLen * 0.5
+                    local cutProgress = math.min(1.0, progress * 3)
+                    local actualEndY = startY + (endY - startY) * cutProgress
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx + offX - 3, startY)
+                    nvgLineTo(nvg, cx + offX + 3, actualEndY)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 60, 30, alpha))
+                    nvgStrokeWidth(nvg, 2.5 * fade)
+                    nvgStroke(nvg)
+                end
+                -- 怒火圆环（狂怒时更亮）
+                if progress < 0.5 then
+                    local ring = (0.5 - progress) * 2
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, hexSize * 0.4 * (1 - ring * 0.5))
+                    nvgStrokeColor(nvg, nvgRGBA(255, 100, 50, math.floor(ring * 180)))
+                    nvgStrokeWidth(nvg, 2.0)
+                    nvgStroke(nvg)
+                end
             end
 
         end

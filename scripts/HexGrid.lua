@@ -582,7 +582,7 @@ end
 --- 获取指定位置的棋子 (仅活着的)
 function HexGrid.GetPieceAt(board, col, row)
     for _, p in ipairs(board.pieces) do
-        if p.col == col and p.row == row and p.hp > 0 then
+        if p.col == col and p.row == row and p.hp > 0 and not p.hidden then
             return p
         end
     end
@@ -842,11 +842,12 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver, opts)
             -- 第四章: 流沙区阻断方向扫描（不可飞越）
             if HexGrid.IsInQuicksandZone(board, ec, er) then break end
 
-            -- 道具阻断方向扫描（路途上有道具不可跳过，但落点可以有道具）
-            if HexGrid.GetItemAt(board, ec, er) then break end
-
+            -- 棋子/怪物检查（优先于道具，防止道具覆盖怪物判断）
             local piece = HexGrid.GetPieceAt(board, ec, er)
             if piece and piece.hidden then break end  -- 遁地/隐藏的棋子不可跳跃，阻断方向
+
+            -- 道具阻断方向扫描（仅在该格无棋子时生效；有怪物时走下方跳跃逻辑）
+            if not piece and HexGrid.GetItemAt(board, ec, er) then break end
             if piece then
                 -- 找到了一个棋子（已揭示区域，所以可以看到）
                 if piece.team == "enemy" then
@@ -1182,8 +1183,8 @@ local BOSS_FRAMES = {
         enraged = "image/edited_boss_coral_guardian_enraged_transparent_20260523133406.png",
     },
     sand_worm = {
-        normal  = "image/sandworm_head_20260529063646.png",
-        enraged = "image/sandworm_head_20260529063646.png",  -- 暂用同一张，后续可替换狂暴版
+        normal  = "image/sandworm_head_new_20260601072952.png",
+        enraged = "image/sandworm_head_new_20260601072952.png",  -- 暂用同一张，后续可替换狂暴版
         body    = "image/sandworm_body_20260529063642.png",
     },
 }
@@ -1849,112 +1850,127 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
             nvgFill(nvg)
         end
 
-        -- ─── 沙虫头部：NanoVG 程序化绘制 ───
+        -- ─── 沙虫头部：NanoVG 程序化绘制（与身体统一风格） ───
         if bt == "sand_worm" and not piece.isSegment then
             local hx = cx + finalOffX
             local hy = cy + finalOffY + bossYOff
-            local hr = drawRadius * 0.85 * (1.0 + skillScaleBonus)
+            local hr = drawRadius * 0.88 * (1.0 + skillScaleBonus)
 
-            -- 头部主体（圆润的沙金色球体）
+            -- 头部主体（与身体段相同的沙金色渐变球体，但更亮更大）
             nvgBeginPath(nvg)
             nvgCircle(nvg, hx, hy, hr)
-            local headGrad = nvgRadialGradient(nvg, hx - hr * 0.25, hy - hr * 0.3,
-                hr * 0.1, hr * 1.1,
-                nvgRGBA(240, 200, 100, 255),
-                nvgRGBA(160, 110, 40, 255))
+            local headGrad = nvgRadialGradient(nvg, hx - hr * 0.2, hy - hr * 0.25,
+                hr * 0.05, hr * 1.0,
+                nvgRGBA(255, 215, 110, 255),
+                nvgRGBA(180, 120, 45, 255))
             nvgFillPaint(nvg, headGrad)
             nvgFill(nvg)
 
-            -- 环状鳞片纹理（3道弧线）
-            for ri = 1, 3 do
-                local rFrac = 0.25 + ri * 0.2
+            -- 环状鳞甲纹理（与身体段统一，但更密集，4道弧线）
+            for ri = 1, 4 do
+                local rFrac = ri / 5
                 local rY = hy - hr + hr * 2 * rFrac
-                local halfW = hr * math.sin(math.acos(math.abs(rFrac - 0.5) * 2)) * 0.8
+                local halfW = hr * math.sin(math.acos(math.abs(rFrac - 0.5) * 2)) * 0.85
                 if halfW > 2 then
                     nvgBeginPath(nvg)
                     nvgMoveTo(nvg, hx - halfW, rY)
-                    nvgQuadTo(nvg, hx, rY + hr * 0.05, hx + halfW, rY)
-                    nvgStrokeColor(nvg, nvgRGBA(130, 85, 30, 100))
-                    nvgStrokeWidth(nvg, 1.5)
+                    nvgQuadTo(nvg, hx, rY + hr * 0.04, hx + halfW, rY)
+                    nvgStrokeColor(nvg, nvgRGBA(140, 90, 30, 80))
+                    nvgStrokeWidth(nvg, 1.2)
                     nvgStroke(nvg)
                 end
             end
 
-            -- 大嘴（下半部弧形）
-            local mouthY = hy + hr * 0.25
-            local mouthW = hr * 0.6
-            local mouthH = hr * 0.35
-            local mouthOpen = 1.0 + math.sin(gameTime * 2.5) * 0.15
+            -- 大嘴（环形嘴，像沙虫经典造型 - 三瓣裂口）
+            local mouthCy = hy + hr * 0.15
+            local mouthR = hr * 0.42
+            local mouthOpen = 1.0 + math.sin(gameTime * 2.0) * 0.08
+            -- 嘴内深色底
             nvgBeginPath(nvg)
-            nvgEllipse(nvg, hx, mouthY, mouthW, mouthH * mouthOpen)
-            nvgFillColor(nvg, nvgRGBA(60, 20, 10, 240))
+            nvgCircle(nvg, hx, mouthCy, mouthR * mouthOpen)
+            nvgFillColor(nvg, nvgRGBA(40, 12, 8, 250))
             nvgFill(nvg)
-            -- 嘴内深色
+            -- 嘴内渐变深渊
             nvgBeginPath(nvg)
-            nvgEllipse(nvg, hx, mouthY + mouthH * 0.1, mouthW * 0.7, mouthH * 0.6 * mouthOpen)
-            nvgFillColor(nvg, nvgRGBA(30, 10, 5, 255))
+            nvgCircle(nvg, hx, mouthCy, mouthR * 0.6 * mouthOpen)
+            nvgFillPaint(nvg, nvgRadialGradient(nvg, hx, mouthCy, 0, mouthR * 0.6,
+                nvgRGBA(80, 20, 10, 255), nvgRGBA(20, 5, 2, 255)))
             nvgFill(nvg)
-            -- 上排牙齿（锯齿三角）
-            local toothCount = 5
-            for ti = 1, toothCount do
-                local tFrac = (ti - 0.5) / toothCount
-                local tx = hx - mouthW + mouthW * 2 * tFrac
-                local tSize = hr * 0.1
+            -- 三瓣牙齿（均匀分布在嘴边缘，像沙虫的经典三瓣口器）
+            for ti = 0, 2 do
+                local tAngle = (ti / 3) * math.pi * 2 - math.pi / 2
+                local tBaseX = hx + math.cos(tAngle) * mouthR * 0.85
+                local tBaseY = mouthCy + math.sin(tAngle) * mouthR * 0.85
+                local tTipX = hx + math.cos(tAngle) * mouthR * 0.3
+                local tTipY = mouthCy + math.sin(tAngle) * mouthR * 0.3
+                local tSize = hr * 0.12
+                local perpAngle = tAngle + math.pi / 2
                 nvgBeginPath(nvg)
-                nvgMoveTo(nvg, tx - tSize * 0.4, mouthY - mouthH * 0.5)
-                nvgLineTo(nvg, tx, mouthY - mouthH * 0.1)
-                nvgLineTo(nvg, tx + tSize * 0.4, mouthY - mouthH * 0.5)
+                nvgMoveTo(nvg, tBaseX + math.cos(perpAngle) * tSize, tBaseY + math.sin(perpAngle) * tSize)
+                nvgLineTo(nvg, tTipX, tTipY)
+                nvgLineTo(nvg, tBaseX - math.cos(perpAngle) * tSize, tBaseY - math.sin(perpAngle) * tSize)
                 nvgClosePath(nvg)
-                nvgFillColor(nvg, nvgRGBA(245, 235, 200, 255))
+                nvgFillColor(nvg, nvgRGBA(250, 240, 210, 255))
                 nvgFill(nvg)
             end
+            -- 嘴边缘环
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, hx, mouthCy, mouthR * mouthOpen)
+            nvgStrokeColor(nvg, nvgRGBA(100, 60, 20, 200))
+            nvgStrokeWidth(nvg, 2.0)
+            nvgStroke(nvg)
 
-            -- 眼睛（两颗小圆眼，偏上方）
-            local eyeY = hy - hr * 0.3
-            local eyeSpacing = hr * 0.35
-            local eyeR = hr * 0.14
+            -- 眼睛（两颗发光圆眼，和身体的沙金色协调）
+            local eyeY = hy - hr * 0.35
+            local eyeSpacing = hr * 0.38
+            local eyeR = hr * 0.13
             for ei = -1, 1, 2 do
                 local ex = hx + ei * eyeSpacing
-                -- 眼白
+                -- 眼底光晕
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, ex, eyeY, eyeR * 1.6)
+                nvgFillPaint(nvg, nvgRadialGradient(nvg, ex, eyeY, 0, eyeR * 1.6,
+                    nvgRGBA(255, 160, 30, 80), nvgRGBA(255, 160, 30, 0)))
+                nvgFill(nvg)
+                -- 眼球（橙色发光）
                 nvgBeginPath(nvg)
                 nvgCircle(nvg, ex, eyeY, eyeR)
-                nvgFillColor(nvg, nvgRGBA(255, 220, 80, 255))
+                nvgFillColor(nvg, nvgRGBA(255, 180, 40, 255))
                 nvgFill(nvg)
-                -- 瞳孔
+                -- 竖瞳（垂直椭圆）
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, ex, eyeY + eyeR * 0.1, eyeR * 0.55)
-                nvgFillColor(nvg, nvgRGBA(40, 15, 5, 255))
+                nvgEllipse(nvg, ex, eyeY, eyeR * 0.3, eyeR * 0.7)
+                nvgFillColor(nvg, nvgRGBA(30, 10, 5, 255))
                 nvgFill(nvg)
-                -- 高光
+                -- 高光点
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, ex - eyeR * 0.2, eyeY - eyeR * 0.2, eyeR * 0.22)
-                nvgFillColor(nvg, nvgRGBA(255, 255, 255, 180))
+                nvgCircle(nvg, ex - eyeR * 0.25, eyeY - eyeR * 0.3, eyeR * 0.2)
+                nvgFillColor(nvg, nvgRGBA(255, 255, 255, 200))
                 nvgFill(nvg)
             end
 
-            -- 头顶小角/触角（2个小凸起）
+            -- 头顶甲壳尖刺（2个，比触角更凶猛）
             for ai = -1, 1, 2 do
-                local ax = hx + ai * hr * 0.3
-                local ay = hy - hr * 0.85
-                local sway = math.sin(gameTime * 2.0 + ai * 1.5) * hr * 0.05
+                local spX = hx + ai * hr * 0.35
+                local spBaseY = hy - hr * 0.6
+                local spTipY = hy - hr * 1.05
+                local sway = math.sin(gameTime * 1.5 + ai * 2.0) * hr * 0.02
                 nvgBeginPath(nvg)
-                nvgMoveTo(nvg, ax - hr * 0.06, hy - hr * 0.6)
-                nvgQuadTo(nvg, ax + sway, ay - hr * 0.15, ax + hr * 0.02, ay)
-                nvgStrokeColor(nvg, nvgRGBA(200, 150, 50, 220))
-                nvgStrokeWidth(nvg, hr * 0.1)
-                nvgLineCap(nvg, NVG_ROUND)
-                nvgStroke(nvg)
-                -- 触角顶端小球
-                nvgBeginPath(nvg)
-                nvgCircle(nvg, ax + sway, ay - hr * 0.08, hr * 0.06)
-                nvgFillColor(nvg, nvgRGBA(255, 180, 50, 240))
+                nvgMoveTo(nvg, spX - hr * 0.08, spBaseY)
+                nvgLineTo(nvg, spX + sway, spTipY)
+                nvgLineTo(nvg, spX + hr * 0.08, spBaseY)
+                nvgClosePath(nvg)
+                nvgFillColor(nvg, nvgRGBA(200, 140, 40, 240))
                 nvgFill(nvg)
+                nvgStrokeColor(nvg, nvgRGBA(140, 90, 25, 180))
+                nvgStrokeWidth(nvg, 1.0)
+                nvgStroke(nvg)
             end
 
-            -- 外描边
+            -- 外描边（与身体统一，稍粗）
             nvgBeginPath(nvg)
             nvgCircle(nvg, hx, hy, hr)
-            nvgStrokeColor(nvg, nvgRGBA(120, 80, 25, 180))
+            nvgStrokeColor(nvg, nvgRGBA(120, 80, 25, 200))
             nvgStrokeWidth(nvg, 2.5)
             nvgStroke(nvg)
 
@@ -1969,7 +1985,7 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
             -- 技能闪光
             if skillFlashA > 10 then
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, hx, hy, hr * 1.1)
+                nvgCircle(nvg, hx, hy, hr * 1.05)
                 nvgFillColor(nvg, nvgRGBA(skillFlashR, skillFlashG, skillFlashB, math.floor(skillFlashA * 0.4)))
                 nvgFill(nvg)
             end

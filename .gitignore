@@ -1,2 +1,14 @@
 .build/
 dist/
+.tmp/
+logs/
+engine-docs/
+examples/
+templates/
+urhox-libs/
+schemas/
+lua-tools/
+.emmylua/
+.claude/
+.agent/
+tools/

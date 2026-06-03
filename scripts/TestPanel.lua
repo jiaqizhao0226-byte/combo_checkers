@@ -7,6 +7,7 @@ local UI = require("urhox-libs/UI")
 local AM = require "AudioManager"
 local Equipment = require "Equipment"
 local PlayerData = require "PlayerData"
+local Skills = require "Skills"
 local G = require "GameState"
 local Battle = require "Battle"
 
@@ -124,7 +125,7 @@ function TestPanel.Show()
             gap = 10,
             paddingTop = 8, paddingBottom = 8,
             paddingLeft = 12, paddingRight = 12,
-            borderRadius = 12,
+            borderRadius = 0,
             borderWidth = 1.5,
             borderColor = isActive
                 and {255, 200, 60, 220}
@@ -186,17 +187,22 @@ function TestPanel.Show()
                     type = "linear", direction = "to-bottom",
                     from = {38, 32, 68, 255}, to = {22, 18, 45, 255},
                 },
-                borderRadius = 16,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {90, 70, 160, 150},
-                paddingTop = 16, paddingBottom = 16,
-                paddingLeft = 16, paddingRight = 16,
-                gap = 10,
                 boxShadow = {
                     { x = 0, y = 4, blur = 20, spread = 0, color = {0, 0, 0, 120} },
                 },
                 onClick = function(self) end, -- 阻止穿透
                 children = {
+                    UI.ScrollView {
+                        width = "100%", flexGrow = 1, flexShrink = 1,
+                        children = {
+                            UI.Panel {
+                                width = "100%", gap = 10,
+                                paddingTop = 16, paddingBottom = 16,
+                                paddingLeft = 16, paddingRight = 16,
+                                children = {
                     -- 标题
                     UI.Label {
                         text = "🧪 套装试用",
@@ -256,7 +262,7 @@ function TestPanel.Show()
                             text = isGod and "🛡️ 无敌  ON" or "🛡️ 无敌  OFF",
                             fontSize = 15, fontWeight = "bold",
                             width = "100%", height = 36,
-                            borderRadius = 10,
+                            borderRadius = 0,
                             backgroundGradient = isGod
                                 and { type="linear", direction="to-right", from={120,60,20,255}, to={180,100,20,255} }
                                 or  { type="linear", direction="to-right", from={35,32,60,255}, to={50,45,85,255} },
@@ -283,16 +289,10 @@ function TestPanel.Show()
                         textAlign = "center", width = "100%",
                     },
 
-                    -- 套装列表（滚动区）
-                    UI.ScrollView {
-                        width = "100%", flexGrow = 1, flexShrink = 1,
-                        minHeight = 100,
-                        children = {
-                            UI.Panel {
-                                width = "100%", gap = 6,
-                                children = setCards,
-                            },
-                        },
+                    -- 套装列表
+                    UI.Panel {
+                        width = "100%", gap = 6,
+                        children = setCards,
                     },
 
                     -- 分隔线
@@ -370,7 +370,7 @@ function TestPanel.Show()
                                         text = "🦅 飞跃先锋",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {40, 70, 120, 255}, to = {30, 100, 90, 255},
@@ -402,7 +402,7 @@ function TestPanel.Show()
                                         text = "🔥 连击心得",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {120, 50, 30, 255}, to = {100, 80, 30, 255},
@@ -437,10 +437,10 @@ function TestPanel.Show()
                                 flexDirection = "row", gap = 8,
                                 children = {
                                     UI.Button {
-                                        text = "🦅✕3 三连跳(6/6)",
+                                        text = "🦅x3 三连跳(6/6)",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {20, 90, 80, 255}, to = {40, 130, 60, 255},
@@ -477,7 +477,7 @@ function TestPanel.Show()
                                         text = "🦅🪨 岩石关(Ch3)",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {60, 70, 50, 255}, to = {40, 90, 70, 255},
@@ -518,7 +518,7 @@ function TestPanel.Show()
                                         text = "🩸 嗜血套装",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {110, 20, 30, 255}, to = {80, 10, 50, 255},
@@ -549,7 +549,7 @@ function TestPanel.Show()
                                         text = "⚔️ 踏步斩",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {60, 40, 100, 255}, to = {90, 30, 70, 255},
@@ -565,6 +565,97 @@ function TestPanel.Show()
                                             local bonus = PlayerData.GetTotalBonus(G.playerData)
                                             G.battle = Battle.New(bonus)
                                             Battle.GenerateTestLevel_StepStrike(G.battle)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+
+                    -- 分隔线
+                    UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 60} },
+
+                    -- 组合技测试
+                    UI.Panel {
+                        width = "100%", gap = 6,
+                        children = {
+                            UI.Label {
+                                text = "⚡ 组合技测试",
+                                fontSize = 14, fontWeight = "bold",
+                                fontColor = {200, 195, 230, 230},
+                            },
+                            UI.Label {
+                                text = "自动给予前置技能(等级和≥5)，生成测试关",
+                                fontSize = 11, fontColor = {140, 135, 175, 140},
+                            },
+                            -- 雷震天罚: chain_lightning + quake_land
+                            UI.Panel {
+                                width = "100%",
+                                flexDirection = "row", gap = 8,
+                                children = {
+                                    UI.Button {
+                                        text = "⚡ 雷震天罚",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {100, 100, 20, 255}, to = {60, 80, 30, 255},
+                                        },
+                                        fontColor = {255, 255, 140, 255},
+                                        borderWidth = 1,
+                                        borderColor = {180, 180, 60, 150},
+                                        pressedBackgroundColor = {80, 80, 15, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            -- 给予前置技能: chain_lightning Lv3 + quake_land Lv3
+                                            if G.battle then
+                                                G.battle.skills = G.battle.skills or {}
+                                                G.battle.skills["chain_lightning"] = 3
+                                                G.battle.skills["quake_land"] = 3
+                                            end
+                                            TestPanel.Close()
+                                            -- 生成有多个密集敌人的测试关（方便AOE+弹射）
+                                            local TurnFlow = require "TurnFlow"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            G.battle.skills["chain_lightning"] = 3
+                                            G.battle.skills["quake_land"] = 3
+                                            Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
+                                    -- 猎杀本能: hunter_mark + collector
+                                    UI.Button {
+                                        text = "💀 猎杀本能",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {130, 50, 20, 255}, to = {80, 30, 40, 255},
+                                        },
+                                        fontColor = {255, 160, 100, 255},
+                                        borderWidth = 1,
+                                        borderColor = {200, 100, 50, 150},
+                                        pressedBackgroundColor = {100, 40, 15, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            TestPanel.Close()
+                                            -- 生成测试关并给予前置技能: hunter_mark Lv3 + collector Lv3
+                                            local TurnFlow = require "TurnFlow"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            G.battle.skills["hunter_mark"] = 3
+                                            G.battle.skills["collector"] = 3
+                                            Battle.GenerateTestLevel_ComboMastery(G.battle)
                                             TurnFlow.SnapCameraToHero()
                                             TurnFlow.ClearPlan()
                                             if G.resultPanel then G.resultPanel:SetVisible(false) end
@@ -601,7 +692,7 @@ function TestPanel.Show()
                                         text = "🐙 深渊海妖",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {40, 20, 90, 255}, to = {20, 50, 120, 255},
@@ -629,7 +720,7 @@ function TestPanel.Show()
                                         text = "🌋 熔岩领主",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {140, 50, 10, 255}, to = {100, 30, 0, 255},
@@ -657,7 +748,7 @@ function TestPanel.Show()
                                         text = "🪸 珊瑚守卫",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {20, 80, 100, 255}, to = {60, 40, 90, 255},
@@ -685,7 +776,7 @@ function TestPanel.Show()
                                         text = "🐛 沙虫",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {90, 65, 20, 255}, to = {60, 45, 15, 255},
@@ -740,7 +831,7 @@ function TestPanel.Show()
                                         text = "🌋 第2章",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {110, 45, 15, 255}, to = {80, 30, 10, 255},
@@ -771,7 +862,7 @@ function TestPanel.Show()
                                         text = "🪸 第3章",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {15, 75, 90, 255}, to = {40, 55, 80, 255},
@@ -802,7 +893,7 @@ function TestPanel.Show()
                                         text = "🏜️ 第4章",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {90, 65, 20, 255}, to = {60, 45, 15, 255},
@@ -853,7 +944,7 @@ function TestPanel.Show()
                                         text = "💰 +10000 金币",
                                         fontSize = 14, fontWeight = "bold",
                                         flexGrow = 1, height = 38,
-                                        borderRadius = 10,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {120, 100, 20, 255}, to = {100, 80, 10, 255},
@@ -889,7 +980,7 @@ function TestPanel.Show()
                                 text = "🚫 卸下",
                                 fontSize = 15,
                                 flexGrow = 1, height = 40,
-                                borderRadius = 12,
+                                borderRadius = 0,
                                 backgroundColor = {55, 35, 35, 255},
                                 fontColor = {220, 150, 150, 255},
                                 borderWidth = 1,
@@ -911,7 +1002,7 @@ function TestPanel.Show()
                                 text = "⚡ 重开体验",
                                 fontSize = 16, fontWeight = "bold",
                                 flexGrow = 2, height = 40,
-                                borderRadius = 12,
+                                borderRadius = 0,
                                 backgroundGradient = {
                                     type = "linear", direction = "to-right",
                                     from = {70, 55, 130, 255}, to = {50, 90, 70, 255},
@@ -935,12 +1026,34 @@ function TestPanel.Show()
                         },
                     },
 
+                    -- 🎲 三选一技能测试
+                    UI.Button {
+                        text = "🎲 弹出三选一",
+                        fontSize = 15, fontWeight = "bold",
+                        width = "100%", height = 38,
+                        borderRadius = 0,
+                        backgroundGradient = {
+                            type = "linear", direction = "to-right",
+                            from = {30, 80, 130, 255}, to = {80, 50, 130, 255},
+                        },
+                        fontColor = {180, 220, 255, 255},
+                        borderWidth = 1,
+                        borderColor = {80, 130, 200, 150},
+                        pressedBackgroundColor = {25, 60, 100, 255},
+                        onClick = function(self)
+                            AM.PlaySFX("ui_click")
+                            TestPanel.Close()
+                            local TurnFlow = require "TurnFlow"
+                            TurnFlow.ShowSkillSelect()
+                        end,
+                    },
+
                     -- 关闭
                     UI.Button {
                         text = "关闭",
                         fontSize = 17, fontWeight = "bold",
                         width = "100%", height = 38,
-                        borderRadius = 12,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = {70, 55, 130, 255}, to = {45, 35, 90, 255},
@@ -953,6 +1066,7 @@ function TestPanel.Show()
                             TestPanel.Close()
                         end,
                     },
+                },},},},
                 },
             },
         },

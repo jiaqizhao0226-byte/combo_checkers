@@ -71,6 +71,15 @@ end
 --- 重新构建菜单页面内容
 function MenuSystem.RebuildMenuPage(tabId)
     if not G.menuPageContainer then return end
+    -- 保存装备页仓库滚动位置（rebuild 后恢复）
+    local savedEquipScrollY = nil
+    if tabId == "equip" then
+        local scrollPanel = G.menuPageContainer:FindById("equipInvScroll")
+        if scrollPanel and scrollPanel.GetScroll then
+            local _, sy = scrollPanel:GetScroll()
+            savedEquipScrollY = sy
+        end
+    end
     -- 清理弹窗和拖拽状态
     MenuSystem.HideItemDetail()
     if G.dragOverlay then
@@ -403,7 +412,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                     -- 外壳（紫色暗底）
                     advBar:AddChild(UI.Panel {
                         width = "75%", maxWidth = 320, height = 72,
-                        borderRadius = 16,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = {60, 15, 100, 255}, to = {35, 8, 60, 255},
@@ -423,7 +432,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                         children = {
                             UI.Panel {
                                 width = "100%", flexGrow = 1,
-                                borderRadius = 16,
+                                borderRadius = 0,
                                 justifyContent = "center", alignItems = "center",
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
@@ -435,7 +444,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                                     UI.Panel {
                                         position = "absolute",
                                         top = 2, left = "12%", right = "12%", height = 12,
-                                        borderRadius = 6,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-bottom",
                                             from = {255, 255, 255, 100}, to = {255, 255, 255, 0},
@@ -462,7 +471,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                     -- 3D 立体按钮：外壳(暗色底边) + 内容面板(橘色渐变) + 高光层
                     advBar:AddChild(UI.Panel {
                         width = "75%", maxWidth = 320, height = 72,
-                        borderRadius = 16,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = {140, 55, 5, 255}, to = {90, 30, 0, 255},
@@ -480,7 +489,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                         children = {
                             UI.Panel {
                                 width = "100%", flexGrow = 1,
-                                borderRadius = 16,
+                                borderRadius = 0,
                                 justifyContent = "center", alignItems = "center",
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
@@ -492,7 +501,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                                     UI.Panel {
                                         position = "absolute",
                                         top = 2, left = "12%", right = "12%", height = 12,
-                                        borderRadius = 6,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-bottom",
                                             from = {255, 255, 255, 110}, to = {255, 255, 255, 0},
@@ -534,7 +543,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                 end
                 advBar:AddChild(UI.Panel {
                     width = "75%", maxWidth = 320, height = 72,
-                    borderRadius = 16,
+                    borderRadius = 0,
                     backgroundGradient = {
                         type = "linear", direction = "to-bottom",
                         from = {140, 55, 5, 255}, to = {90, 30, 0, 255},
@@ -548,7 +557,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                     children = {
                         UI.Panel {
                             width = "100%", flexGrow = 1,
-                            borderRadius = 16,
+                            borderRadius = 0,
                             justifyContent = "center", alignItems = "center",
                             backgroundGradient = {
                                 type = "linear", direction = "to-bottom",
@@ -561,7 +570,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                                 UI.Panel {
                                     position = "absolute",
                                     top = 2, left = "12%", right = "12%", height = 12,
-                                    borderRadius = 6,
+                                    borderRadius = 0,
                                     backgroundGradient = {
                                         type = "linear", direction = "to-bottom",
                                         from = {255, 255, 255, 110}, to = {255, 255, 255, 0},
@@ -635,7 +644,7 @@ function MenuSystem.RebuildMenuPage(tabId)
 
         tabAdventureBtn = UI.Panel {
             flexGrow = 1, height = 40,
-            borderRadius = 8,
+            borderRadius = 0,
             justifyContent = "center", alignItems = "center",
             onClick = function()
                 AM.PlaySFX("ui_click")
@@ -651,7 +660,7 @@ function MenuSystem.RebuildMenuPage(tabId)
         }
         tabEndlessBtn = UI.Panel {
             flexGrow = 1, height = 40,
-            borderRadius = 8,
+            borderRadius = 0,
             justifyContent = "center", alignItems = "center",
             onClick = function()
                 AM.PlaySFX("ui_click")
@@ -738,27 +747,21 @@ function MenuSystem.RebuildMenuPage(tabId)
 
         local function buildRankDataAdventure(rankList, nicknameMap)
             local rankData = {}
-            for _, entry in ipairs(rankList) do
+            for i, entry in ipairs(rankList) do
                 local uid  = tostring(entry.userId)
                 local mapped = nicknameMap and nicknameMap[uid]
                 local nick = (mapped and mapped ~= "") and mapped or ("玩家" .. uid:sub(-4))
                 local iscore = entry.iscore or {}
                 rankData[#rankData + 1] = {
+                    rank     = i,  -- 直接使用云端 adventure_rank 降序排名
                     nickname = nick,
                     level    = math.floor(tonumber(iscore.highest_level) or 1),
                     runs     = math.floor(tonumber(iscore.total_runs) or 0),
                     isMe     = (uid == myUserId),
                 }
             end
-            -- 重新排序：进度高优先，进度相同时把数少优先
-            table.sort(rankData, function(a, b)
-                if a.level ~= b.level then return a.level > b.level end
-                return a.runs < b.runs
-            end)
-            -- 重新写入 rank 序号
-            for i, row in ipairs(rankData) do
-                row.rank = i
-            end
+            -- 云端已按 adventure_rank 降序排列（复合分数：level*100000 + (99999-runs)）
+            -- 无需客户端二次排序，直接使用云端顺序即为正确排名
             return rankData
         end
 
@@ -879,6 +882,14 @@ function MenuSystem.RebuildMenuPage(tabId)
             fontSize = 19, fontColor = {120, 130, 160, 200},
         })
     end
+
+    -- 恢复装备页仓库滚动位置
+    if savedEquipScrollY and savedEquipScrollY > 0 then
+        local newScrollPanel = G.menuPageContainer:FindById("equipInvScroll")
+        if newScrollPanel and newScrollPanel.SetScrollDirect then
+            newScrollPanel:SetScrollDirect(0, savedEquipScrollY)
+        end
+    end
 end
 
 -- ============================================================================
@@ -903,7 +914,7 @@ function MenuSystem.ShowItemDetail(idx, cellWidget)
             from = {80, 180, 100, 255}, to = {50, 140, 65, 255},
         },
         pressedBackgroundColor = {40, 120, 55, 255},
-        borderRadius = 12,
+        borderRadius = 0,
         borderWidth = 1.5,
         borderColor = {120, 220, 140, 180},
         boxShadow = {
@@ -1024,7 +1035,7 @@ function MenuSystem.StartDrag(idx, targetSlot, x, y)
         top = y - dragSize / 2,
         width = dragSize, height = dragSize,
         backgroundColor = bgCol,
-        borderRadius = 12,
+        borderRadius = 0,
         borderWidth = 2.5,
         borderColor = borderCol,
         justifyContent = "center", alignItems = "center",
@@ -1122,7 +1133,7 @@ function MenuSystem.StartEquipSlotDrag(slot, x, y)
         top = y - dragSize / 2,
         width = dragSize, height = dragSize,
         backgroundColor = bgCol,
-        borderRadius = 12,
+        borderRadius = 0,
         borderWidth = 2.5,
         borderColor = borderCol,
         justifyContent = "center", alignItems = "center",
@@ -1191,12 +1202,12 @@ function MenuSystem.ShowGachaRules()
                 },
                 -- 进度条底
                 UI.Panel {
-                    flexGrow = 1, height = 8, borderRadius = 4,
+                    flexGrow = 1, height = 8, borderRadius = 0,
                     backgroundColor = {255, 255, 255, 18},
                     children = {
                         UI.Panel {
                             width = pct .. "%", height = "100%",
-                            borderRadius = 4,
+                            borderRadius = 0,
                             backgroundGradient = {
                                 type = "linear", direction = "to-right",
                                 from = barColor[1], to = barColor[2],
@@ -1233,7 +1244,7 @@ function MenuSystem.ShowGachaRules()
         children = {
             UI.Panel {
                 width = "86%", maxWidth = 300,
-                borderRadius = 18,
+                borderRadius = 0,
                 backgroundGradient = {
                     type = "linear", direction = "to-bottom",
                     from = {30, 26, 55, 255}, to = {18, 15, 38, 255},
@@ -1293,7 +1304,7 @@ function MenuSystem.ShowGachaRules()
                     UI.Panel {
                         width = "100%",
                         backgroundColor = {255, 200, 40, 12},
-                        borderRadius = 10,
+                        borderRadius = 0,
                         borderWidth = 1, borderColor = {255, 200, 40, 40},
                         paddingTop = 10, paddingBottom = 10,
                         paddingLeft = 12, paddingRight = 12,
@@ -1328,12 +1339,12 @@ function MenuSystem.ShowGachaRules()
                                     },
                                     -- 进度条底
                                     UI.Panel {
-                                        flexGrow = 1, height = 7, borderRadius = 4,
+                                        flexGrow = 1, height = 7, borderRadius = 0,
                                         backgroundColor = {255, 255, 255, 18},
                                         children = {
                                             UI.Panel {
                                                 width = math.floor((G.playerData.pityCounter or 0) / Equipment.PITY_THRESHOLD * 100) .. "%",
-                                                height = "100%", borderRadius = 4,
+                                                height = "100%", borderRadius = 0,
                                                 backgroundGradient = {
                                                     type = "linear", direction = "to-right",
                                                     from = {255, 210, 40, 255}, to = {255, 160, 20, 255},
@@ -1355,7 +1366,7 @@ function MenuSystem.ShowGachaRules()
                     UI.Panel {
                         width = "100%",
                         backgroundColor = {140, 100, 255, 12},
-                        borderRadius = 10,
+                        borderRadius = 0,
                         borderWidth = 1, borderColor = {140, 100, 255, 40},
                         paddingTop = 10, paddingBottom = 10,
                         paddingLeft = 12, paddingRight = 12,
@@ -1396,7 +1407,7 @@ function MenuSystem.ShowGachaRules()
                                         width = "100%", flexDirection = "row",
                                         alignItems = "flex-start", gap = 6,
                                         children = {
-                                            UI.Label { text = "◆", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
+                                            UI.Label { text = "*", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
                                             UI.Panel { flexGrow = 1, gap = 2, children = {
                                                 UI.Label { text = "🦅 飞跃先锋", fontSize = 12, fontWeight = "bold", fontColor = {255, 220, 100, 255} },
                                                 UI.Label { text = "4件：可跳过2连续敌人\n6件：可跳过3连续敌人", fontSize = 11, fontColor = {200, 195, 185, 200}, flexWrap = "wrap" },
@@ -1408,7 +1419,7 @@ function MenuSystem.ShowGachaRules()
                                         width = "100%", flexDirection = "row",
                                         alignItems = "flex-start", gap = 6,
                                         children = {
-                                            UI.Label { text = "◆", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
+                                            UI.Label { text = "*", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
                                             UI.Panel { flexGrow = 1, gap = 2, children = {
                                                 UI.Label { text = "🔥 连击心得", fontSize = 12, fontWeight = "bold", fontColor = {255, 220, 100, 255} },
                                                 UI.Label { text = "4件：50%概率Combo+1\n6件：75%概率Combo+1", fontSize = 11, fontColor = {200, 195, 185, 200}, flexWrap = "wrap" },
@@ -1420,10 +1431,10 @@ function MenuSystem.ShowGachaRules()
                                         width = "100%", flexDirection = "row",
                                         alignItems = "flex-start", gap = 6,
                                         children = {
-                                            UI.Label { text = "◆", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
+                                            UI.Label { text = "*", fontSize = 11, fontColor = {255, 200, 40, 255}, marginTop = 1 },
                                             UI.Panel { flexGrow = 1, gap = 2, children = {
                                                 UI.Label { text = "🩸 嗜血猎魂", fontSize = 12, fontWeight = "bold", fontColor = {255, 220, 100, 255} },
-                                                UI.Label { text = "4件：击杀敌人回血\n6件：HP<50%时击杀触发血怒，下一跳ATK×1.5（最多叠3层）", fontSize = 11, fontColor = {200, 195, 185, 200}, flexWrap = "wrap" },
+                                                UI.Label { text = "4件：击杀敌人回血\n6件：HP<50%时击杀触发血怒，下一跳ATKx1.5（最多叠3层）", fontSize = 11, fontColor = {200, 195, 185, 200}, flexWrap = "wrap" },
                                             }},
                                         },
                                     },
@@ -1439,7 +1450,7 @@ function MenuSystem.ShowGachaRules()
                             UI.Panel {
                                 flexGrow = 1, alignItems = "center", gap = 3,
                                 backgroundColor = {255, 255, 255, 8},
-                                borderRadius = 10, borderWidth = 1,
+                                borderRadius = 0, borderWidth = 1,
                                 borderColor = {255, 255, 255, 18},
                                 paddingTop = 8, paddingBottom = 8,
                                 children = {
@@ -1454,7 +1465,7 @@ function MenuSystem.ShowGachaRules()
                             UI.Panel {
                                 flexGrow = 1, alignItems = "center", gap = 3,
                                 backgroundColor = {255, 255, 255, 8},
-                                borderRadius = 10, borderWidth = 1,
+                                borderRadius = 0, borderWidth = 1,
                                 borderColor = {255, 255, 255, 18},
                                 paddingTop = 8, paddingBottom = 8,
                                 children = {
@@ -1466,7 +1477,7 @@ function MenuSystem.ShowGachaRules()
                                                 text = "省40G",
                                                 fontSize = 10, fontColor = {120, 255, 120, 200},
                                                 backgroundColor = {0, 160, 80, 60},
-                                                borderRadius = 6,
+                                                borderRadius = 0,
                                                 paddingLeft = 4, paddingRight = 4,
                                                 paddingTop = 1, paddingBottom = 1,
                                             },
@@ -1489,7 +1500,7 @@ function MenuSystem.ShowGachaRules()
                             UI.Panel {
                                 paddingTop = 9, paddingBottom = 9,
                                 paddingLeft = 36, paddingRight = 36,
-                                borderRadius = 20,
+                                borderRadius = 0,
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
                                     from = {80, 65, 130, 255}, to = {55, 42, 100, 255},
@@ -1557,7 +1568,7 @@ function MenuSystem.ShowGachaResults(results)
     local lightBurst = UI.Panel {
         position = "absolute",
         top = -40, left = -60, right = -60, bottom = -40,
-        borderRadius = 200,
+        borderRadius = 0,
         backgroundGradient = {
             type = "radial",
             from = {255, 230, 100, 0}, to = {255, 200, 40, 0},
@@ -1592,7 +1603,7 @@ function MenuSystem.ShowGachaResults(results)
         variant = "primary",
         width = 170, height = 46, fontSize = 23,
         fontWeight = "bold",
-        borderRadius = 23,
+        borderRadius = 0,
         backgroundGradient = {
             type = "linear", direction = "to-bottom",
             from = {255, 220, 65, 255}, to = {235, 185, 30, 255},
@@ -1633,7 +1644,7 @@ function MenuSystem.ShowGachaResults(results)
             goldSparkles[i] = sp
             goldSparkleWidgets[i] = UI.Label {
                 position = "absolute",
-                text = "✦",
+                text = "+",
                 fontSize = sp.size,
                 fontColor = {255, 215, 0, 0},
                 left = math.floor(sp.x * 300),
@@ -1646,7 +1657,7 @@ function MenuSystem.ShowGachaResults(results)
         position = "absolute",
         top = 0, left = 0, right = 0, bottom = 0,
         overflow = "hidden",
-        borderRadius = 24,
+        borderRadius = 0,
         opacity = 0,
         children = goldSparkleWidgets,
     } or nil
@@ -1655,7 +1666,7 @@ function MenuSystem.ShowGachaResults(results)
     local goldGlow = hasGold and UI.Panel {
         position = "absolute",
         top = -3, left = -3, right = -3, bottom = -3,
-        borderRadius = 27,
+        borderRadius = 0,
         borderWidth = 3,
         borderColor = {255, 215, 0, 0},
         boxShadow = {
@@ -1673,7 +1684,7 @@ function MenuSystem.ShowGachaResults(results)
             from = hasGold and {50, 42, 20, 250} or {32, 36, 65, 250},
             to = hasGold and {30, 25, 10, 250} or {20, 22, 45, 250},
         },
-        borderRadius = 24, borderWidth = 2.5,
+        borderRadius = 0, borderWidth = 2.5,
         borderColor = hasGold and {255, 200, 60, 200} or {170, 100, 235, 170},
         boxShadow = {
             { x = 0, y = 6, blur = 24, spread = 0, color = {0, 0, 0, 80} },
@@ -1943,7 +1954,7 @@ function MenuSystem.CreateMenuUI()
                                             flexDirection = "row", alignItems = "center",
                                             paddingLeft = 10, paddingRight = 10,
                                             paddingTop = 4, paddingBottom = 4,
-                                            borderRadius = 14,
+                                            borderRadius = 0,
                                             backgroundGradient = {
                                                 type = "linear", direction = "to-bottom",
                                                 from = {45, 120, 210, 255}, to = {30, 80, 160, 255},
@@ -2000,7 +2011,7 @@ function MenuSystem.CreateMenuUI()
                                         type = "linear", direction = "to-right",
                                         from = {55, 42, 12, 240}, to = {35, 28, 8, 240},
                                     },
-                                    borderRadius = 18,
+                                    borderRadius = 0,
                                     borderWidth = 1.5,
                                     borderColor = {160, 125, 40, 160},
                                     paddingLeft = 4, paddingRight = 14,
@@ -2057,7 +2068,7 @@ function MenuSystem.CreateMenuUI()
                         text = "⚙",
                         fontSize = 22,
                         width = 32, height = 28,
-                        borderRadius = 8,
+                        borderRadius = 0,
                         backgroundColor = {0, 0, 0, 0},
                         fontColor = {180, 175, 215, 180},
                         pressedBackgroundColor = {255, 255, 255, 20},
@@ -2078,7 +2089,7 @@ function MenuSystem.CreateMenuUI()
                         from = {50, 70, 140, 220}, to = {25, 35, 80, 240},
                     },
                     pressedBackgroundColor = {80, 110, 190, 240},
-                    borderRadius = 21,
+                    borderRadius = 0,
                     borderWidth = 1,
                     borderColor = {100, 150, 255, 100},
                     text = "<",
@@ -2107,7 +2118,7 @@ function MenuSystem.CreateMenuUI()
                         from = {50, 70, 140, 220}, to = {25, 35, 80, 240},
                     },
                     pressedBackgroundColor = {80, 110, 190, 240},
-                    borderRadius = 21,
+                    borderRadius = 0,
                     borderWidth = 1,
                     borderColor = {100, 150, 255, 100},
                     text = ">",

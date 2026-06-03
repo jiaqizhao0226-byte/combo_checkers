@@ -154,7 +154,7 @@ function SetEffects.ConsumeBloodRage(seState)
         return 1.0, nil
     end
     seState.bloodRageStacks = seState.bloodRageStacks - 1
-    local text = "🩸血怒! ATK×1.5"
+    local text = "🩸血怒! ATKx1.5"
     return 1.5, text
 end
 

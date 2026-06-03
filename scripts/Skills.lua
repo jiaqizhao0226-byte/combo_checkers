@@ -41,7 +41,7 @@ Skills.SKILLS = {
             local dmg = 6 + lv * 2          -- Lv1=8, Lv2=10, Lv3=12, Lv4=14, Lv5=16
             local range = lv >= 3 and 2 or 1
             local extra = ""
-            if lv >= 4 then extra = extra .. "；连跳≥3全场AOE" end
+            if lv >= 4 then extra = extra .. "；连跳>=3全场AOE" end
             if lv >= 5 then extra = extra .. "；碎甲(DEF减半1回合)" end
             return string.format("跳跃落地时对周围%d圈敌人造成%d伤害%s", range, dmg, extra)
         end,
@@ -75,7 +75,7 @@ Skills.SKILLS = {
             local pct = 5 + lv * 3           -- Lv1=8%, Lv2=11%, Lv3=14%, Lv4=17%, Lv5=20%
             local extra = ""
             if lv >= 3 then extra = extra .. "；连击击杀+5临时ATK+12HP（上限+30ATK）" end
-            if lv >= 5 then extra = extra .. "；HP>80%时附带ATK×20%真实伤害" end
+            if lv >= 5 then extra = extra .. "；HP>80%时附带ATKx20%真实伤害" end
             return string.format("跳杀敌人时回复%d%%伤害为生命%s", pct, extra)
         end,
     },
@@ -90,7 +90,7 @@ Skills.SKILLS = {
         desc = function(lv)
             local pct = 20 + lv * 8          -- Lv1=28%, Lv2=36%, ..., Lv5=60%
             local extra = ""
-            if lv >= 3 then extra = extra .. "；反弹→治疗50%；被攻+3护盾" end
+            if lv >= 3 then extra = extra .. "；反弹->治疗50%；被攻+3护盾" end
             if lv >= 5 then extra = extra .. "；护盾>10反弹+20%" end
             return string.format("受到攻击时反弹%d%%伤害给敌人%s", pct, extra)
         end,
@@ -109,7 +109,7 @@ Skills.SKILLS = {
         rarity = {1, 1, 2, 2, 3},  -- 控制技能，最高史诗
         desc = function(lv)
             local dmg = 5 + lv * 5           -- Lv1=10, Lv2=15, ..., Lv5=30
-            local dur = 2 + math.floor(lv / 2) -- Lv1=2, Lv2=3, Lv3=3, Lv4=4, Lv5=4
+            local dur = 3 + math.floor(lv / 2) -- Lv1=3, Lv2=4, Lv3=4, Lv4=5, Lv5=5
             local extra = ""
             if lv >= 3 then extra = extra .. "；减速1回合" end
             if lv >= 5 then extra = extra .. "；踩刺敌人受全伤害+20%" end
@@ -143,9 +143,9 @@ Skills.SKILLS = {
         desc = function(lv)
             local bonus = 50 + lv * 30       -- Lv1=80%, ..., Lv5=200%
             local extra = ""
-            if lv >= 4 then extra = extra .. "；连跳加成上限提升至+200%（最高×3）" end
-            if lv >= 5 then extra = extra .. "；重击加成提升至+200%（即基伤×3）" end
-            return string.format("连续跳杀≥3次时，伤害提升%d%%%s", bonus, extra)
+            if lv >= 4 then extra = extra .. "；连跳加成上限提升至+200%（最高x3）" end
+            if lv >= 5 then extra = extra .. "；重击加成提升至+200%（即基伤x3）" end
+            return string.format("连续跳杀>=3次时，伤害提升%d%%%s", bonus, extra)
         end,
     },
 
@@ -247,28 +247,56 @@ Skills.SKILLS = {
 }
 
 -- ============================================================================
--- 6 个组合技定义
--- 解锁条件：两个前置技能均达到 maxLevel (Lv5) 时自动激活
+-- 组合技定义 (5个已确认，第6个待定)
+-- 解锁条件：两个前置技能等级之和 >= 5 时自动激活
 -- ============================================================================
 
 Skills.COMBOS = {
+    -- 1. 雷震天罚: AOE + 弹射 = 电磁风暴
     {
         id = "combo_thunder_quake",
         name = "雷震天罚",
         icon = "skill_combo_storm",
         color = {160, 160, 40},
-        desc = "AOE击中敌人50%触发闪电(15伤)",
+        desc = "震地落命中敌人50%概率追加闪电(15伤,可弹射1次)",
         requires = {"chain_lightning", "quake_land"},
     },
+    -- 2. 血棘共生: 吸血 + 反伤 = 攻防转换
     {
         id = "combo_blood_thorns",
         name = "血棘共生",
         icon = "skill_combo_thorn",
         color = {180, 80, 80},
-        desc = "反弹50%→治疗；HP<50%反弹+20%",
+        desc = "荆棘反弹伤害50%转治疗；HP<50%时反弹额外+20%",
         requires = {"vampiric_jump", "thorns"},
     },
-
+    -- 3. 猎杀本能: 标记 + 斩杀 = 精准猎手
+    {
+        id = "combo_hunter_instinct",
+        name = "猎杀本能",
+        icon = "skill_combo_shield",
+        color = {255, 100, 40},
+        desc = "每次跳跃后，全屏HP≤20%的小怪直接处决；每次处决回复10HP",
+        requires = {"hunter_mark", "collector"},
+    },
+    -- 4. 焚身狂战: 血怒 + 玻璃大炮 = 极致高风险高回报
+    {
+        id = "combo_burning_rage",
+        name = "焚身狂战",
+        icon = "skill_combo_fire",
+        color = {255, 60, 20},
+        desc = "血怒期间跳杀附加ATK×40%真伤；击杀回复3HP",
+        requires = {"blood_rage", "glass_cannon"},
+    },
+    -- 5. 碎片雷区: 分裂 + 陷阱 = 连锁区域控制
+    {
+        id = "combo_shard_minefield",
+        name = "碎片雷区",
+        icon = "skill_combo_pirate",
+        color = {180, 140, 60},
+        desc = "碎片落点变地刺(25伤2回合)；地刺被踩射出1枚碎片",
+        requires = {"split_shot", "spike_trap"},
+    },
 }
 
 -- ============================================================================
@@ -302,22 +330,26 @@ function Skills.GetDef(id)
     return Skills.SKILLS[id]
 end
 
+--- 组合技解锁阈值：两个前置技能等级之和 >= 此值即激活
+Skills.COMBO_THRESHOLD = 5
+
 --- 获取当前已激活的组合技
 ---@param owned table  {skillId = level, ...}
 ---@return table[]     激活的组合技定义列表
 function Skills.GetActiveCombos(owned)
     local result = {}
     for _, combo in ipairs(Skills.COMBOS) do
-        local allMax = true
+        local levelSum = 0
+        local allOwned = true
         for _, req in ipairs(combo.requires) do
-            local def = Skills.SKILLS[req]
-            local maxLv = def and def.maxLevel or 5
-            if (owned[req] or 0) < maxLv then
-                allMax = false
+            local lv = owned[req] or 0
+            if lv <= 0 then
+                allOwned = false
                 break
             end
+            levelSum = levelSum + lv
         end
-        if allMax then
+        if allOwned and levelSum >= Skills.COMBO_THRESHOLD then
             result[#result + 1] = combo
         end
     end
@@ -407,31 +439,29 @@ function Skills.GetOwnedIcons(owned)
     return table.concat(names, " | ")
 end
 
---- 获取接近解锁的组合技（前置之一已 Lv4+）
+--- 获取接近解锁的组合技（等级之和 >= 阈值-1，即差1级就解锁）
 ---@param owned table  {skillId = level, ...}
 ---@return table[]     接近解锁的组合技列表（含 progress 信息）
 function Skills.GetNearCombos(owned)
     local result = {}
     for _, combo in ipairs(Skills.COMBOS) do
-        local totalReq = #combo.requires
-        local metCount = 0
-        local nearCount = 0
+        local levelSum = 0
+        local allOwned = true
         for _, req in ipairs(combo.requires) do
             local lv = owned[req] or 0
-            local def = Skills.SKILLS[req]
-            local maxLv = def and def.maxLevel or 5
-            if lv >= maxLv then
-                metCount = metCount + 1
-            elseif lv >= 4 then
-                nearCount = nearCount + 1
+            if lv <= 0 then
+                allOwned = false
             end
+            levelSum = levelSum + lv
         end
-        -- 至少一个满级或接近满级，但尚未全部满级
-        if metCount < totalReq and (metCount + nearCount) > 0 then
+        -- 已激活的不算"接近"
+        if allOwned and levelSum >= Skills.COMBO_THRESHOLD then
+            -- skip, already active
+        elseif levelSum >= Skills.COMBO_THRESHOLD - 1 and levelSum > 0 then
             result[#result + 1] = {
                 combo = combo,
-                metCount = metCount,
-                totalReq = totalReq,
+                levelSum = levelSum,
+                threshold = Skills.COMBO_THRESHOLD,
             }
         end
     end

@@ -81,7 +81,7 @@ local function BuildEquipSlot(slotId, equippedItem, size, onUnequip, dragCallbac
             children[#children + 1] = UI.Panel {
                 width = "100%", height = 3,
                 backgroundColor = setColor,
-                borderRadius = 1,
+                borderRadius = 0,
                 position = "absolute", top = 0, left = 0, right = 0,
             }
         end
@@ -107,7 +107,7 @@ local function BuildEquipSlot(slotId, equippedItem, size, onUnequip, dragCallbac
                 type = "linear", direction = "to-bottom",
                 from = gFrom, to = gTo,
             },
-            borderRadius = 10,
+            borderRadius = 0,
             borderWidth = 2,
             borderColor = borderCol,
             boxShadow = RarityShadow(rarity),
@@ -221,7 +221,7 @@ local function BuildEquipSlot(slotId, equippedItem, size, onUnequip, dragCallbac
                 type = "linear", direction = "to-bottom",
                 from = {45, 50, 65, 255}, to = {30, 34, 48, 255},
             },
-            borderRadius = 12,
+            borderRadius = 0,
             borderWidth = 2,
             borderColor = {70, 75, 95, 180},
             borderStyle = "dashed",
@@ -277,7 +277,7 @@ function MenuPages.BuildItemDetailPopup(item, equipment)
             UI.Panel {
                 width = iconSize + 10, height = iconSize + 10,
                 backgroundColor = bgCol,
-                borderRadius = 12, borderWidth = 2.5, borderColor = borderCol,
+                borderRadius = 0, borderWidth = 2.5, borderColor = borderCol,
                 justifyContent = "center", alignItems = "center",
                 children = {
                     iconPath
@@ -366,7 +366,7 @@ function MenuPages.BuildItemDetailPopup(item, equipment)
             setChildren[#setChildren + 1] = UI.Panel {
                 flexDirection = "row", gap = 5, alignItems = "center",
                 children = {
-                    UI.Label { text = active4 and "✦" or "◇", fontSize = 14,
+                    UI.Label { text = active4 and "[+]" or "[ ]", fontSize = 14,
                         fontColor = active4 and {255, 220, 80, 255} or {80, 85, 100, 180} },
                     UI.Label {
                         text = "4件: " .. setDef.desc4,
@@ -381,7 +381,7 @@ function MenuPages.BuildItemDetailPopup(item, equipment)
             setChildren[#setChildren + 1] = UI.Panel {
                 flexDirection = "row", gap = 5, alignItems = "center",
                 children = {
-                    UI.Label { text = active6 and "✦" or "◇", fontSize = 14,
+                    UI.Label { text = active6 and "[+]" or "[ ]", fontSize = 14,
                         fontColor = active6 and {255, 230, 100, 255} or {80, 85, 100, 180} },
                     UI.Label {
                         text = "6件: " .. setDef.desc6,
@@ -406,7 +406,7 @@ function MenuPages.BuildItemDetailPopup(item, equipment)
             from = {gFrom[1] + 8, gFrom[2] + 8, gFrom[3] + 12, 252},
             to = {gTo[1] + 5, gTo[2] + 5, gTo[3] + 8, 252},
         },
-        borderRadius = 14,
+        borderRadius = 0,
         borderWidth = 2,
         borderColor = {borderCol[1], borderCol[2], borderCol[3], 180},
         boxShadow = {
@@ -431,7 +431,7 @@ local function BuildItemCell(item, size, onClick, selected, dragCallbacks)
                 type = "linear", direction = "to-bottom",
                 from = {48, 52, 68, 255}, to = {35, 38, 52, 255},
             },
-            borderRadius = 10,
+            borderRadius = 0,
             borderWidth = 1.5,
             borderColor = {60, 65, 82, 170},
             justifyContent = "center", alignItems = "center",
@@ -451,7 +451,7 @@ local function BuildItemCell(item, size, onClick, selected, dragCallbacks)
         cellChildren[#cellChildren + 1] = UI.Panel {
             width = "100%", height = 3,
             backgroundColor = setColor,
-            borderRadius = 1,
+            borderRadius = 0,
             position = "absolute", top = 0, left = 0, right = 0,
         }
     end
@@ -477,14 +477,14 @@ local function BuildItemCell(item, size, onClick, selected, dragCallbacks)
         cellChildren[#cellChildren + 1] = UI.Panel {
             position = "absolute", top = 0, left = 0, right = 0, bottom = 0,
             backgroundColor = {255, 80, 60, 50},
-            borderRadius = 8,
+            borderRadius = 0,
             justifyContent = "center", alignItems = "center",
         }
         cellChildren[#cellChildren + 1] = UI.Panel {
             position = "absolute", top = 3, right = 3,
             width = 22, height = 22,
             backgroundColor = {255, 80, 60, 240},
-            borderRadius = 11,
+            borderRadius = 0,
             justifyContent = "center", alignItems = "center",
             boxShadow = {
                 { x = 0, y = 1, blur = 3, spread = 0, color = {0, 0, 0, 60} },
@@ -513,7 +513,7 @@ local function BuildItemCell(item, size, onClick, selected, dragCallbacks)
                 type = "linear", direction = "to-bottom",
                 from = gFrom, to = gTo,
             },
-            borderRadius = 8,
+            borderRadius = 0,
             borderWidth = selected and 2.5 or 2,
             borderColor = actualBorderCol,
             boxShadow = selected
@@ -579,7 +579,7 @@ local function BuildItemCell(item, size, onClick, selected, dragCallbacks)
                 type = "linear", direction = "to-bottom",
                 from = gFrom, to = gTo,
             },
-            borderRadius = 8,
+            borderRadius = 0,
             borderWidth = selected and 2.5 or 2,
             borderColor = actualBorderCol,
             boxShadow = selected
@@ -702,7 +702,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                             textShadow = is4 and { offsetX = 0, offsetY = 1, blur = 2, color = {0, 0, 0, 60} } or nil,
                         },
                         is4 and UI.Label {
-                            text = is6 and "✦✦" or "✦",
+                            text = is6 and "++" or "+",
                             fontSize = 15, fontColor = {255, 220, 80, 255},
                             textShadow = { offsetX = 0, offsetY = 1, blur = 3, color = {255, 200, 40, 50} },
                         } or nil,
@@ -732,7 +732,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     from = {sc[1], sc[2], sc[3], 45}, to = {sc[1], sc[2], sc[3], 15},
                 } or nil,
                 backgroundColor = (not is4) and {35, 38, 52, 200} or nil,
-                borderRadius = 10,
+                borderRadius = 0,
                 borderWidth = is4 and 1.5 or 1,
                 borderColor = is4 and {sc[1], sc[2], sc[3], 120} or {60, 65, 82, 120},
                 boxShadow = is4 and {
@@ -763,12 +763,12 @@ function MenuPages.BuildEquipPage(data, callbacks)
                 },
                 -- 英雄图标（小企鹅）
                 UI.Panel {
-                    width = 140, height = 170,
+                    width = 140, height = 190,
                     backgroundGradient = {
                         type = "linear", direction = "to-bottom",
                         from = {55, 65, 105, 255}, to = {35, 42, 72, 255},
                     },
-                    borderRadius = 14,
+                    borderRadius = 0,
                     borderWidth = 2.5,
                     borderColor = {95, 115, 185, 200},
                     boxShadow = {
@@ -776,10 +776,10 @@ function MenuPages.BuildEquipPage(data, callbacks)
                         { x = 0, y = 1, blur = 4, spread = 0, color = {100, 120, 200, 25}, inset = true },
                     },
                     justifyContent = "center", alignItems = "center",
-                    flexDirection = "column", gap = 2,
+                    flexDirection = "column", gap = 4,
                     overflow = "hidden",
                     children = {
-                        UI.Panel { backgroundImage = "image/hero_penguin_pixel_sword.png", width = 150, height = 150, backgroundFit = "contain" },
+                        UI.Panel { backgroundImage = "image/hero_penguin_pixel_sword.png", width = 130, height = 130, backgroundFit = "contain" },
                         UI.Label {
                             text = "英雄",
                             fontSize = 19, fontColor = {160, 180, 230, 220},
@@ -891,7 +891,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                 type = "linear", direction = "to-bottom",
                 from = {48, 52, 72, 240}, to = {35, 38, 55, 240},
             },
-            borderRadius = 10,
+            borderRadius = 0,
             borderWidth = 1,
             borderColor = {70, 75, 100, 150},
             paddingLeft = 10, paddingRight = 10,
@@ -910,7 +910,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     from = {180, 70, 50, 240}, to = {140, 45, 35, 240},
                 },
                 pressedBackgroundColor = {200, 90, 70, 255},
-                borderRadius = 10,
+                borderRadius = 0,
                 borderWidth = 1,
                 borderColor = {220, 100, 70, 150},
                 paddingLeft = 12, paddingRight = 12,
@@ -948,7 +948,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     from = {60, 100, 180, 240}, to = {40, 70, 140, 240},
                 },
                 pressedBackgroundColor = {80, 120, 200, 255},
-                borderRadius = 10,
+                borderRadius = 0,
                 borderWidth = 1,
                 borderColor = {90, 140, 220, 180},
                 paddingLeft = 10, paddingRight = 10,
@@ -981,7 +981,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     from = {140, 60, 200, 240}, to = {100, 40, 160, 240},
                 },
                 pressedBackgroundColor = {160, 80, 220, 255},
-                borderRadius = 10,
+                borderRadius = 0,
                 borderWidth = 1,
                 borderColor = {180, 100, 240, 180},
                 paddingLeft = 10, paddingRight = 10,
@@ -1022,7 +1022,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                             type = "linear", direction = "to-bottom",
                             from = decoBarColor.from, to = decoBarColor.to,
                         },
-                        borderRadius = 2,
+                        borderRadius = 0,
                     },
                     UI.Label {
                         text = isDecomposing and "分解模式" or "仓库",
@@ -1062,117 +1062,181 @@ function MenuPages.BuildEquipPage(data, callbacks)
             },
         }
     else
-        -- 按稀有度排序（金→紫→蓝），保留原始索引用于回调
-        local sortedIndices = {}
-        for i = 1, #data.inventory do
-            sortedIndices[#sortedIndices + 1] = i
+        -- 按部位分组展示
+        local SLOT_ICONS = {
+            weapon = "⚔️", necklace = "📿", helmet = "🪖",
+            top_armor = "🛡️", bottom_armor = "👖", shoes = "👟",
+        }
+
+        -- 按部位分组（保留原始索引用于回调）
+        local slotGroups = {}
+        for _, slot in ipairs(Equipment.SLOT_ORDER) do
+            slotGroups[slot] = {}
         end
-        table.sort(sortedIndices, function(a, b)
-            local ra = data.inventory[a] and data.inventory[a].rarity or "blue"
-            local rb = data.inventory[b] and data.inventory[b].rarity or "blue"
-            local sa = Equipment.RARITY_SORT[ra] or 0
-            local sb = Equipment.RARITY_SORT[rb] or 0
-            if sa ~= sb then return sa > sb end  -- 高稀有度在前
-            return a < b  -- 同稀有度按原始顺序
-        end)
+        for i, entry in ipairs(data.inventory) do
+            local itemDef = Equipment.GetItemDef(entry.id)
+            local slot = itemDef and itemDef.slot or "weapon"
+            if not slotGroups[slot] then slotGroups[slot] = {} end
+            slotGroups[slot][#slotGroups[slot] + 1] = i
+        end
 
-        local currentRow = {}
-        for i, idx in ipairs(sortedIndices) do
-            local entry = data.inventory[idx]
-            local isSelected = selectedSet[idx] == true
-            local cellOnClick
-            if isDecomposing then
-                cellOnClick = function(self)
-                    AM.PlaySFX("ui_click")
-                    if callbacks and callbacks.onSelectDecompose then
-                        callbacks.onSelectDecompose(idx)
-                    end
-                end
-            else
-                cellOnClick = function(self)
-                    AM.PlaySFX("ui_click")
-                    if callbacks and callbacks.onShowDetail then
-                        callbacks.onShowDetail(idx, self)
-                    end
-                end
-            end
+        -- 各部位内按稀有度排序（金→紫→蓝）
+        for _, slot in ipairs(Equipment.SLOT_ORDER) do
+            local group = slotGroups[slot]
+            table.sort(group, function(a, b)
+                local ra = data.inventory[a] and data.inventory[a].rarity or "blue"
+                local rb = data.inventory[b] and data.inventory[b].rarity or "blue"
+                local sa = Equipment.RARITY_SORT[ra] or 0
+                local sb = Equipment.RARITY_SORT[rb] or 0
+                if sa ~= sb then return sa > sb end
+                return a < b
+            end)
+        end
 
-            -- 非分解模式下支持拖拽穿戴
-            local cellDragCb = nil
-            if not isDecomposing and entry then
-                local itemDef = Equipment.GetItemDef(entry.id)
-                local targetSlot = itemDef and itemDef.slot or nil
-                if targetSlot then
-                    cellDragCb = {
-                        onDragStart = function(x, y)
-                            if callbacks and callbacks.onDragStart then
-                                callbacks.onDragStart(idx, targetSlot, x, y)
-                            end
-                            -- 高亮目标槽位
-                            local sw = slotWidgets[targetSlot]
-                            if sw then
-                                sw:SetStyle({
-                                    borderColor = {255, 255, 100, 255},
-                                    borderWidth = 3,
-                                    boxShadow = {
-                                        { x = 0, y = 0, blur = 14, spread = 3, color = {255, 230, 80, 120} },
-                                        { x = 0, y = 0, blur = 6, spread = 1, color = {255, 255, 150, 80} },
-                                    },
-                                })
-                            end
-                        end,
-                        onDragMove = function(x, y)
-                            if callbacks and callbacks.onDragMove then
-                                callbacks.onDragMove(x, y)
-                            end
-                        end,
-                        onDragEnd = function(x, y)
-                            -- 恢复槽位样式
-                            local sw = slotWidgets[targetSlot]
-                            if sw then
-                                local equipped = data.equipment[targetSlot]
-                                if equipped then
-                                    local r = equipped.rarity or "common"
-                                    local bc = RARITY_BORDER[r] or RARITY_BORDER.common
-                                    sw:SetStyle({
-                                        borderColor = bc,
-                                        borderWidth = 2,
-                                        boxShadow = RarityShadow(r),
-                                    })
-                                else
-                                    sw:SetStyle({
-                                        borderColor = {70, 75, 95, 180},
-                                        borderWidth = 2,
-                                        borderStyle = "dashed",
-                                        boxShadow = {
-                                            { x = 0, y = 1, blur = 4, spread = 0, color = {0, 0, 0, 40} },
-                                        },
-                                    })
-                                end
-                            end
-                            if callbacks and callbacks.onDragEnd then
-                                callbacks.onDragEnd(idx, targetSlot, x, y, sw)
-                            end
-                        end,
-                    }
-                end
-            end
+        -- 渲染每个部位分区
+        for _, slot in ipairs(Equipment.SLOT_ORDER) do
+            local group = slotGroups[slot]
+            local slotName = Equipment.SLOT_NAMES[slot] or slot
+            local slotIcon = SLOT_ICONS[slot] or "📦"
 
-            local cell = BuildItemCell(entry, cellSize, cellOnClick, isDecomposing and isSelected, cellDragCb)
-            if cell then
-                currentRow[#currentRow + 1] = cell
-            end
-            if #currentRow >= 4 or i == #sortedIndices then
-                while #currentRow < 4 do
-                    currentRow[#currentRow + 1] = BuildItemCell(nil, cellSize, nil)
-                end
+            -- 部位分区标题
+            invRows[#invRows + 1] = UI.Panel {
+                width = "100%", flexDirection = "row",
+                alignItems = "center", gap = 6,
+                paddingTop = 10, paddingBottom = 4, paddingLeft = 2,
+                children = {
+                    UI.Label { text = slotIcon, fontSize = 15 },
+                    UI.Label {
+                        text = slotName,
+                        fontSize = 15, fontColor = {170, 180, 210, 255},
+                        fontWeight = "bold",
+                    },
+                    UI.Panel {
+                        backgroundColor = {60, 65, 90, 180},
+                        borderRadius = 0,
+                        paddingLeft = 6, paddingRight = 6,
+                        paddingTop = 1, paddingBottom = 1,
+                        children = {
+                            UI.Label {
+                                text = tostring(#group),
+                                fontSize = 12, fontColor = {140, 150, 180, 200},
+                            },
+                        },
+                    },
+                },
+            }
+
+            if #group == 0 then
+                -- 空部位占位
                 invRows[#invRows + 1] = UI.Panel {
-                    width = "100%", flexDirection = "row",
-                    justifyContent = "center", gap = 8,
-                    paddingBottom = 6,
-                    children = currentRow,
+                    width = "100%", justifyContent = "center", alignItems = "center",
+                    paddingTop = 6, paddingBottom = 10,
+                    children = {
+                        UI.Label {
+                            text = "暂无",
+                            fontSize = 14, fontColor = {90, 95, 120, 150},
+                        },
+                    },
                 }
-                currentRow = {}
+            else
+                -- 渲染该部位的装备格子（4列）
+                local currentRow = {}
+                for i, idx in ipairs(group) do
+                    local entry = data.inventory[idx]
+                    local isSelected = selectedSet[idx] == true
+                    local cellOnClick
+                    if isDecomposing then
+                        cellOnClick = function(self)
+                            AM.PlaySFX("ui_click")
+                            if callbacks and callbacks.onSelectDecompose then
+                                callbacks.onSelectDecompose(idx)
+                            end
+                        end
+                    else
+                        cellOnClick = function(self)
+                            AM.PlaySFX("ui_click")
+                            if callbacks and callbacks.onShowDetail then
+                                callbacks.onShowDetail(idx, self)
+                            end
+                        end
+                    end
+
+                    -- 非分解模式下支持拖拽穿戴
+                    local cellDragCb = nil
+                    if not isDecomposing and entry then
+                        local itemDef = Equipment.GetItemDef(entry.id)
+                        local targetSlot = itemDef and itemDef.slot or nil
+                        if targetSlot then
+                            cellDragCb = {
+                                onDragStart = function(x, y)
+                                    if callbacks and callbacks.onDragStart then
+                                        callbacks.onDragStart(idx, targetSlot, x, y)
+                                    end
+                                    local sw = slotWidgets[targetSlot]
+                                    if sw then
+                                        sw:SetStyle({
+                                            borderColor = {255, 255, 100, 255},
+                                            borderWidth = 3,
+                                            boxShadow = {
+                                                { x = 0, y = 0, blur = 14, spread = 3, color = {255, 230, 80, 120} },
+                                                { x = 0, y = 0, blur = 6, spread = 1, color = {255, 255, 150, 80} },
+                                            },
+                                        })
+                                    end
+                                end,
+                                onDragMove = function(x, y)
+                                    if callbacks and callbacks.onDragMove then
+                                        callbacks.onDragMove(x, y)
+                                    end
+                                end,
+                                onDragEnd = function(x, y)
+                                    local sw = slotWidgets[targetSlot]
+                                    if sw then
+                                        local equipped = data.equipment[targetSlot]
+                                        if equipped then
+                                            local r = equipped.rarity or "common"
+                                            local bc = RARITY_BORDER[r] or RARITY_BORDER.common
+                                            sw:SetStyle({
+                                                borderColor = bc,
+                                                borderWidth = 2,
+                                                boxShadow = RarityShadow(r),
+                                            })
+                                        else
+                                            sw:SetStyle({
+                                                borderColor = {70, 75, 95, 180},
+                                                borderWidth = 2,
+                                                borderStyle = "dashed",
+                                                boxShadow = {
+                                                    { x = 0, y = 1, blur = 4, spread = 0, color = {0, 0, 0, 40} },
+                                                },
+                                            })
+                                        end
+                                    end
+                                    if callbacks and callbacks.onDragEnd then
+                                        callbacks.onDragEnd(idx, targetSlot, x, y, sw)
+                                    end
+                                end,
+                            }
+                        end
+                    end
+
+                    local cell = BuildItemCell(entry, cellSize, cellOnClick, isDecomposing and isSelected, cellDragCb)
+                    if cell then
+                        currentRow[#currentRow + 1] = cell
+                    end
+                    if #currentRow >= 4 or i == #group then
+                        while #currentRow < 4 do
+                            currentRow[#currentRow + 1] = BuildItemCell(nil, cellSize, nil)
+                        end
+                        invRows[#invRows + 1] = UI.Panel {
+                            width = "100%", flexDirection = "row",
+                            justifyContent = "center", gap = 8,
+                            paddingBottom = 6,
+                            children = currentRow,
+                        }
+                        currentRow = {}
+                    end
+                end
             end
         end
     end
@@ -1203,7 +1267,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                         from = {60, 65, 85, 240}, to = {42, 46, 62, 240},
                     },
                     pressedBackgroundColor = {75, 80, 100, 255},
-                    borderRadius = 12,
+                    borderRadius = 0,
                     borderWidth = 1,
                     borderColor = {90, 95, 120, 150},
                     paddingLeft = 18, paddingRight = 18,
@@ -1230,7 +1294,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                         or  { type = "linear", direction = "to-bottom",
                               from = {80, 60, 55, 200}, to = {60, 45, 40, 200} },
                     pressedBackgroundColor = selectedCount > 0 and {220, 95, 70, 255} or nil,
-                    borderRadius = 12,
+                    borderRadius = 0,
                     borderWidth = 1.5,
                     borderColor = selectedCount > 0 and {255, 130, 90, 180} or {100, 80, 70, 120},
                     paddingTop = 8, paddingBottom = 8,
@@ -1247,7 +1311,7 @@ function MenuPages.BuildEquipPage(data, callbacks)
                     children = {
                         UI.Label {
                             text = selectedCount > 0
-                                and string.format("确认分解 %d 件 → %d 金币", selectedCount, selectedGold)
+                                and string.format("确认分解 %d 件 -> %d 金币", selectedCount, selectedGold)
                                 or "请选择要分解的装备",
                             fontSize = 16,
                             fontColor = selectedCount > 0 and {255, 240, 220, 255} or {140, 120, 110, 180},
@@ -1349,7 +1413,7 @@ local function BuildTalentNode(talent, data, isLast, callbacks)
         btnPressed  = {42, 44, 55, 255}
     end
     local btnFontColor = isMax and {55, 200, 70, 255}
-        or (canAfford and {15, 12, 30, 255} or {100, 105, 125, 220})
+        or (canAfford and {80, 50, 0, 255} or {100, 105, 125, 220})
 
     local talentId = talent.id
 
@@ -1357,7 +1421,7 @@ local function BuildTalentNode(talent, data, isLast, callbacks)
     for i = 1, maxLv do
         dots[#dots + 1] = UI.Panel {
             width = 10, height = 10,
-            borderRadius = 5,
+            borderRadius = 0,
             backgroundColor = i <= level
                 and {255, 200, 60, 255}
                 or {55, 58, 72, 255},
@@ -1379,7 +1443,7 @@ local function BuildTalentNode(talent, data, isLast, callbacks)
                 children = {
                     UI.Panel {
                         width = 50, height = 50,
-                        borderRadius = 10,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = nodeGradFrom, to = nodeGradTo,
@@ -1424,7 +1488,7 @@ local function BuildTalentNode(talent, data, isLast, callbacks)
                                     from = {38, 58, 92, 255}, to = {25, 42, 70, 255},
                                 } or nil,
                                 backgroundColor = level <= 0 and {50, 52, 65, 255} or nil,
-                                borderRadius = 8,
+                                borderRadius = 0,
                                 paddingLeft = 6, paddingRight = 6,
                                 paddingTop = 1, paddingBottom = 1,
                                 children = {
@@ -1454,19 +1518,20 @@ local function BuildTalentNode(talent, data, isLast, callbacks)
                             UI.Button {
                                 text = btnText,
                                 height = 30, paddingLeft = 14, paddingRight = 14,
-                                fontSize = 16,
+                                fontSize = 16, fontWeight = "bold",
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
                                     from = btnGradFrom, to = btnGradTo,
                                 },
                                 pressedBackgroundColor = btnPressed,
-                                fontColor = btnFontColor,
-                                borderRadius = 15,
+                                textColor = btnFontColor,
+                                borderRadius = 0,
                                 boxShadow = canAfford and (not isMax) and {
                                     { x = 0, y = 2, blur = 5, spread = 0, color = {0, 0, 0, 40} },
                                     { x = 0, y = 1, blur = 2, spread = 0, color = {255, 255, 255, 20}, inset = true },
                                 } or nil,
-                                textShadow = isMax and { offsetX = 0, offsetY = 1, blur = 2, color = {0, 80, 0, 40} } or nil,
+                                textShadow = isMax and { offsetX = 0, offsetY = 1, blur = 2, color = {0, 80, 0, 40} }
+                                    or (canAfford and { offsetX = 0, offsetY = 1, blur = 1, color = {255, 255, 200, 60} } or nil),
                                 onClick = (not isMax and canAfford) and function(self)
                                     AM.PlaySFX("ui_click")
                                     if callbacks and callbacks.onUpgrade then
@@ -1739,7 +1804,7 @@ local function BuildSetPoster(setDef)
 
     return UI.Panel {
         width = "100%",
-        borderRadius = 18,
+        borderRadius = 0,
         borderWidth = 2,
         borderColor = {255, 225, 100, 120},
         overflow = "hidden",
@@ -1800,7 +1865,7 @@ local function BuildSetPoster(setDef)
                     type = "linear", direction = "to-right",
                     from = {255, 70, 70, 255}, to = {255, 120, 40, 255},
                 },
-                borderRadius = 4,
+                borderRadius = 0,
                 justifyContent = "center", alignItems = "center",
                 transform = { rotate = 28 },
                 boxShadow = {
@@ -1864,7 +1929,7 @@ function MenuPages.BuildShopPage(data, callbacks)
             dots[#dots + 1] = UI.Panel {
                 width = i == c.index and 18 or 8,
                 height = 8,
-                borderRadius = 4,
+                borderRadius = 0,
                 backgroundColor = i == c.index and {255, 215, 0, 255} or {255, 255, 255, 80},
                 transition = "all 0.3s easeOut",
             }
@@ -1909,7 +1974,7 @@ function MenuPages.BuildShopPage(data, callbacks)
             -- "开一次" 按钮 (金色，3D凸起质感)
             UI.Panel {
                 flexGrow = 1, height = 60,
-                borderRadius = 16,
+                borderRadius = 0,
                 backgroundGradient = canSingle and {
                     type = "linear", direction = "to-bottom",
                     from = {160, 110, 10, 255}, to = {90, 60, 0, 255},
@@ -1933,7 +1998,7 @@ function MenuPages.BuildShopPage(data, callbacks)
                 children = {
                     UI.Panel {
                         width = "100%", flexGrow = 1,
-                        borderRadius = 14,
+                        borderRadius = 0,
                         justifyContent = "center", alignItems = "center",
                         backgroundGradient = canSingle and {
                             type = "linear", direction = "to-bottom",
@@ -1964,7 +2029,7 @@ function MenuPages.BuildShopPage(data, callbacks)
             -- "开三次" 按钮 (紫色，3D凸起质感)
             UI.Panel {
                 flexGrow = 1, height = 60,
-                borderRadius = 16,
+                borderRadius = 0,
                 backgroundGradient = canTriple and {
                     type = "linear", direction = "to-bottom",
                     from = {100, 45, 160, 255}, to = {50, 15, 90, 255},
@@ -1988,7 +2053,7 @@ function MenuPages.BuildShopPage(data, callbacks)
                 children = {
                     UI.Panel {
                         width = "100%", flexGrow = 1,
-                        borderRadius = 14,
+                        borderRadius = 0,
                         justifyContent = "center", alignItems = "center",
                         backgroundGradient = canTriple and {
                             type = "linear", direction = "to-bottom",
@@ -2037,7 +2102,7 @@ function MenuPages.BuildShopPage(data, callbacks)
                 flexDirection = "row", alignItems = "center", gap = 5,
                 paddingTop = 6, paddingBottom = 6,
                 paddingLeft = 18, paddingRight = 18,
-                borderRadius = 20,
+                borderRadius = 0,
                 backgroundColor = {255, 255, 255, 10},
                 borderWidth = 1,
                 borderColor = {255, 255, 255, 35},
@@ -2122,7 +2187,7 @@ function MenuPages.BuildPullResults(results)
                 justifyContent = "center",
                 gap = 4,
                 backgroundColor = bgColor,
-                borderRadius = 10,
+                borderRadius = 0,
                 borderWidth = 2.5,
                 borderColor = rc,
                 boxShadow = {

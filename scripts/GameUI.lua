@@ -69,7 +69,7 @@ function GameUI.CreateHUD()
                                 flexDirection = "row", alignItems = "center", gap = 3,
                                 marginLeft = -4,
                                 backgroundColor = {55, 16, 22, 230},
-                                borderRadius = 12,
+                                borderRadius = 0,
                                 borderWidth = 1.5,
                                 borderColor = {130, 40, 40, 140},
                                 paddingLeft = 10, paddingRight = 8,
@@ -103,7 +103,7 @@ function GameUI.CreateHUD()
                             type = "linear", direction = "to-bottom",
                             from = {48, 40, 78, 230}, to = {30, 25, 55, 230},
                         },
-                        borderRadius = 14,
+                        borderRadius = 0,
                         borderWidth = 1.5,
                         borderColor = {100, 80, 160, 120},
                         paddingLeft = 10, paddingRight = 10,
@@ -167,7 +167,7 @@ function GameUI.CreateHUD()
                             UI.Panel {
                                 marginLeft = -3,
                                 backgroundColor = {50, 38, 10, 220},
-                                borderRadius = 12,
+                                borderRadius = 0,
                                 borderWidth = 1.5,
                                 borderColor = {160, 125, 40, 140},
                                 paddingLeft = 8, paddingRight = 10,
@@ -237,7 +237,7 @@ function GameUI.CreateResultPanel()
                     type = "linear", direction = "to-bottom",
                     from = {38, 42, 72, 252}, to = {22, 24, 48, 252},
                 },
-                borderRadius = 24, borderWidth = 1.5,
+                borderRadius = 0, borderWidth = 1.5,
                 borderColor = {130, 110, 210, 120},
                 alignItems = "center",
                 boxShadow = {
@@ -261,7 +261,7 @@ function GameUI.CreateResultPanel()
                         id = "resultBtn",
                         text = "再来一局", variant = "primary",
                         width = 210, height = 50, fontSize = 23,
-                        borderRadius = 25,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = {255, 215, 60, 255}, to = {235, 180, 30, 255},
@@ -280,7 +280,7 @@ function GameUI.CreateResultPanel()
                     UI.Button {
                         text = "返回主菜单", variant = "secondary",
                         width = 210, height = 50, fontSize = 21,
-                        borderRadius = 25,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = {52, 48, 78, 255}, to = {35, 32, 58, 255},
@@ -357,7 +357,7 @@ function GameUI.PopulateSkillCards(choices)
         local curLv = choice.currentLevel
         local nextLv = choice.nextLevel
         local isNew = curLv == 0
-        local tagText = isNew and "新技能" or ("Lv" .. curLv .. "→" .. nextLv)
+        local tagText = isNew and "新技能" or ("Lv" .. curLv .. "->" .. nextLv)
         local tagColor = isNew and {100, 220, 255, 255} or {255, 200, 50, 255}
         local nextDesc = def.desc(nextLv)
 
@@ -366,7 +366,7 @@ function GameUI.PopulateSkillCards(choices)
         for i = 1, def.maxLevel do
             local filled = i <= curLv
             levelDots[#levelDots + 1] = UI.Panel {
-                width = 18, height = 6, borderRadius = 3,
+                width = 18, height = 6, borderRadius = 0,
                 backgroundColor = filled
                     and {clr[1], clr[2], clr[3], 255}
                     or {60, 65, 85, 150},
@@ -377,7 +377,7 @@ function GameUI.PopulateSkillCards(choices)
         container:AddChild(UI.Panel {
             width = "100%",
             flexDirection = "row",
-            borderRadius = 12, overflow = "hidden",
+            borderRadius = 0, overflow = "hidden",
             backgroundColor = isNew and {30, 25, 45, 250} or {25, 28, 42, 240},
             borderWidth = isNew and 2.0 or 1.5,
             borderColor = {clr[1], clr[2], clr[3], isNew and 220 or 80},
@@ -579,18 +579,17 @@ function GameUI.CreateUI()
                             G.callbacks.HandleCellClick(col, row)
                         end,
                     },
-                    -- 设置按钮 + 技能图标（绝对定位，左上角，与目标栏同行）
+                    -- 设置按钮（绝对定位，左上角，与目标栏同行）
                     UI.Panel {
                         position = "absolute",
                         top = 6, left = 10,
-                        flexDirection = "row", alignItems = "center", gap = 4,
                         zIndex = 10,
                         children = {
                             UI.Button {
                                 text = "⚙",
                                 fontSize = 20,
                                 width = 34, height = 34,
-                                borderRadius = 17,
+                                borderRadius = 0,
                                 backgroundColor = {45, 38, 75, 220},
                                 fontColor = {180, 175, 215, 230},
                                 borderWidth = 1,
@@ -600,11 +599,6 @@ function GameUI.CreateUI()
                                     SettingsPopup.Show()
                                 end,
                             },
-                            UI.Panel {
-                                id = "skillsRow",
-                                flexDirection = "row", alignItems = "center",
-                                gap = 3, flexShrink = 1,
-                            },
                         },
                     },
 
@@ -613,7 +607,7 @@ function GameUI.CreateUI()
                         position = "absolute",
                         top = 6, right = 10,
                         width = 38, height = 38,
-                        borderRadius = 19,
+                        borderRadius = 0,
                         justifyContent = "center", alignItems = "center",
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
@@ -658,7 +652,7 @@ function GameUI.CreateUI()
                                     type = "linear", direction = "to-right",
                                     from = {155, 35, 35, 245}, to = {120, 25, 28, 245},
                                 },
-                                borderRadius = 18,
+                                borderRadius = 0,
                                 borderWidth = 1.5,
                                 borderColor = {210, 65, 65, 150},
                                 paddingLeft = 16, paddingRight = 16,
@@ -688,7 +682,7 @@ function GameUI.CreateUI()
                                     type = "linear", direction = "to-right",
                                     from = {35, 120, 100, 245}, to = {25, 95, 80, 245},
                                 },
-                                borderRadius = 18,
+                                borderRadius = 0,
                                 borderWidth = 1.5,
                                 borderColor = {65, 200, 150, 150},
                                 paddingLeft = 16, paddingRight = 16,
@@ -717,7 +711,7 @@ function GameUI.CreateUI()
                                     type = "linear", direction = "to-right",
                                     from = {120, 50, 20, 245}, to = {90, 35, 15, 245},
                                 },
-                                borderRadius = 18,
+                                borderRadius = 0,
                                 borderWidth = 1.5,
                                 borderColor = {255, 140, 50, 150},
                                 paddingLeft = 16, paddingRight = 16,
@@ -765,7 +759,7 @@ function GameUI.CreateUI()
                             -- 血条外框
                             UI.Panel {
                                 width = "90%", height = 26,
-                                borderRadius = 13,
+                                borderRadius = 0,
                                 backgroundColor = {10, 5, 20, 230},
                                 borderWidth = 2,
                                 borderColor = {200, 50, 50, 200},
@@ -779,7 +773,7 @@ function GameUI.CreateUI()
                                     UI.Panel {
                                         id = "bossHpFill",
                                         width = "100%", height = "100%",
-                                        borderRadius = 12,
+                                        borderRadius = 0,
                                         backgroundGradient = {
                                             type = "linear", direction = "to-right",
                                             from = {200, 35, 35, 255}, to = {255, 70, 50, 255},
@@ -815,11 +809,11 @@ function GameUI.CreateUI()
                         children = {
                             UI.Button {
                                 id = "confirmBtn",
-                                text = "✓ 确认跳跃",
+                                text = "确认跳跃",
                                 variant = "primary",
                                 height = 46, paddingLeft = 24, paddingRight = 24,
                                 fontSize = 21,
-                                borderRadius = 23,
+                                borderRadius = 0,
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
                                     from = {255, 218, 65, 255}, to = {235, 180, 30, 255},
@@ -842,7 +836,7 @@ function GameUI.CreateUI()
                                 variant = "secondary",
                                 height = 46, paddingLeft = 18, paddingRight = 18,
                                 fontSize = 19,
-                                borderRadius = 23,
+                                borderRadius = 0,
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
                                     from = {55, 50, 82, 245}, to = {38, 34, 60, 245},
@@ -861,11 +855,11 @@ function GameUI.CreateUI()
                             },
                             UI.Button {
                                 id = "cancelBtn",
-                                text = "× 重选",
+                                text = "重选",
                                 variant = "secondary",
                                 height = 46, paddingLeft = 18, paddingRight = 18,
                                 fontSize = 19,
-                                borderRadius = 23,
+                                borderRadius = 0,
                                 backgroundGradient = {
                                     type = "linear", direction = "to-bottom",
                                     from = {55, 50, 82, 245}, to = {38, 34, 60, 245},
@@ -895,7 +889,7 @@ function GameUI.CreateUI()
                 zIndex = 20,
                 flexDirection = "row", alignItems = "center", gap = 4,
                 backgroundColor = {35, 55, 75, 200},
-                borderRadius = 14,
+                borderRadius = 0,
                 borderWidth = 1,
                 borderColor = {60, 100, 150, 120},
                 paddingLeft = 8, paddingRight = 10, paddingTop = 6, paddingBottom = 6,
@@ -914,6 +908,32 @@ function GameUI.CreateUI()
                     },
                 },
             },
+            -- 技能按钮（绝对定位在根容器右下角）
+            UI.Panel {
+                position = "absolute",
+                bottom = 70, right = 10,
+                zIndex = 20,
+                flexDirection = "row", alignItems = "center", gap = 4,
+                backgroundColor = {55, 35, 75, 200},
+                borderRadius = 0,
+                borderWidth = 1,
+                borderColor = {100, 60, 150, 120},
+                paddingLeft = 8, paddingRight = 10, paddingTop = 6, paddingBottom = 6,
+                onClick = function(self)
+                    GameUI.ShowSkillsPopup()
+                end,
+                children = {
+                    UI.Label {
+                        text = "⚔",
+                        fontSize = 16,
+                    },
+                    UI.Label {
+                        text = "技能",
+                        fontSize = 12,
+                        fontColor = {200, 170, 240, 230},
+                    },
+                },
+            },
             GameUI.CreateResultPanel(),
             GameUI.CreateSkillModal(),
         },
@@ -926,7 +946,7 @@ function GameUI.CreateUI()
     G.goldLabel = G.uiRoot:FindById("goldLabel")
     G.logLabel = G.uiRoot:FindById("logLabel")
     G.levelLabel = G.uiRoot:FindById("levelLabel")
-    G.skillsRow = G.uiRoot:FindById("skillsRow")
+    G.skillsRow = nil  -- 已移除左上角技能栏，改为右下角按钮查看
     G.shieldIcon = G.uiRoot:FindById("shieldIcon")
     G.killLabel = G.uiRoot:FindById("killLabel")
     G.killBar = G.uiRoot:FindById("killBar")
@@ -1093,33 +1113,7 @@ function GameUI.UpdateHUD()
     if G.comboLabel then
         G.comboLabel:SetText("")
     end
-    if G.skillsRow then
-        G.skillsRow:ClearChildren()
-        local owned = G.battle.skills
-        local hasAny = false
-        for id, lv in pairs(owned) do
-            if lv > 0 then
-                local def = Skills.GetDef(id)
-                if def then
-                    hasAny = true
-                    G.skillsRow:AddChild(UI.Panel {
-                        backgroundImage = IconAtlas.GetPath(def.icon),
-                        width = 22, height = 22, backgroundFit = "contain",
-                    })
-                end
-            end
-        end
-        -- 已激活的组合技图标
-        local combos = Skills.GetActiveCombos(owned)
-        for _, c in ipairs(combos) do
-            hasAny = true
-            G.skillsRow:AddChild(UI.Panel {
-                backgroundImage = IconAtlas.GetPath(c.icon),
-                width = 22, height = 22, backgroundFit = "contain",
-                borderWidth = 1, borderColor = {255, 200, 60, 150}, borderRadius = 4,
-            })
-        end
-    end
+    -- 技能栏已移至右下角弹窗查看，无需在 HUD 中更新
     if G.shieldIcon then
         G.shieldIcon:SetVisible(G.battle.hasShield)
     end
@@ -1141,21 +1135,21 @@ local CHAPTER_TUTORIALS = {
         title = "新手教学",
         accentColor = {70, 150, 230, 255},
         steps = {
-            { icon = "🔵  👉  ⬜", caption = "点击相邻空格移动英雄" },
-            { icon = "🔵 ⚔️ 🔴  💥", caption = "跳过敌人，造成伤害" },
+            { icon = "🔵 👉 ⬜", caption = "点击相邻空格移动英雄" },
+            { icon = "🔵 ⚔️ 🔴 💥", caption = "跳过敌人，造成伤害" },
             { icon = "💥💥💥 ➡️ 🌟", caption = "连跳触发COMBO奖励" },
-            { icon = "💊  💰  🛡️", caption = "路上有血瓶、金币、护盾可拾取" },
+            { icon = "💊 💰 🛡️", caption = "路上有血瓶、金币、护盾可拾取" },
         },
-        goal = "⚔️ 消灭足够的敌人  =  通关",
+        goal = "⚔️ 消灭足够的敌人 = 通关",
         buttonText = "出发！🌊",
     },
     [2] = {
         title = "炎魔祭坛",
         accentColor = {230, 120, 50, 255},
         steps = {
-            { icon = "🔥  🛡️🔴🛡️🔴", caption = "祭坛给周围敌人套上护盾" },
-            { icon = "🐧  👉  🔥  💥", caption = "移动到祭坛上摧毁它" },
-            { icon = "💥  ➡️  🔴🔴", caption = "祭坛摧毁，护盾消失！" },
+            { icon = "🔥 🛡️🔴🛡️🔴", caption = "祭坛给周围敌人套上护盾" },
+            { icon = "🐧 👉 🔥 💥", caption = "移动到祭坛上摧毁它" },
+            { icon = "💥 ➡️ 🔴🔴", caption = "祭坛摧毁，护盾消失！" },
         },
         goal = "🔥摧毁祭坛 + ⚔️击杀目标 = 通关",
         buttonText = "迎战火焰！🔥",
@@ -1164,22 +1158,23 @@ local CHAPTER_TUTORIALS = {
         title = "珊瑚迷宫",
         accentColor = {80, 210, 190, 255},
         steps = {
-            { icon = "🦀  🪨  🐚", caption = "蟹和壳被障碍隔开了" },
-            { icon = "💥  ➡️  🦀🐚", caption = "清除障碍，打通道路" },
-            { icon = "🦀🐚  ✅", caption = "路通了，蟹自动回家" },
+            { icon = "🦀 🪨 🐚", caption = "蟹和壳被障碍隔开了" },
+            { icon = "💥 ➡️ 🦀🐚", caption = "清除障碍，打通道路" },
+            { icon = "🦀🐚 ✅", caption = "路通了，蟹自动回家" },
         },
-        goal = "⚔️ 击杀目标  +  🦀 救出全部蟹  =  通关",
+        goal = "⚔️ 击杀目标 + 🦀 救出全部蟹 = 通关",
         buttonText = "出发救蟹！🦀",
     },
     [4] = {
         title = "流沙荒漠",
         accentColor = {210, 170, 50, 255},
         steps = {
-            { icon = "🦂  💀  ➡️  ⏳", caption = "击杀小怪有概率产生流沙区" },
-            { icon = "🐧  ⏳  💨  😵", caption = "流沙区会推开主角并中断连跳" },
-            { icon = "⏳  5️⃣  ➡️  ✨", caption = "流沙区5回合后自动消散" },
+            { icon = "🦂 💀 ➡️ ⏳", caption = "击杀小怪有概率产生流沙区" },
+            { icon = "🐧 ⏳ 💨 😵", caption = "流沙区会推开主角并中断连跳" },
+            { icon = "🛑 🐧 ➡️ ✨", caption = "踩上停沙格可消除全场流沙" },
+            { icon = "⏳ 5️⃣ ➡️ ✨", caption = "流沙区5回合后也会自动消散" },
         },
-        goal = "⚔️ 击杀目标  +  🚫 避开流沙  =  通关",
+        goal = "⚔️ 击杀目标 + 🛑 善用停沙格 = 通关",
         buttonText = "征服沙漠！🏜️",
     },
 }
@@ -1198,12 +1193,12 @@ local function MakeTutorialStep(stepNum, step, accent)
         paddingTop = 8, paddingBottom = 8,
         paddingLeft = 10, paddingRight = 10,
         backgroundColor = {accent[1], accent[2], accent[3], 18},
-        borderRadius = 12,
+        borderRadius = 0,
         children = {
             -- 步骤编号圆圈
             UI.Panel {
                 width = 26, height = 26,
-                borderRadius = 13,
+                borderRadius = 0,
                 backgroundColor = {accent[1], accent[2], accent[3], 200},
                 justifyContent = "center", alignItems = "center",
                 flexShrink = 0,
@@ -1223,8 +1218,9 @@ local function MakeTutorialStep(stepNum, step, accent)
                 children = {
                     UI.Label {
                         text = step.icon,
-                        fontSize = 28,
+                        fontSize = 22,
                         textAlign = "center",
+                        numberOfLines = 1,
                     },
                     UI.Label {
                         text = step.caption,
@@ -1263,7 +1259,7 @@ function GameUI.ShowChapterTutorial(chapter)
     contentChildren[#contentChildren + 1] = UI.Panel {
         width = 60, height = 2,
         backgroundColor = {ac[1], ac[2], ac[3], 120},
-        alignSelf = "center", borderRadius = 1,
+        alignSelf = "center", borderRadius = 0,
         marginBottom = 12,
     }
 
@@ -1289,7 +1285,7 @@ function GameUI.ShowChapterTutorial(chapter)
         paddingTop = 10, paddingBottom = 10,
         paddingLeft = 8, paddingRight = 8,
         backgroundColor = {ac[1], ac[2], ac[3], 45},
-        borderRadius = 10,
+        borderRadius = 0,
         borderWidth = 2,
         borderColor = {ac[1], ac[2], ac[3], 100},
         justifyContent = "center",
@@ -1297,7 +1293,7 @@ function GameUI.ShowChapterTutorial(chapter)
         children = {
             UI.Label {
                 text = tut.goal,
-                fontSize = 16, fontWeight = "bold",
+                fontSize = 14, fontWeight = "bold",
                 fontColor = {ac[1], ac[2], ac[3], 255},
                 textAlign = "center",
                 numberOfLines = 1,
@@ -1311,7 +1307,7 @@ function GameUI.ShowChapterTutorial(chapter)
         variant = "primary",
         width = 180, height = 44, fontSize = 20,
         fontWeight = "bold",
-        borderRadius = 22,
+        borderRadius = 0,
         backgroundGradient = {
             type = "linear", direction = "to-bottom",
             from = {ac[1], ac[2], ac[3], 255},
@@ -1347,7 +1343,7 @@ function GameUI.ShowChapterTutorial(chapter)
                     type = "linear", direction = "to-bottom",
                     from = {25, 40, 45, 250}, to = {15, 25, 30, 250},
                 },
-                borderRadius = 16,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {ac[1], ac[2], ac[3], 100},
                 paddingTop = 20, paddingBottom = 20,
@@ -1389,12 +1385,12 @@ function GameUI.ShowComboTutorial(onClose)
             paddingTop = 10, paddingBottom = 10,
             paddingLeft = 12, paddingRight = 12,
             backgroundColor = {tier.color[1], tier.color[2], tier.color[3], 20},
-            borderRadius = 12,
+            borderRadius = 0,
             children = {
                 -- 连击数标签
                 UI.Panel {
                     width = 64, height = 32,
-                    borderRadius = 16,
+                    borderRadius = 0,
                     backgroundColor = {tier.color[1], tier.color[2], tier.color[3], 180},
                     justifyContent = "center", alignItems = "center",
                     flexShrink = 0,
@@ -1460,7 +1456,7 @@ function GameUI.ShowComboTutorial(onClose)
         UI.Panel {
             width = 70, height = 2,
             backgroundColor = {ac[1], ac[2], ac[3], 100},
-            alignSelf = "center", borderRadius = 1,
+            alignSelf = "center", borderRadius = 0,
             marginBottom = 6,
         },
     }
@@ -1479,7 +1475,7 @@ function GameUI.ShowComboTutorial(onClose)
                 variant = "primary",
                 width = 180, height = 48, fontSize = 20,
                 fontWeight = "bold",
-                borderRadius = 21,
+                borderRadius = 0,
                 backgroundGradient = {
                     type = "linear", direction = "to-bottom",
                     from = {255, 210, 70, 255},
@@ -1511,7 +1507,7 @@ function GameUI.ShowComboTutorial(onClose)
                     type = "linear", direction = "to-bottom",
                     from = {30, 35, 45, 250}, to = {15, 20, 28, 250},
                 },
-                borderRadius = 18,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {ac[1], ac[2], ac[3], 100},
                 paddingTop = 22, paddingBottom = 22,
@@ -1575,7 +1571,7 @@ function GameUI.ShowEnemyIntro(introList)
             paddingTop = 10, paddingBottom = 10,
             paddingLeft = 14, paddingRight = 14,
             backgroundColor = {255, 255, 255, 12},
-            borderRadius = 12,
+            borderRadius = 0,
             gap = 12,
             children = {
                 -- 怪物图标
@@ -1612,7 +1608,7 @@ function GameUI.ShowEnemyIntro(introList)
         variant = "primary",
         width = 140, height = 42, fontSize = 17,
         fontWeight = "bold",
-        borderRadius = 21,
+        borderRadius = 0,
         backgroundGradient = {
             type = "linear", direction = "to-bottom",
             from = {80, 140, 220, 255}, to = {50, 100, 180, 255},
@@ -1651,7 +1647,7 @@ function GameUI.ShowEnemyIntro(introList)
         UI.Panel {
             width = 60, height = 2.5,
             backgroundColor = {255, 180, 80, 100},
-            borderRadius = 1,
+            borderRadius = 0,
             marginBottom = 6,
         },
     }
@@ -1673,7 +1669,7 @@ function GameUI.ShowEnemyIntro(introList)
                     type = "linear", direction = "to-bottom",
                     from = {30, 35, 55, 245}, to = {18, 22, 38, 245},
                 },
-                borderRadius = 16,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {255, 180, 80, 80},
                 paddingTop = 20, paddingBottom = 20,
@@ -1891,7 +1887,7 @@ local TUTORIAL_PAGES = {
             { separator = true, text = "── 特殊机制 ──" },
             { emoji = "⏳", text = "流沙区 — 击杀敌人概率产生，5回合后消散" },
             { emoji = "💨", text = "流沙推移 — 跳入流沙会被推开+受伤+中断连跳" },
-            { emoji = "🐛", text = "沙丘巨虫(Boss) — 蛇形移动+尾鞭+沙暴+钻地" },
+            { emoji = "🐛", text = "沙丘巨虫(Boss) — 蛇形移动+尾鞭+巨岩投掷+钻地" },
         },
     },
     -- ========== Page 7: 无尽模式·特殊怪 ==========
@@ -1952,7 +1948,7 @@ local function MakeTutorialEntry(entry, idx, accent)
                 UI.Panel {
                     width = "90%", height = 1,
                     backgroundColor = {accent[1], accent[2], accent[3], 60},
-                    borderRadius = 1,
+                    borderRadius = 0,
                     marginBottom = 4,
                 },
                 UI.Label {
@@ -1973,14 +1969,14 @@ local function MakeTutorialEntry(entry, idx, accent)
         paddingTop = 10, paddingBottom = 10,
         paddingLeft = 12, paddingRight = 12,
         backgroundColor = {accent[1], accent[2], accent[3], 18},
-        borderRadius = 12,
+        borderRadius = 0,
         borderWidth = 1,
         borderColor = {accent[1], accent[2], accent[3], 40},
         children = {
             -- 左侧大emoji
             UI.Panel {
                 width = 40, height = 40,
-                borderRadius = 20,
+                borderRadius = 0,
                 backgroundColor = {accent[1], accent[2], accent[3], 35},
                 justifyContent = "center", alignItems = "center",
                 flexShrink = 0,
@@ -2038,10 +2034,10 @@ local function BuildTutorialPageContent(pageIdx)
             },
             -- 关闭按钮
             UI.Button {
-                text = "✕",
+                text = "X",
                 fontSize = 16, fontWeight = "bold",
                 width = 32, height = 32,
-                borderRadius = 16,
+                borderRadius = 0,
                 backgroundColor = {255, 255, 255, 20},
                 fontColor = {200, 200, 200, 180},
                 pressedBackgroundColor = {255, 80, 80, 100},
@@ -2057,7 +2053,7 @@ local function BuildTutorialPageContent(pageIdx)
     headerChildren[#headerChildren + 1] = UI.Panel {
         width = 60, height = 2,
         backgroundColor = {ac[1], ac[2], ac[3], 120},
-        alignSelf = "center", borderRadius = 1,
+        alignSelf = "center", borderRadius = 0,
         marginBottom = 4,
     }
 
@@ -2074,7 +2070,7 @@ local function BuildTutorialPageContent(pageIdx)
         text = "◀ 上一页",
         fontSize = 15,
         width = 90, height = 36,
-        borderRadius = 16,
+        borderRadius = 0,
         backgroundColor = pageIdx > 1 and {ac[1], ac[2], ac[3], 60} or {80, 80, 80, 40},
         fontColor = pageIdx > 1 and {ac[1], ac[2], ac[3], 240} or {120, 120, 120, 120},
         pressedBackgroundColor = {ac[1], ac[2], ac[3], 120},
@@ -2089,7 +2085,7 @@ local function BuildTutorialPageContent(pageIdx)
         dotsChildren[#dotsChildren + 1] = UI.Panel {
             width = i == pageIdx and 16 or 8,
             height = 8,
-            borderRadius = 4,
+            borderRadius = 0,
             backgroundColor = i == pageIdx
                 and {ac[1], ac[2], ac[3], 220}
                 or {150, 150, 150, 80},
@@ -2105,7 +2101,7 @@ local function BuildTutorialPageContent(pageIdx)
         text = "下一页 ▶",
         fontSize = 15,
         width = 90, height = 36,
-        borderRadius = 16,
+        borderRadius = 0,
         backgroundColor = pageIdx < totalPages and {ac[1], ac[2], ac[3], 60} or {80, 80, 80, 40},
         fontColor = pageIdx < totalPages and {ac[1], ac[2], ac[3], 240} or {120, 120, 120, 120},
         pressedBackgroundColor = {ac[1], ac[2], ac[3], 120},
@@ -2179,7 +2175,7 @@ function GameUI.ShowTutorialGuide(pageIdx)
                     type = "linear", direction = "to-bottom",
                     from = {25, 40, 50, 252}, to = {12, 18, 28, 252},
                 },
-                borderRadius = 16,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {ac[1], ac[2], ac[3], 120},
                 paddingTop = 18, paddingBottom = 12,
@@ -2217,6 +2213,363 @@ function GameUI.ShowTutorialGuide(pageIdx)
     }
 
     UI.GetRoot():AddChild(G.tutorialGuidePopup)
+end
+
+-- ============================================================================
+-- 技能查看弹窗（右下角按钮触发）
+-- ============================================================================
+-- 技能详情浮窗（点击图标后显示）
+function GameUI._ShowSkillTooltip(item)
+    -- 移除已有的 tooltip
+    if G.skillTooltip then
+        G.skillTooltip:Remove()
+        G.skillTooltip = nil
+    end
+
+    local rarityColor = item.def.rarity == "legendary" and {255, 200, 50, 255}
+        or item.def.rarity == "rare" and {180, 120, 255, 255}
+        or {100, 180, 255, 255}
+    local rarityName = item.def.rarity == "legendary" and "传说"
+        or item.def.rarity == "rare" and "稀有"
+        or "普通"
+
+    G.skillTooltip = UI.Panel {
+        position = "absolute",
+        top = 0, left = 0, right = 0, bottom = 0,
+        justifyContent = "center", alignItems = "center",
+        backgroundColor = {0, 0, 0, 120},
+        zIndex = 950,
+        onClick = function(self)
+            if G.skillTooltip then
+                G.skillTooltip:Remove()
+                G.skillTooltip = nil
+            end
+        end,
+        children = {
+            UI.Panel {
+                width = "75%", maxWidth = 260,
+                backgroundColor = {30, 25, 55, 245},
+                borderRadius = 0,
+                borderWidth = 1.5,
+                borderColor = {rarityColor[1], rarityColor[2], rarityColor[3], 150},
+                paddingTop = 12, paddingBottom = 12,
+                paddingLeft = 14, paddingRight = 14,
+                gap = 6,
+                alignItems = "center",
+                onClick = function(self) end, -- 阻止穿透
+                children = {
+                    -- 图标
+                    UI.Panel {
+                        backgroundImage = IconAtlas.GetPath(item.def.icon),
+                        width = 40, height = 40, backgroundFit = "contain",
+                    },
+                    -- 名称 + 等级
+                    UI.Label {
+                        text = item.def.name .. "  Lv." .. item.lv,
+                        fontSize = 16, fontWeight = "bold",
+                        fontColor = rarityColor,
+                        textAlign = "center",
+                    },
+                    -- 稀有度
+                    UI.Label {
+                        text = rarityName,
+                        fontSize = 11,
+                        fontColor = {rarityColor[1], rarityColor[2], rarityColor[3], 180},
+                        textAlign = "center",
+                    },
+                    -- 分隔线
+                    UI.Panel { width = "80%", height = 1, backgroundColor = {80, 65, 140, 80} },
+                    -- 描述
+                    UI.Label {
+                        text = (type(item.def.desc) == "function" and item.def.desc(item.lv) or item.def.desc) or "",
+                        fontSize = 13, fontColor = {200, 195, 230, 220},
+                        textAlign = "center", width = "100%",
+                        numberOfLines = 4,
+                    },
+                },
+            },
+        },
+    }
+    UI.GetRoot():AddChild(G.skillTooltip)
+end
+
+-- ============================================================================
+
+function GameUI.ShowSkillsPopup()
+    AM.PlaySFX("ui_popup_open")
+
+    if G.skillsPopup then
+        G.skillsPopup:Remove()
+        G.skillsPopup = nil
+    end
+
+    local owned = (G.battle and G.battle.skills) or {}
+
+    -- 已拥有技能列表
+    local skillItems = {}
+    for id, lv in pairs(owned) do
+        if lv > 0 then
+            local def = Skills.GetDef(id)
+            if def then
+                skillItems[#skillItems + 1] = { def = def, lv = lv }
+            end
+        end
+    end
+
+    -- 按名字排序
+    table.sort(skillItems, function(a, b) return a.def.name < b.def.name end)
+
+    -- 已激活组合技
+    local activeCombos = Skills.GetActiveCombos(owned)
+    -- 即将解锁组合技
+    local nearCombos = Skills.GetNearCombos(owned)
+
+    -- 构建技能网格图标 children（小图标平铺）
+    local skillGridChildren = {}
+    if #skillItems == 0 then
+        skillGridChildren[#skillGridChildren + 1] = UI.Label {
+            text = "尚未获得技能",
+            fontSize = 16, fontColor = {130, 125, 165, 150},
+            textAlign = "center", width = "100%",
+            paddingTop = 12, paddingBottom = 12,
+        }
+    else
+        for _, item in ipairs(skillItems) do
+            local rarityColor = item.def.rarity == "legendary" and {255, 200, 50, 255}
+                or item.def.rarity == "rare" and {180, 120, 255, 255}
+                or {100, 180, 255, 255}
+            skillGridChildren[#skillGridChildren + 1] = UI.Panel {
+                width = 56, height = 68,
+                alignItems = "center", justifyContent = "center",
+                gap = 2,
+                backgroundColor = {50, 42, 90, 180},
+                borderRadius = 0,
+                borderWidth = 1,
+                borderColor = {rarityColor[1], rarityColor[2], rarityColor[3], 100},
+                children = {
+                    UI.Panel {
+                        backgroundImage = IconAtlas.GetPath(item.def.icon),
+                        width = 38, height = 38, backgroundFit = "contain",
+                    },
+                    UI.Label {
+                        text = "Lv" .. item.lv,
+                        fontSize = 12, fontWeight = "bold",
+                        fontColor = rarityColor,
+                        textAlign = "center",
+                    },
+                },
+                -- 点击显示技能详情浮窗
+                onClick = function(self)
+                    GameUI._ShowSkillTooltip(item)
+                end,
+            }
+        end
+    end
+
+    -- 构建组合技合成列表（只展示已实装的组合技）
+    local implementedCombos = {
+        combo_thunder_quake = true,
+        combo_hunter_instinct = true,
+    }
+    local comboChildren = {}
+    for _, combo in ipairs(Skills.COMBOS) do
+        if not implementedCombos[combo.id] then goto continue_combo end
+        local isActive = false
+        for _, ac in ipairs(activeCombos) do
+            if ac.id == combo.id then isActive = true; break end
+        end
+        local isNear = false
+        if not isActive then
+            for _, nc in ipairs(nearCombos) do
+                if nc.combo.id == combo.id then isNear = true; break end
+            end
+        end
+
+        -- 前置技能名称
+        local reqNames = {}
+        for _, reqId in ipairs(combo.requires) do
+            local reqDef = Skills.GetDef(reqId)
+            local reqLv = owned[reqId] or 0
+            reqNames[#reqNames + 1] = (reqDef and reqDef.name or reqId) .. " Lv." .. reqLv
+        end
+
+        local statusText, statusColor
+        if isActive then
+            statusText = "✓ 已激活"
+            statusColor = {100, 255, 140, 255}
+        elseif isNear then
+            statusText = "差一点!"
+            statusColor = {255, 220, 80, 255}
+        else
+            statusText = "未解锁"
+            statusColor = {120, 115, 155, 150}
+        end
+
+        comboChildren[#comboChildren + 1] = UI.Panel {
+            width = "100%",
+            paddingTop = 4, paddingBottom = 4,
+            paddingLeft = 6, paddingRight = 6,
+            gap = 2,
+            backgroundColor = isActive and {40, 60, 50, 180} or {35, 30, 60, 120},
+            borderRadius = 0,
+            borderWidth = isActive and 1 or 0,
+            borderColor = {80, 180, 100, 100},
+            children = {
+                -- 标题行
+                UI.Panel {
+                    width = "100%",
+                    flexDirection = "row", alignItems = "center", gap = 4,
+                    children = {
+                        UI.Panel {
+                            backgroundImage = IconAtlas.GetPath(combo.icon),
+                            width = 18, height = 18, backgroundFit = "contain",
+                        },
+                        UI.Label {
+                            text = combo.name,
+                            fontSize = 13, fontWeight = "bold",
+                            fontColor = combo.color and {combo.color[1], combo.color[2], combo.color[3], 255} or {220, 215, 250, 255},
+                            flexGrow = 1,
+                        },
+                        UI.Label {
+                            text = statusText,
+                            fontSize = 11, fontColor = statusColor,
+                        },
+                    },
+                },
+                -- 效果描述
+                UI.Label {
+                    text = combo.desc,
+                    fontSize = 11, fontColor = {180, 175, 210, 200},
+                    numberOfLines = 2, width = "100%",
+                },
+                -- 合成条件
+                UI.Label {
+                    text = "需要: " .. table.concat(reqNames, " + ") .. " (等级和≥5)",
+                    fontSize = 10, fontColor = {140, 135, 175, 160},
+                    numberOfLines = 2, width = "100%",
+                },
+            },
+        }
+        ::continue_combo::
+    end
+
+    G.skillsPopup = UI.Panel {
+        position = "absolute",
+        top = 0, left = 0, right = 0, bottom = 0,
+        justifyContent = "center", alignItems = "center",
+        backgroundColor = {0, 0, 0, 160},
+        backdropBlur = 4,
+        zIndex = 900,
+        onClick = function(self)
+            if G.skillTooltip then G.skillTooltip:Remove(); G.skillTooltip = nil end
+            if G.skillsPopup then
+                G.skillsPopup:SetVisible(false)
+                AM.PlaySFX("ui_popup_close")
+            end
+        end,
+        children = {
+            UI.Panel {
+                width = "88%", maxWidth = 380,
+                maxHeight = "85%",
+                backgroundGradient = {
+                    type = "linear", direction = "to-bottom",
+                    from = {38, 32, 68, 255}, to = {22, 18, 45, 255},
+                },
+                borderRadius = 0,
+                borderWidth = 1.5,
+                borderColor = {90, 70, 160, 150},
+                paddingTop = 16, paddingBottom = 16,
+                paddingLeft = 14, paddingRight = 14,
+                gap = 12,
+                boxShadow = {
+                    { x = 0, y = 4, blur = 20, spread = 0, color = {0, 0, 0, 120} },
+                },
+                onClick = function(self) end, -- 阻止穿透
+                children = {
+                    -- 标题
+                    UI.Label {
+                        text = "⚔ 技能 & 组合技",
+                        fontSize = 22, fontWeight = "bold",
+                        fontColor = {230, 225, 255, 255},
+                        textAlign = "center", width = "100%",
+                    },
+
+                    -- 已拥有技能
+                    UI.Panel {
+                        width = "100%", gap = 6,
+                        children = {
+                            UI.Label {
+                                text = "已拥有技能 (" .. #skillItems .. ")",
+                                fontSize = 16, fontWeight = "bold",
+                                fontColor = {180, 200, 230, 240},
+                            },
+                            UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 80} },
+                        },
+                    },
+
+                    -- 技能图标网格（平铺展示）
+                    UI.Panel {
+                        width = "100%",
+                        flexDirection = "row",
+                        flexWrap = "wrap",
+                        gap = 6,
+                        paddingTop = 4, paddingBottom = 8,
+                        children = skillGridChildren,
+                    },
+
+                    -- 组合技合成
+                    UI.Panel {
+                        width = "100%", gap = 3,
+                        children = {
+                            UI.Label {
+                                text = "组合技合成 (" .. #activeCombos .. "/2 已激活)",
+                                fontSize = 12, fontWeight = "bold",
+                                fontColor = {220, 200, 130, 180},
+                            },
+                            UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 60} },
+                        },
+                    },
+
+                    -- 组合技列表（滚动）
+                    UI.ScrollView {
+                        width = "100%", flexGrow = 1, flexShrink = 1,
+                        minHeight = 80,
+                        children = {
+                            UI.Panel {
+                                width = "100%", gap = 6,
+                                children = comboChildren,
+                            },
+                        },
+                    },
+
+                    -- 关闭按钮
+                    UI.Button {
+                        text = "关闭",
+                        fontSize = 16, fontWeight = "bold",
+                        width = "100%", height = 36,
+                        borderRadius = 0,
+                        backgroundGradient = {
+                            type = "linear", direction = "to-bottom",
+                            from = {60, 50, 110, 255}, to = {40, 32, 75, 255},
+                        },
+                        fontColor = {200, 195, 230, 255},
+                        borderWidth = 1,
+                        borderColor = {90, 75, 150, 130},
+                        pressedBackgroundColor = {50, 40, 90, 255},
+                        onClick = function(self)
+                            if G.skillTooltip then G.skillTooltip:Remove(); G.skillTooltip = nil end
+                            if G.skillsPopup then
+                                G.skillsPopup:SetVisible(false)
+                                AM.PlaySFX("ui_popup_close")
+                            end
+                        end,
+                    },
+                },
+            },
+        },
+    }
+
+    UI.GetRoot():AddChild(G.skillsPopup)
 end
 
 return GameUI

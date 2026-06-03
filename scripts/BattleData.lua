@@ -44,6 +44,9 @@ BattleData.ENEMY_GOLD = {
     sand_scorpion   = 2,
     quicksand_worm  = 1,
     sand_hawk       = 2,
+    sand_strider    = 3,
+    sand_rattler    = 2,
+    venom_lizard    = 2,
     -- Boss
     boss     = 10,
 }
@@ -240,28 +243,60 @@ BattleData.ENEMY_TEMPLATES = {
     -- ====== 第四章: 流沙荒漠 ======
     sand_scorpion = {
         team = "enemy", enemyType = "sand_scorpion",
-        hp = 30, maxHp = 30,
-        atk = 10,
+        hp = 32, maxHp = 32,
+        atk = 18,
         attackRange = 1,
         attackLabel = "蛰刺",
         name = "沙蝎",
     },
     quicksand_worm = {
         team = "enemy", enemyType = "quicksand_worm",
-        hp = 15, maxHp = 15,
-        atk = 6,
+        hp = 18, maxHp = 18,
+        atk = 14,
         attackRange = 1,
         attackLabel = "啃噬",
         name = "流沙虫",
     },
     sand_hawk = {
         team = "enemy", enemyType = "sand_hawk",
-        hp = 20, maxHp = 20,
-        atk = 12,
+        hp = 22, maxHp = 22,
+        atk = 20,
         attackRange = 2,
         attackLabel = "俯冲",
         fleesWhenClose = true,  -- 英雄靠近时后退
         name = "沙鹰",
+    },
+    -- ====== 第四章特殊机制敌人 ======
+    sand_strider = {
+        team = "enemy", enemyType = "sand_strider",
+        hp = 16, maxHp = 16,
+        atk = 18,
+        attackRange = 99,       -- 全图攻击
+        attackLabel = "沙暴射线",
+        chargeTurns = 1,        -- 蓄力1回合后才能攻击
+        _chargeCD = 0,          -- 当前蓄力状态（0=可蓄力，>0=蓄力中）
+        _charged = false,       -- 蓄力完成标记
+        name = "沙暴行者",
+    },
+    sand_rattler = {
+        team = "enemy", enemyType = "sand_rattler",
+        hp = 28, maxHp = 28,
+        atk = 10,
+        attackRange = 1,
+        attackLabel = "咬击",
+        counterMultiplier = 2.0, -- 反击时伤害倍率
+        _enraged = false,        -- 狂怒状态（被攻击/跳过后激活）
+        name = "沙漠响尾蛇",
+    },
+    venom_lizard = {
+        team = "enemy", enemyType = "venom_lizard",
+        hp = 24, maxHp = 24,
+        atk = 11,
+        attackRange = 1,
+        attackLabel = "毒尾",
+        poisonDamage = 5,       -- 中毒每回合伤害
+        poisonDuration = 2,     -- 中毒持续回合
+        name = "毒尾蜥",
     },
     -- ====== 无尽模式专属 ======
     swift_barracuda = {
@@ -308,6 +343,9 @@ BattleData.ENEMY_INTRO = {
     sand_scorpion   = { icon = "🦂", name = "沙蝎",   desc = "沙漠中的伏击者" },
     quicksand_worm  = { icon = "🪱", name = "流沙虫", desc = "潜伏沙中的蠕虫，近距啃噬" },
     sand_hawk       = { icon = "🦅", name = "沙鹰",   desc = "远程俯冲，靠近会后退" },
+    sand_strider    = { icon = "🌪️", name = "沙暴行者", desc = "蓄力一回合后可攻击全图任意目标！" },
+    sand_rattler    = { icon = "🐍", name = "响尾蛇", desc = "被攻击或跳过后狂怒，下回合造成双倍伤害" },
+    venom_lizard    = { icon = "🦎", name = "毒尾蜥", desc = "攻击附带剧毒，持续掉血" },
 }
 
 BattleData.BOSS_TEMPLATES = {
@@ -371,7 +409,7 @@ BattleData.BOSS_TEMPLATES = {
     -- 第四章Boss: 沙丘巨虫
     sand_worm = {
         team = "enemy", enemyType = "boss",
-        hp = 420, maxHp = 420,
+        hp = 600, maxHp = 600,
         atk = 18,
         attackRange = 1,
         attackLabel = "吞噬",
@@ -384,7 +422,8 @@ BattleData.BOSS_TEMPLATES = {
         segments = 7,           -- 总节数（含头）
         burrowCooldown = 0,     -- 钻地冷却
         tailWhipCooldown = 0,   -- 尾部甩飞冷却
-        sandstormCooldown = 0,  -- 沙暴冷却
+        sandstormCooldown = 0,  -- 巨岩投掷冷却
+        sandFuryCooldown = 4,   -- 呼唤风沙冷却（首次延迟4回合）
         enraged = false,
     },
 }

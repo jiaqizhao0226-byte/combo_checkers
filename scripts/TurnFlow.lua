@@ -3,6 +3,7 @@
 -- ============================================================================
 
 local Battle = require "Battle"
+local BattleBoss = require "BattleBoss"
 local HexGrid = require "HexGrid"
 local Skills = require "Skills"
 local PlayerData = require "PlayerData"
@@ -160,11 +161,124 @@ function TurnFlow.ReturnToMenu()
     SettleBattleRewards()
     G.menuTab = "adventure"
     G.selectedLevel = G.highestLevel
-    -- 主线仅3章，无尽模式在 selectedChapter=0
-    local maxChapter = math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER)
-    G.selectedChapter = math.min(maxChapter, 3)
+
+    -- 检测初次通关第三章 → 自动切换到无尽模式页面
+    local justUnlockedEndless = false
+    if (G.playerData.highestLevel or 1) > 3 * Battle.LEVELS_PER_CHAPTER
+       and not G.playerData.endlessUnlockSeen then
+        G.playerData.endlessUnlockSeen = true
+        PlayerData.Save(G.playerData)
+        G.selectedChapter = 0  -- 切换到无尽模式页面
+        justUnlockedEndless = true
+    else
+        -- 主线仅3章，无尽模式在 selectedChapter=0
+        local maxChapter = math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER)
+        G.selectedChapter = math.min(maxChapter, 3)
+    end
+
     MenuSystem.CreateMenuUI()
     AM.PlayBGM("menu")
+
+    -- 初次解锁无尽模式弹窗
+    if justUnlockedEndless then
+        TurnFlow.ShowEndlessUnlockPopup()
+    end
+end
+
+-- ============================================================================
+-- 无尽模式解锁弹窗
+-- ============================================================================
+
+function TurnFlow.ShowEndlessUnlockPopup()
+    local UI = require("urhox-libs/UI")
+    AM.PlaySFX("chapter_clear")
+
+    local popup
+    popup = UI.Panel {
+        position = "absolute", top = 0, left = 0, right = 0, bottom = 0,
+        zIndex = 960, justifyContent = "center", alignItems = "center",
+        backgroundColor = {0, 0, 0, 180},
+        children = {
+            UI.Panel {
+                width = 320, paddingTop = 28, paddingBottom = 24,
+                paddingLeft = 24, paddingRight = 24,
+                alignItems = "center",
+                borderRadius = 0,
+                backgroundGradient = {
+                    type = "linear", direction = "to-bottom",
+                    from = {50, 20, 90, 255}, to = {25, 10, 50, 255},
+                },
+                borderWidth = 1, borderColor = {160, 100, 255, 120},
+                boxShadow = {
+                    { x = 0, y = 8, blur = 32, spread = 4, color = {120, 50, 200, 100} },
+                    { x = 0, y = 0, blur = 60, spread = 10, color = {160, 80, 255, 40} },
+                },
+                children = {
+                    -- 图标
+                    UI.Label {
+                        text = "🌀", fontSize = 48, textAlign = "center",
+                        marginBottom = 12,
+                    },
+                    -- 标题
+                    UI.Label {
+                        text = "无尽模式已解锁！", fontSize = 22,
+                        fontColor = {220, 180, 255, 255}, fontWeight = "bold",
+                        textAlign = "center", marginBottom = 8,
+                    },
+                    -- 描述
+                    UI.Label {
+                        text = "恭喜通关第三章！无尽模式开放：\n敌人无穷无尽，看你能坚持多久！",
+                        fontSize = 15, fontColor = {180, 165, 210, 220},
+                        textAlign = "center", marginBottom = 20,
+                        lineHeight = 1.4,
+                    },
+                    -- 开始无尽模式按钮
+                    UI.Button {
+                        text = "🌀 挑战无尽模式", variant = "primary",
+                        width = 240, height = 50, fontSize = 20,
+                        borderRadius = 0,
+                        backgroundGradient = {
+                            type = "linear", direction = "to-bottom",
+                            from = {130, 60, 200, 255}, to = {80, 30, 140, 255},
+                        },
+                        fontColor = {255, 255, 255, 255}, fontWeight = "bold",
+                        pressedBackgroundColor = {100, 40, 160, 255},
+                        boxShadow = {
+                            { x = 0, y = 4, blur = 16, spread = 0, color = {140, 70, 220, 100} },
+                        },
+                        onClick = function(self)
+                            AM.PlaySFX("ui_click")
+                            if popup then popup:SetVisible(false) end
+                            if G.callbacks.EnterEndless then
+                                G.callbacks.EnterEndless()
+                            end
+                        end,
+                    },
+                    -- 继续主线按钮
+                    UI.Button {
+                        text = "⚔️ 继续主线冒险", variant = "secondary",
+                        width = 240, height = 44, fontSize = 17,
+                        borderRadius = 0, marginTop = 10,
+                        backgroundGradient = {
+                            type = "linear", direction = "to-bottom",
+                            from = {45, 42, 70, 255}, to = {30, 28, 50, 255},
+                        },
+                        borderWidth = 1, borderColor = {90, 80, 140, 140},
+                        fontColor = {180, 175, 215, 255},
+                        pressedBackgroundColor = {38, 35, 58, 255},
+                        onClick = function(self)
+                            AM.PlaySFX("ui_click")
+                            if popup then popup:SetVisible(false) end
+                            -- 留在主菜单，玩家可自行选择章节
+                        end,
+                    },
+                },
+            },
+        },
+    }
+    if G.menuRoot then
+        G.menuRoot:AddChild(popup)
+    end
 end
 
 -- ============================================================================
@@ -199,10 +313,10 @@ function TurnFlow.OnSkillSelected(choice)
 
     local newLv = Skills.Level(G.battle.skills, choice.id)
     if choice.currentLevel == 0 then
-        Battle.AddLog(G.battle, string.format("✦ 习得 %s %s (Lv1)",
+        Battle.AddLog(G.battle, string.format("[+] 习得 %s %s (Lv1)",
             def.icon, def.name))
     else
-        Battle.AddLog(G.battle, string.format("★ %s %s → Lv%d",
+        Battle.AddLog(G.battle, string.format("[*] %s %s -> Lv%d",
             def.icon, def.name, newLv))
     end
 
@@ -837,6 +951,12 @@ function TurnFlow.ExecuteOneJump()
             G.executeTimer = hasQuake and 0.5 or 0.3
         else
             -- 落点也被堵了，终止连跳链
+            -- 如果是流沙格阻断，给予醒目提示
+            if G.battle.combo >= 1 and HexGrid.IsInQuicksandZone(G.battle.board, jumpInfo.col, jumpInfo.row) then
+                Battle.AddFloatingText(G.battle, G.battle.hero.col, G.battle.hero.row,
+                    "⏳流沙阻断连跳!", {255, 180, 50, 255}, "combo", 2.5)
+                AM.PlaySFX("combo_doomsday_blast", 0.4)
+            end
             TurnFlow.FinishExecution()
         end
         return
@@ -1052,6 +1172,7 @@ function TurnFlow.EndPlayerTurn()
     G.validJumps = {}
     if G.btnPanel then G.btnPanel:SetVisible(false) end
     G.battle.phase = "ENEMY_TURN"
+    G.bossCasting = false  -- 重置前摇状态
     log:Write(LOG_INFO, string.format("[PHASE] turn=%d → ENEMY_TURN (combo=%d spotlight=%s tutorial=%s)",
         math.floor(G.battle.turn or 0), math.floor(G.battle.combo or 0),
         tostring(G.comboSpotlightShowing), tostring(G.comboTutorialShowing)))
@@ -1060,6 +1181,9 @@ function TurnFlow.EndPlayerTurn()
 end
 
 function TurnFlow.ProcessEnemyTurn()
+    -- 第四章: 呼唤风沙持续伤害（敌方行动前）
+    Battle.ProcessSandFury(G.battle)
+
     local actions = Battle.ProcessEnemyTurn(G.battle)
 
     -- 第四章: 流沙回合推进（敌方行动后，流沙倒计时）
@@ -1161,7 +1285,7 @@ local function CreateDefeatPopup()
                 UI.Panel {
                     width = 280, paddingTop = 28, paddingBottom = 22,
                     paddingLeft = 24, paddingRight = 24,
-                    alignItems = "center", borderRadius = 18,
+                    alignItems = "center", borderRadius = 0,
                     backgroundColor = {30, 28, 50, 240},
                     borderWidth = 1, borderColor = isEndless and {160, 60, 200, 180} or {120, 60, 60, 180},
                     children = {
@@ -1178,7 +1302,7 @@ local function CreateDefeatPopup()
                             text = isEndless and "🌀 再挑战" or "🔄 重新挑战",
                             variant = "primary",
                             width = 220, height = 48, fontSize = 21, marginTop = 20,
-                            borderRadius = 24,
+                            borderRadius = 0,
                             backgroundGradient = {
                                 type = "linear", direction = "to-bottom",
                                 from = isEndless and {120, 40, 200, 255} or {60, 140, 220, 255},
@@ -1203,7 +1327,7 @@ local function CreateDefeatPopup()
                         },
                         UI.Button { text = "返回主菜单", variant = "secondary",
                             width = 220, height = 42, fontSize = 18, marginTop = 10,
-                            borderRadius = 21,
+                            borderRadius = 0,
                             backgroundColor = {52, 48, 78, 200},
                             fontColor = {160, 155, 195, 220},
                             onClick = function(self)
@@ -1381,7 +1505,7 @@ function TurnFlow.ShowChapterClear(chapter)
         btnChildren[#btnChildren + 1] = UI.Button {
             text = "⚔️ 进入下一章", variant = "primary",
             width = 230, height = 52, fontSize = 22,
-            borderRadius = 26,
+            borderRadius = 0,
             backgroundGradient = {
                 type = "linear", direction = "to-bottom",
                 from = {theme.color1[1], theme.color1[2], theme.color1[3], 255},
@@ -1404,7 +1528,7 @@ function TurnFlow.ShowChapterClear(chapter)
     btnChildren[#btnChildren + 1] = UI.Button {
         text = "🏠 返回主菜单", variant = "secondary",
         width = 230, height = 46, fontSize = 19,
-        borderRadius = 23, marginTop = hasNextChapter and 8 or 0,
+        borderRadius = 0, marginTop = hasNextChapter and 8 or 0,
         backgroundGradient = {
             type = "linear", direction = "to-bottom",
             from = {52, 48, 78, 255}, to = {35, 32, 58, 255},
@@ -1467,7 +1591,7 @@ function TurnFlow.ShowChapterClear(chapter)
             UI.Panel {
                 width = 310, paddingTop = 30, paddingBottom = 24,
                 paddingLeft = 26, paddingRight = 26,
-                alignItems = "center", borderRadius = 22,
+                alignItems = "center", borderRadius = 0,
                 backgroundGradient = {
                     type = "linear", direction = "to-bottom",
                     from = {38, 42, 72, 248}, to = {22, 24, 48, 248},
@@ -1478,14 +1602,10 @@ function TurnFlow.ShowChapterClear(chapter)
                     { x = 0, y = 0, blur = 1, spread = 0, color = {theme.color1[1], theme.color1[2], theme.color1[3], 30}, inset = true },
                 },
                 children = {
-                    -- 大 emoji icon
+                    -- 标题行（emoji + 文字同行）
                     UI.Label {
-                        text = theme.icon, fontSize = 56,
-                        textShadow = { offsetX = 0, offsetY = 3, blur = 12, color = {theme.color1[1], theme.color1[2], theme.color1[3], 120} },
-                    },
-                    -- 标题
-                    UI.Label {
-                        text = "🎉 恭喜通关！", fontSize = 32,
+                        text = theme.icon .. " 恭喜通关！",
+                        fontSize = 32,
                         fontColor = {255, 225, 65, 255}, fontWeight = "bold", marginTop = 8,
                         textShadow = { offsetX = 0, offsetY = 2, blur = 10, color = {200, 160, 0, 100} },
                         numberOfLines = 1,
@@ -1494,7 +1614,7 @@ function TurnFlow.ShowChapterClear(chapter)
                     UI.Label {
                         text = string.format("第%d章 · %s", chapter, theme.name),
                         fontSize = 20, fontColor = {theme.color1[1], theme.color1[2], theme.color1[3], 255},
-                        fontWeight = "bold", marginTop = 4,
+                        fontWeight = "bold", marginTop = 4, numberOfLines = 1,
                     },
                     -- 分割线
                     UI.Panel {
@@ -1724,14 +1844,35 @@ function TurnFlow.Update(dt)
                     pcall(GameUI.UpdateHUD)
                 end
                 pcall(GameUI.UpdateLog, G.enemyTurnMsg)
-            else
+            elseif G.bossCasting then
+                -- 前摇结束，执行实际技能
+                G.bossCasting = false
                 local ok, err = pcall(TurnFlow.ProcessEnemyTurn)
                 if not ok then
                     log:Write(LOG_ERROR, "ProcessEnemyTurn crashed: " .. tostring(err))
-                    -- 崩溃恢复：跳过敌人回合，直接进入玩家回合
                     G.enemyAnimWait = true
                     G.enemyTurnTimer = 0.3
                     G.enemyTurnMsg = "⚠️ 敌人行动异常 — 你的回合"
+                end
+            else
+                -- Boss前摇：先展示技能公告，延迟0.8秒后再执行
+                local isBoss = Battle.IsBossLevel(G.battle.level)
+                local showedPreCast = false
+                if isBoss then
+                    local ok2, result = pcall(BattleBoss.PreCastAnnounce, G.battle)
+                    showedPreCast = ok2 and result
+                end
+                if showedPreCast then
+                    G.bossCasting = true
+                    G.enemyTurnTimer = 0.8
+                else
+                    local ok, err = pcall(TurnFlow.ProcessEnemyTurn)
+                    if not ok then
+                        log:Write(LOG_ERROR, "ProcessEnemyTurn crashed: " .. tostring(err))
+                        G.enemyAnimWait = true
+                        G.enemyTurnTimer = 0.3
+                        G.enemyTurnMsg = "⚠️ 敌人行动异常 — 你的回合"
+                    end
                 end
             end
         end

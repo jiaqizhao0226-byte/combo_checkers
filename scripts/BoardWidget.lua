@@ -44,6 +44,9 @@ local ENEMY_COLORS = {
     sand_scorpion   = {200, 160, 60},
     quicksand_worm  = {180, 140, 80},
     sand_hawk       = {220, 180, 100},
+    sand_strider    = {160, 100, 200},
+    sand_rattler    = {180, 80, 60},
+    venom_lizard    = {100, 180, 70},
 }
 local function GetEnemyColor(enemyType)
     return ENEMY_COLORS[enemyType] or {180, 60, 60}
@@ -889,49 +892,53 @@ function BoardWidget:Render(nvg)
         ::cull_poison::
     end
 
-    -- 1.55 绘制地刺格（向上三角尖刺 + 脉动光晕）
+    -- 1.55 绘制地刺格（静态三角尖刺）
     local spikeTraps = G.battle and G.battle._spikeTraps or {}
-    local gt_spike = G.time or 0
     for _, spike in ipairs(spikeTraps) do
         local cx, cy = HexGrid.HexToPixel(spike.col, spike.row, hexSize, ox, oy)
         if not IsCellOnScreen(cx, cy, hexSize, l.x, l.y, l.w, l.h) then goto cull_spike end
         do
-        local pulse = 0.6 + 0.4 * math.sin(gt_spike * 3.5 + spike.col * 2)
-        -- 底层光晕
+        -- 六边形深色底板 + 白色粗边框（任何棋盘都醒目）
         nvgBeginPath(nvg)
-        nvgCircle(nvg, cx, cy, hexSize * 0.6)
-        nvgFillColor(nvg, nvgRGBA(200, 50, 30, math.floor(30 * pulse)))
+        for i = 0, 5 do
+            local angle = math.rad(60 * i - 90)
+            local vx = cx + hexSize * 0.88 * math.cos(angle)
+            local vy = cy + hexSize * 0.88 * math.sin(angle)
+            if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+        end
+        nvgClosePath(nvg)
+        nvgFillColor(nvg, nvgRGBA(20, 10, 10, 210))
         nvgFill(nvg)
-        -- 六边形底色
-        HexGrid.DrawHex(nvg, cx, cy, hexSize * 0.88,
-            nvgRGBA(140, 50, 25, math.floor(60 * pulse)), nvgRGBA(200, 80, 45, 140))
-        -- 3根向上三角尖刺（经典地刺造型）
-        local spikeH = hexSize * 0.42
-        local spikeW = hexSize * 0.14
+        nvgStrokeColor(nvg, nvgRGBA(255, 255, 255, 200))
+        nvgStrokeWidth(nvg, 3.5)
+        nvgStroke(nvg)
+        -- 3根向上三角尖刺（鲜红色）
+        local spikeH = hexSize * 0.46
+        local spikeW = hexSize * 0.16
         local offsets = {-0.25, 0, 0.25}
         local heights = {0.8, 1.0, 0.8}  -- 中间最高
         for i = 1, 3 do
             local bx = cx + offsets[i] * hexSize
-            local by = cy + hexSize * 0.12
+            local by = cy + hexSize * 0.14
             local h = spikeH * heights[i]
             nvgBeginPath(nvg)
             nvgMoveTo(nvg, bx, by - h)         -- 尖端
             nvgLineTo(nvg, bx - spikeW, by)    -- 左底
             nvgLineTo(nvg, bx + spikeW, by)    -- 右底
             nvgClosePath(nvg)
-            nvgFillColor(nvg, nvgRGBA(210, 70, 35, math.floor(230 * pulse)))
+            nvgFillColor(nvg, nvgRGBA(230, 50, 40, 240))
             nvgFill(nvg)
-            nvgStrokeColor(nvg, nvgRGBA(255, 130, 60, math.floor(200 * pulse)))
+            nvgStrokeColor(nvg, nvgRGBA(255, 180, 150, 200))
             nvgStrokeWidth(nvg, 1.5)
             nvgStroke(nvg)
         end
-        -- 剩余回合数（描边清晰）
-        nvgFontSize(nvg, hexSize * 0.28)
+        -- 剩余回合数（加大字号 + 白色粗描边）
+        nvgFontSize(nvg, hexSize * 0.38)
         nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-        nvgFillColor(nvg, nvgRGBA(0, 0, 0, 200))
-        nvgText(nvg, cx + 1, cy - hexSize * 0.18 + 1, tostring(spike.turns))
-        nvgFillColor(nvg, nvgRGBA(255, 220, 160, 250))
-        nvgText(nvg, cx, cy - hexSize * 0.18, tostring(spike.turns))
+        nvgFillColor(nvg, nvgRGBA(0, 0, 0, 240))
+        nvgText(nvg, cx + 1, cy - hexSize * 0.22 + 1, tostring(spike.turns))
+        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255))
+        nvgText(nvg, cx, cy - hexSize * 0.22, tostring(spike.turns))
         end -- do
         ::cull_spike::
     end
@@ -1079,6 +1086,58 @@ function BoardWidget:Render(nvg)
         end
     end
 
+    -- 1.58 绘制停沙格（青蓝色特殊格子，踩上消除全场流沙）
+    if board.sandStopTile then
+        local st = board.sandStopTile
+        local cx, cy = HexGrid.HexToPixel(st.col, st.row, hexSize, ox, oy)
+        if IsCellOnScreen(cx, cy, hexSize, l.x, l.y, l.w, l.h) then
+            local gt = G.time or 0
+            local pulse = 0.85 + 0.15 * math.sin(gt * 3.0)
+            local drawSize = hexSize * 0.82 * pulse
+            -- 青蓝色底色（与流沙琥珀色形成对比）
+            HexGrid.DrawHex(nvg, cx, cy, drawSize,
+                nvgRGBA(60, 180, 220, 180), nvgRGBA(80, 220, 255, 140))
+            -- 内部冰晶渐变光
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, cy, hexSize * 0.4 * pulse)
+            nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.4 * pulse,
+                nvgRGBA(150, 240, 255, 160),
+                nvgRGBA(60, 160, 200, 0)))
+            nvgFill(nvg)
+            -- 旋转的小粒子（3个）
+            for i = 1, 3 do
+                local angle = gt * 1.5 + i * 2.094
+                local dist = hexSize * 0.25
+                local px = cx + math.cos(angle) * dist
+                local py = cy + math.sin(angle) * dist
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, px, py, 2.5)
+                nvgFillColor(nvg, nvgRGBA(180, 255, 255, 200))
+                nvgFill(nvg)
+            end
+            -- 中心图标
+            nvgFontSize(nvg, hexSize * 0.5)
+            nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgFontBlur(nvg, 0)
+            nvgFillColor(nvg, nvgRGBA(255, 255, 255, 230))
+            nvgText(nvg, cx, cy, "🛑")
+            -- 漂浮"停沙"文字（上下浮动，大字+深色描边更醒目）
+            local floatY = math.sin(gt * 2.5) * 3.0
+            local txtY = cy - hexSize * 0.44 + floatY
+            nvgFontSize(nvg, hexSize * 0.38)
+            nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgFontBlur(nvg, 0)
+            -- 深色描边（多方向偏移）
+            nvgFillColor(nvg, nvgRGBA(10, 40, 60, 220))
+            for _, off in ipairs({{1,1},{-1,1},{1,-1},{-1,-1},{0,2},{0,-2}}) do
+                nvgText(nvg, cx + off[1], txtY + off[2], "停沙")
+            end
+            -- 文字主体（纯白，与青蓝底色对比强烈）
+            nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255))
+            nvgText(nvg, cx, txtY, "停沙")
+        end
+    end
+
     -- 1.6 绘制障碍物（岩石 / 触手 / 珊瑚）
     local obsChapter = G.battle and math.ceil((G.battle.level or 1) / Battle.LEVELS_PER_CHAPTER) or 1
     for _, obs in ipairs(board.obstacles) do
@@ -1192,6 +1251,61 @@ function BoardWidget:Render(nvg)
             nvgFillPaint(nvg, abyssPaint)
             nvgFill(nvg)
             IconAtlas.DrawNVG(nvg, "board_abyss", cx, cy, hexSize * 0.55)
+        elseif obs.isBoulder then
+            -- ── 巨岩碎石：沙黄色碎裂岩块，临时障碍 ──
+            local t = G.time or 0
+            local rs = hexSize * 0.75
+            local wobble = math.sin(t * 1.5 + obs.col * 2.1) * 0.02
+
+            -- 阴影
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx + hexSize * 0.04, cy + hexSize * 0.05, rs * 0.9)
+            nvgFillColor(nvg, nvgRGBA(0, 0, 0, 80))
+            nvgFill(nvg)
+
+            -- 岩块主体（不规则沙黄色多边形）
+            nvgBeginPath(nvg)
+            local verts = 6
+            for i = 1, verts do
+                local angle = (i / verts) * math.pi * 2 - math.pi / 2
+                local r = rs * (0.82 + 0.18 * math.sin(i * 2.7 + obs.row))
+                local vx = cx + math.cos(angle + wobble) * r
+                local vy = cy + math.sin(angle + wobble) * r
+                if i == 1 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+            end
+            nvgClosePath(nvg)
+            local bGrad = nvgLinearGradient(nvg, cx, cy - rs, cx, cy + rs,
+                nvgRGBA(180, 145, 80, 255), nvgRGBA(110, 80, 40, 255))
+            nvgFillPaint(nvg, bGrad)
+            nvgFill(nvg)
+            nvgStrokeColor(nvg, nvgRGBA(80, 55, 25, 200))
+            nvgStrokeWidth(nvg, 2.0)
+            nvgStroke(nvg)
+
+            -- 裂纹（表示即将碎裂）
+            for ci = 1, 3 do
+                local ca = (ci / 3) * math.pi * 2 + obs.col * 1.3
+                local x1 = cx + math.cos(ca) * rs * 0.15
+                local y1 = cy + math.sin(ca) * rs * 0.15
+                local x2 = cx + math.cos(ca) * rs * 0.7
+                local y2 = cy + math.sin(ca) * rs * 0.7
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, x1, y1)
+                nvgLineTo(nvg, x2, y2)
+                nvgStrokeColor(nvg, nvgRGBA(50, 30, 10, 180))
+                nvgStrokeWidth(nvg, 1.5)
+                nvgStroke(nvg)
+            end
+
+            -- 碎石散落小颗粒
+            for pi = 1, 4 do
+                local pa = (pi / 4) * math.pi * 2 + obs.row * 0.9
+                local pd = rs * (1.1 + 0.15 * math.sin(pi * 2.1))
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx + math.cos(pa) * pd, cy + math.sin(pa) * pd, hexSize * 0.04)
+                nvgFillColor(nvg, nvgRGBA(150, 115, 60, 180))
+                nvgFill(nvg)
+            end
         else
             -- 普通障碍：深色实心填充 + 几何纹路，与怪物明确区分
             local isCoral = (obsChapter == 3)
@@ -2188,6 +2302,98 @@ function BoardWidget:Render(nvg)
         nvgStroke(nvg)
     end
 
+    -- 7.04 沙虫emerging期间尾部沙坑（虫身正在从地下爬出时，在洞口画沙坑）
+    if G.battle.sandWormSegments and G.battle.boss and G.battle.boss.emerging then
+        -- 找到洞口位置：优先用 sandWormEmergeHole，否则用最后一个隐藏段的位置
+        local holeCol, holeRow
+        if G.battle.sandWormEmergeHole then
+            holeCol = G.battle.sandWormEmergeHole.col
+            holeRow = G.battle.sandWormEmergeHole.row
+        else
+            for i = #G.battle.sandWormSegments, 1, -1 do
+                local seg = G.battle.sandWormSegments[i]
+                if seg.hidden then
+                    holeCol, holeRow = seg.col, seg.row
+                    break
+                end
+            end
+        end
+        if holeCol and holeRow then
+            local gt = G.time or 0
+            local px, py = HexGrid.HexToPixel(holeCol, holeRow, hexSize, ox, oy)
+            local pitR = hexSize * 0.55
+
+            -- 外圈：大范围沙土堆积（浅棕色柔和扩散）
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, px, py, pitR * 1.6)
+            nvgFillPaint(nvg, nvgRadialGradient(nvg, px, py,
+                pitR * 0.6, pitR * 1.6,
+                nvgRGBA(160, 120, 55, 130),
+                nvgRGBA(160, 120, 55, 0)))
+            nvgFill(nvg)
+
+            -- 沙坑主体（深色凹陷）
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, px, py, pitR)
+            nvgFillPaint(nvg, nvgRadialGradient(nvg, px, py,
+                0, pitR,
+                nvgRGBA(35, 22, 8, 200),
+                nvgRGBA(90, 60, 25, 120)))
+            nvgFill(nvg)
+
+            -- 坑口凸起边缘（沙土堆高亮环）
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, px, py, pitR * 1.05)
+            nvgStrokeColor(nvg, nvgRGBA(180, 140, 60, 160))
+            nvgStrokeWidth(nvg, 3.5)
+            nvgStroke(nvg)
+
+            -- 内部深色描边
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, px, py, pitR * 0.7)
+            nvgStrokeColor(nvg, nvgRGBA(50, 30, 10, 140))
+            nvgStrokeWidth(nvg, 2.0)
+            nvgStroke(nvg)
+
+            -- 辐射裂缝（6条，从坑口向外延伸）
+            for ci = 1, 6 do
+                local angle = (ci / 6) * math.pi * 2 + holeCol * 0.7
+                local innerR = pitR * 0.8
+                local outerR = pitR * (1.3 + 0.2 * math.sin(ci * 1.7))
+                local ix = px + math.cos(angle) * innerR
+                local iy = py + math.sin(angle) * innerR
+                local ex = px + math.cos(angle) * outerR
+                local ey = py + math.sin(angle) * outerR
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, ix, iy)
+                nvgLineTo(nvg, ex, ey)
+                nvgStrokeColor(nvg, nvgRGBA(100, 65, 25, 120))
+                nvgStrokeWidth(nvg, 1.8)
+                nvgStroke(nvg)
+            end
+
+            -- 沙粒从坑口向外飞溅动画
+            for si = 1, 8 do
+                local angle = (si / 8) * math.pi * 2 + gt * 0.5 + si * 0.3
+                local dist = pitR * (1.1 + 0.15 * math.sin(gt * 2.0 + si * 1.5))
+                local sx2 = px + math.cos(angle) * dist
+                local sy2 = py + math.sin(angle) * dist
+                local pSize = hexSize * (0.03 + 0.01 * math.sin(gt * 3.0 + si))
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx2, sy2, pSize)
+                nvgFillColor(nvg, nvgRGBA(200, 155, 70, 140))
+                nvgFill(nvg)
+            end
+
+            -- 坑内蠕动暗影（暗示地下有东西在爬出）
+            local wriggle = math.sin(gt * 3.5) * pitR * 0.1
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, px + wriggle, py, pitR * 0.4, pitR * 0.3)
+            nvgFillColor(nvg, nvgRGBA(15, 8, 3, math.floor(140 + 50 * math.sin(gt * 4.0))))
+            nvgFill(nvg)
+        end
+    end
+
     -- 7.05 沙虫身体连接管（宽体管道，匹配鳞甲风格）
     if G.battle.sandWormSegments and #G.battle.sandWormSegments >= 2 then
         local segs = G.battle.sandWormSegments
@@ -2304,36 +2510,84 @@ function BoardWidget:Render(nvg)
         end -- if not burrowed/hidden
     end
 
-    -- 7.06 沙虫遁地中提示（Boss遁地期间显示在左上角，不挡棋盘）
+    -- 7.06 沙虫遁地中提示（固定位置和大小，不随镜头缩放浮动）
     if G.battle.sandWormSegments and #G.battle.sandWormSegments >= 1 then
         local bossHead = G.battle.sandWormSegments[1]
         if bossHead and (bossHead.burrowed or bossHead.burrowCasting) and bossHead.hp > 0 then
             local gt = G.time or 0
-            -- 左上角位置（基于屏幕坐标，确保不超出屏幕）
-            local tipX = math.max(8, ox) + 8
-            local tipY = math.max(8, oy) + 8
-            -- 半透明背景条
-            local labelW = hexSize * 4.0
-            local labelH = hexSize * 0.8
-            local lx = tipX
-            local ly = tipY
+            -- 使用 widget 绝对坐标（固定屏幕位置，不随相机/缩放变化）
+            local tipX = l.x + 12
+            local tipY = l.y + 90
+            -- 固定像素尺寸，不随 hexSize 缩放
+            local labelW = 260
+            local labelH = 32
             local bgAlpha = math.floor(160 + 40 * math.sin(gt * 3.0))
             nvgBeginPath(nvg)
-            nvgRoundedRect(nvg, lx, ly, labelW, labelH, 8)
+            nvgRoundedRect(nvg, tipX, tipY, labelW, labelH, 6)
             nvgFillColor(nvg, nvgRGBA(40, 30, 15, bgAlpha))
             nvgFill(nvg)
-            -- 文字
-            nvgFontSize(nvg, 16)
+            -- 文字（固定字号）
+            nvgFontSize(nvg, 15)
             nvgTextAlign(nvg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
             local textAlpha = math.floor(200 + 55 * math.sin(gt * 2.5))
             nvgFillColor(nvg, nvgRGBA(255, 210, 100, textAlpha))
-            local textX = lx + 8
-            local textY = ly + labelH / 2
+            local textX = tipX + 8
+            local textY = tipY + labelH / 2
             if bossHead.burrowCasting then
                 nvgText(nvg, textX, textY, "⏳ 沙虫正在准备遁地...")
             else
                 local remain = bossHead.burrowTimer or 0
                 nvgText(nvg, textX, textY, "🕳️ 沙虫遁地中... (" .. remain .. "回合后钻出)")
+            end
+        end
+    end
+
+    -- 7.06b 沙虫钻出预警（红色描边闪烁，7格AOE范围）
+    if G.battle.sandWormEmergeWarning then
+        local warn = G.battle.sandWormEmergeWarning
+        local warnTiles = warn.tiles or { { col = warn.col, row = warn.row } }
+        local pulse = 0.6 + 0.4 * math.sin((G.time or 0) * 8)  -- 快速闪烁
+        for tIdx, tile in ipairs(warnTiles) do
+            if HexGrid.InBounds(tile.col, tile.row) then
+                local tx, ty = HexGrid.HexToPixel(tile.col, tile.row, hexSize, ox, oy)
+                -- 红色描边六边形
+                nvgBeginPath(nvg)
+                local rWarn = hexSize * 0.52
+                for vi = 0, 5 do
+                    local angle = math.pi / 3 * vi - math.pi / 6
+                    local vx = tx + rWarn * math.cos(angle)
+                    local vy = ty + rWarn * math.sin(angle)
+                    if vi == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                -- 中心格描边更粗更亮
+                local isCenter = (tile.col == warn.col and tile.row == warn.row)
+                local strokeAlpha = isCenter and math.floor(240 * pulse) or math.floor(180 * pulse)
+                local strokeW = isCenter and 4.0 or 2.5
+                nvgStrokeColor(nvg, nvgRGBA(255, 40, 20, strokeAlpha))
+                nvgStrokeWidth(nvg, strokeW)
+                nvgStroke(nvg)
+                -- 半透明红色填充
+                nvgBeginPath(nvg)
+                local rFill = hexSize * 0.46
+                for vi = 0, 5 do
+                    local angle = math.pi / 3 * vi - math.pi / 6
+                    local vx = tx + rFill * math.cos(angle)
+                    local vy = ty + rFill * math.sin(angle)
+                    if vi == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                local fillAlpha = isCenter and math.floor(80 * pulse) or math.floor(40 * pulse)
+                nvgFillColor(nvg, nvgRGBA(255, 30, 20, fillAlpha))
+                nvgFill(nvg)
+                -- 仅中心格显示警告图标
+                if isCenter then
+                    nvgFontFace(nvg, "emoji")
+                    nvgFontSize(nvg, hexSize * 0.5)
+                    nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                    nvgFillColor(nvg, nvgRGBA(255, 60, 30, math.floor(220 * pulse)))
+                    nvgText(nvg, tx, ty, "⚠️")
+                end
             end
         end
     end
@@ -2384,15 +2638,175 @@ function BoardWidget:Render(nvg)
         end
     end
 
-    -- 7.08 沙虫爬出延迟显示处理（emergeDelay倒计时，到0时取消隐藏）
-    if G.battle.sandWormSegments then
+    -- 7.07 沙虫钻入动画处理（身体段逐节滑入洞口后隐藏）
+    if G.battle.sandWormSegments and G.battle.sandWormDiveHole then
+        local dt = G.dt or 0.016
+        local allDived = true
         for _, seg in ipairs(G.battle.sandWormSegments) do
-            if seg.emergeDelay and seg.emergeDelay > 0 then
-                seg.emergeDelay = seg.emergeDelay - (G.dt or 0.016)
-                if seg.emergeDelay <= 0 then
-                    seg.emergeDelay = nil  -- 延迟结束，正常显示
+            if seg.diveDelay then
+                allDived = false
+                if seg.diveDelay > 0 then
+                    seg.diveDelay = seg.diveDelay - dt
+                else
+                    -- delay结束，开始0.7秒滑动动画（从当前位置滑入洞口，较慢以保持整体感）
+                    if not seg.diveProgress then
+                        seg.diveProgress = 0
+                        seg.diveFromCol = seg.col
+                        seg.diveFromRow = seg.row
+                    end
+                    seg.diveProgress = seg.diveProgress + dt / 0.7
+                    if seg.diveProgress >= 1.0 then
+                        -- 滑入完成，隐藏该节
+                        seg.hidden = true
+                        seg.diveDelay = nil
+                        seg.diveProgress = nil
+                        seg.diveFromCol = nil
+                        seg.diveFromRow = nil
+                        seg.diveTargetCol = nil
+                        seg.diveTargetRow = nil
+                    end
                 end
             end
+        end
+        -- 所有段都钻入完毕，清理洞口标记
+        if allDived then
+            G.battle.sandWormDiveHole = nil
+        end
+    end
+
+    -- 7.08 沙虫爬出动画处理（身体段从洞口爬出到目标位置）
+    if G.battle.sandWormSegments then
+        local dt = G.dt or 0.016
+        for _, seg in ipairs(G.battle.sandWormSegments) do
+            if seg.emergeDelay and seg.emergeDelay > 0 then
+                seg.emergeDelay = seg.emergeDelay - dt
+                if seg.emergeDelay <= 0 then
+                    seg.emergeDelay = nil
+                    -- 不清除 emergeFromCol/Row，让滑动阶段继续使用
+                end
+            elseif seg.emergeFromCol and not seg.emergeDelay then
+                -- delay结束后，开始0.4秒的滑动动画（从洞口到目标位置）
+                if not seg.emergeProgress then
+                    seg.emergeProgress = 0
+                end
+                seg.emergeProgress = seg.emergeProgress + dt / 0.4
+                if seg.emergeProgress >= 1.0 then
+                    seg.emergeFromCol = nil
+                    seg.emergeFromRow = nil
+                    seg.emergeProgress = nil
+                end
+            end
+        end
+    end
+    -- 7.09 沙虫洞口视觉效果（显示虫身从地下伸出，避免看起来凭空截断）
+    if G.battle.sandWormEmergeHole then
+        local hole = G.battle.sandWormEmergeHole
+        local hx, hy = HexGrid.HexToPixel(hole.col, hole.row, hexSize, ox, oy)
+        local gt = G.time or 0
+        local holeR = hexSize * 0.48  -- 洞口半径（略小于格子）
+
+        -- 0) 从最后一个可见段到洞口的"渐入地下"连接管
+        if G.battle.sandWormSegments then
+            local segs = G.battle.sandWormSegments
+            local lastVisible = nil
+            local lastVisIdx = 0
+            for i = #segs, 1, -1 do
+                if not segs[i].hidden and segs[i].hp > 0
+                   and not (segs[i].emergeDelay and segs[i].emergeDelay > 0) then
+                    lastVisible = segs[i]
+                    lastVisIdx = i
+                    break
+                end
+            end
+            if lastVisible and (lastVisible.col ~= hole.col or lastVisible.row ~= hole.row) then
+                local sx, sy = HexGrid.HexToPixel(lastVisible.col, lastVisible.row, hexSize, ox, oy)
+                local drawR = hexSize * 0.5 * 1.25
+                local segScale = math.max(0.55, 1.0 - (lastVisIdx - 1) * 0.06)
+                local tubeStart = drawR * segScale * 1.4
+                local tubeEnd = tubeStart * 0.4  -- 越靠近洞口越细（钻入地下效果）
+                -- 渐变管道：从可见段到洞口
+                local dx, dy = hx - sx, hy - sy
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist > 1 then
+                    local nx, ny = -dy / dist, dx / dist
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, sx + nx * tubeStart * 0.5, sy + ny * tubeStart * 0.5)
+                    nvgLineTo(nvg, hx + nx * tubeEnd * 0.5, hy + ny * tubeEnd * 0.5)
+                    nvgLineTo(nvg, hx - nx * tubeEnd * 0.5, hy - ny * tubeEnd * 0.5)
+                    nvgLineTo(nvg, sx - nx * tubeStart * 0.5, sy - ny * tubeStart * 0.5)
+                    nvgClosePath(nvg)
+                    -- 渐变填充：身体色到暗色
+                    nvgFillPaint(nvg, nvgLinearGradient(nvg, sx, sy, hx, hy,
+                        nvgRGBA(180, 140, 60, 200),
+                        nvgRGBA(80, 50, 20, 160)))
+                    nvgFill(nvg)
+                    -- 细腻鳞甲纹理线
+                    nvgStrokeColor(nvg, nvgRGBA(120, 80, 30, 100))
+                    nvgStrokeWidth(nvg, 1.5)
+                    nvgStroke(nvg)
+                end
+            end
+        end
+
+        -- 1) 外圈：扰动的沙土堆（浅棕色环形，模拟掘出的沙土）
+        nvgBeginPath(nvg)
+        nvgCircle(nvg, hx, hy, holeR * 1.3)
+        nvgFillPaint(nvg, nvgRadialGradient(nvg, hx, hy,
+            holeR * 0.8, holeR * 1.3,
+            nvgRGBA(160, 120, 60, 120),
+            nvgRGBA(160, 120, 60, 0)))
+        nvgFill(nvg)
+
+        -- 2) 洞口暗色椭圆（深色的地洞）
+        nvgBeginPath(nvg)
+        nvgEllipse(nvg, hx, hy + holeR * 0.1, holeR * 0.75, holeR * 0.55)
+        nvgFillPaint(nvg, nvgRadialGradient(nvg, hx, hy + holeR * 0.1,
+            0, holeR * 0.5,
+            nvgRGBA(15, 8, 5, 220),
+            nvgRGBA(50, 30, 15, 180)))
+        nvgFill(nvg)
+
+        -- 3) 洞口边缘裂纹（深色描边环）
+        nvgBeginPath(nvg)
+        nvgEllipse(nvg, hx, hy + holeR * 0.1, holeR * 0.78, holeR * 0.58)
+        nvgStrokeColor(nvg, nvgRGBA(80, 50, 20, 160))
+        nvgStrokeWidth(nvg, 2.5)
+        nvgStroke(nvg)
+
+        -- 4) 散落的沙粒（围绕洞口的小圆点，轻微动态）
+        nvgFillColor(nvg, nvgRGBA(180, 140, 70, 100))
+        for i = 1, 8 do
+            local angle = (i / 8) * math.pi * 2 + gt * 0.3
+            local dist = holeR * (1.0 + 0.15 * math.sin(gt * 2.0 + i * 1.7))
+            local px = hx + math.cos(angle) * dist
+            local py = hy + math.sin(angle) * dist * 0.7
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, px, py, hexSize * 0.03)
+            nvgFill(nvg)
+        end
+
+        -- 5) 洞口内部微弱的蠕动暗影（暗示地下有东西）
+        local wriggle = math.sin(gt * 4.0) * holeR * 0.08
+        nvgBeginPath(nvg)
+        nvgEllipse(nvg, hx + wriggle, hy + holeR * 0.05, holeR * 0.4, holeR * 0.25)
+        nvgFillColor(nvg, nvgRGBA(10, 5, 2, math.floor(100 + 40 * math.sin(gt * 3.0))))
+        nvgFill(nvg)
+    end
+
+    -- 清理洞口标记（所有身体段都已爬出后，且boss不再处于逐步钻出状态）
+    if G.battle.sandWormEmergeHole then
+        local boss = G.battle.boss
+        local stillEmerging = boss and boss.emerging
+        if not stillEmerging then
+            local allDone = true
+            if G.battle.sandWormSegments then
+                for _, seg in ipairs(G.battle.sandWormSegments) do
+                    if seg.emergeDelay or seg.emergeFromCol then
+                        allDone = false; break
+                    end
+                end
+            end
+            if allDone then G.battle.sandWormEmergeHole = nil end
         end
     end
 
@@ -2427,6 +2841,26 @@ function BoardWidget:Render(nvg)
                     local arc = math.sin(t * math.pi) * hexSize * 1.2 * arcMul
                     cy = cy - arc
                 end
+            elseif p.diveProgress and p.diveFromCol then
+                -- 沙虫身体段钻入动画：从当前位置滑向洞口并缩小
+                local t = math.min(1.0, p.diveProgress)
+                t = t * t * (3.0 - 2.0 * t)  -- smoothstep
+                local fromX, fromY = HexGrid.HexToPixel(p.diveFromCol, p.diveFromRow, hexSize, ox, oy)
+                local toX, toY = HexGrid.HexToPixel(p.diveTargetCol, p.diveTargetRow, hexSize, ox, oy)
+                cx = fromX + (toX - fromX) * t
+                cy = fromY + (toY - fromY) * t
+                -- 随着接近洞口，棋子缩小（模拟钻入地下效果）
+                p._diveScale = 1.0 - t * 0.6  -- 从1.0缩小到0.4
+            elseif p.emergeFromCol and p.emergeProgress then
+                -- 沙虫身体段爬出动画：从洞口平滑移动到目标位置
+                local t = math.min(1.0, p.emergeProgress)
+                t = t * t * (3.0 - 2.0 * t)  -- smoothstep
+                local fromX, fromY = HexGrid.HexToPixel(p.emergeFromCol, p.emergeFromRow, hexSize, ox, oy)
+                local toX, toY = HexGrid.HexToPixel(p.col, p.row, hexSize, ox, oy)
+                cx = fromX + (toX - fromX) * t
+                cy = fromY + (toY - fromY) * t
+                -- 爬出时从小变大（从洞口挤出效果）
+                p._diveScale = 0.4 + t * 0.6  -- 从0.4放大到1.0
             else
                 cx, cy = HexGrid.HexToPixel(p.col, p.row, hexSize, ox, oy)
             end
@@ -2492,7 +2926,13 @@ function BoardWidget:Render(nvg)
                     nvgFill(nvg)
                 end
             end
-            HexGrid.DrawPiece(nvg, cx, cy, pieceRadius, p)
+            -- 应用钻入/爬出缩放效果
+            local drawRadius = pieceRadius
+            if p._diveScale then
+                drawRadius = pieceRadius * p._diveScale
+                p._diveScale = nil  -- 一次性字段，用完清理
+            end
+            HexGrid.DrawPiece(nvg, cx, cy, drawRadius, p)
         end
         ::continue_piece::
     end
@@ -3277,6 +3717,50 @@ function BoardWidget:Render(nvg)
             nvgFillColor(nvg, nvgRGBA(ft.color[1], ft.color[2], ft.color[3], alpha))
             nvgText(nvg, cx, outY, ft.text)
 
+        elseif ft.style == "execution" then
+            -- 处决：超大字体、缓慢上浮、红黑光晕、持续显眼
+            local exeScale = 1.0
+            if progress < 0.15 then
+                -- 爆发放大
+                exeScale = 1.0 + (progress / 0.15) * 1.8
+            elseif progress < 0.4 then
+                -- 缓慢缩回
+                exeScale = 2.8 - (progress - 0.15) / 0.25 * 0.6
+            else
+                -- 平稳维持
+                exeScale = 2.2 - (progress - 0.4) * 0.5
+            end
+            exeScale = math.max(1.0, exeScale)
+            local fontSize = hexSize * 0.7 * exeScale
+            -- 缓慢上浮（比普通文字慢很多）
+            local outY = cy - hexSize * 0.3 - progress * hexSize * 0.6
+            -- 淡出从60%进度才开始
+            local exeAlpha = progress < 0.6 and 255 or math.floor((1.0 - (progress - 0.6) / 0.4) * 255)
+            -- 红色外层光晕（多方向粗描边）
+            nvgFontSize(nvg, fontSize * 1.05)
+            local glowA = math.floor(exeAlpha * 0.5)
+            nvgFillColor(nvg, nvgRGBA(180, 0, 0, glowA))
+            for dx = -3, 3, 3 do
+                for dy = -3, 3, 3 do
+                    if dx ~= 0 or dy ~= 0 then
+                        nvgText(nvg, cx + dx, outY + dy, ft.text)
+                    end
+                end
+            end
+            -- 黑色粗描边
+            nvgFontSize(nvg, fontSize)
+            nvgFillColor(nvg, nvgRGBA(0, 0, 0, exeAlpha))
+            for dx = -2, 2, 1 do
+                for dy = -2, 2, 1 do
+                    if dx ~= 0 or dy ~= 0 then
+                        nvgText(nvg, cx + dx, outY + dy, ft.text)
+                    end
+                end
+            end
+            -- 主体文字（亮红）
+            nvgFillColor(nvg, nvgRGBA(ft.color[1], ft.color[2], ft.color[3], exeAlpha))
+            nvgText(nvg, cx, outY, ft.text)
+
         elseif ft.style == "combo_reward" then
             -- 连击奖励：大字弹跳 + 光晕描边
             local rewardScale = 1.0
@@ -3473,6 +3957,11 @@ function BoardWidget:Update(dt)
     -- VFX 计时更新
     for i = #G.battle.vfx, 1, -1 do
         local v = G.battle.vfx[i]
+        -- startDelay 支持：延迟期间不递减主 timer
+        if v.startDelay and v.startDelay > 0 then
+            v.startDelay = v.startDelay - dt
+            if v.startDelay > 0 then goto continue_vfx end
+        end
         v.timer = v.timer - dt
         -- 中间时间点回调（射线到达时触发伤害等）
         if v.onHit and v.hitTime and v.timer <= v.hitTime then
@@ -3487,6 +3976,7 @@ function BoardWidget:Update(dt)
             end
             table.remove(G.battle.vfx, i)
         end
+        ::continue_vfx::
     end
 
     -- 连击公告计时

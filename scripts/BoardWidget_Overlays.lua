@@ -43,6 +43,95 @@ function BoardWidget_Overlays.Render(ctx)
         nvgText(nvg, l.x + l.w / 2, l.y + 66, "⏳ 时间冻结中")
     end
 
+    -- 9.6 呼唤风沙持续效果覆盖层（全屏黄沙暴风特效）
+    if G.battle.sandFuryActive then
+        local furyTime = G.time or 0
+        local turnsLeft = G.battle.sandFuryTurns or 0
+        local pulse = 0.6 + 0.4 * math.sin(furyTime * 2.0)
+
+        -- ① 全屏黄沙底色渐变（上深下浅，模拟沙暴遮天）
+        nvgBeginPath(nvg)
+        nvgRect(nvg, l.x, l.y, l.w, l.h)
+        nvgFillPaint(nvg, nvgLinearGradient(nvg, l.x, l.y, l.x, l.y + l.h,
+            nvgRGBA(180, 130, 40, math.floor(45 * pulse)),
+            nvgRGBA(200, 160, 60, math.floor(20 * pulse))))
+        nvgFill(nvg)
+
+        -- ② 横向大沙带（3条不同速度的水平沙雾带，模拟狂风卷沙）
+        for band = 1, 3 do
+            local bandY = l.y + l.h * (0.2 + band * 0.2) + math.sin(furyTime * (1.5 + band * 0.3)) * 15
+            local bandH = l.h * (0.08 + band * 0.02)
+            local bandAlpha = math.floor((30 + band * 8) * pulse)
+            local shiftX = (furyTime * (60 + band * 25)) % l.w
+            nvgBeginPath(nvg)
+            nvgRect(nvg, l.x - shiftX, bandY, l.w + shiftX, bandH)
+            nvgFillColor(nvg, nvgRGBA(210, 170, 70, bandAlpha))
+            nvgFill(nvg)
+        end
+
+        -- ③ 大量飞沙粒子（40颗，横向高速飘动 + 轻微纵向抖动）
+        for i = 1, 40 do
+            local seed = i * 97.3
+            local speed = 80 + (i % 5) * 30
+            local sx = l.x + ((seed + furyTime * speed) % l.w)
+            local sy = l.y + ((seed * 1.7) % l.h) + math.sin(furyTime * 3 + i) * 4
+            local sz = 1.5 + (i % 4) * 0.8
+            local alpha = math.floor((60 + (i % 3) * 25) * pulse)
+            nvgBeginPath(nvg)
+            -- 沙粒用椭圆（水平拉长，模拟风速感）
+            nvgEllipse(nvg, sx, sy, sz * 2.0, sz * 0.7)
+            nvgFillColor(nvg, nvgRGBA(220, 180, 80, alpha))
+            nvgFill(nvg)
+        end
+
+        -- ④ 边缘沙尘加重（四边暗角渐变，增加暴风感）
+        local edgeSize = l.w * 0.18
+        -- 左边缘
+        nvgBeginPath(nvg)
+        nvgRect(nvg, l.x, l.y, edgeSize, l.h)
+        nvgFillPaint(nvg, nvgLinearGradient(nvg, l.x, l.y, l.x + edgeSize, l.y,
+            nvgRGBA(160, 120, 40, math.floor(50 * pulse)), nvgRGBA(160, 120, 40, 0)))
+        nvgFill(nvg)
+        -- 右边缘
+        nvgBeginPath(nvg)
+        nvgRect(nvg, l.x + l.w - edgeSize, l.y, edgeSize, l.h)
+        nvgFillPaint(nvg, nvgLinearGradient(nvg, l.x + l.w - edgeSize, l.y, l.x + l.w, l.y,
+            nvgRGBA(160, 120, 40, 0), nvgRGBA(160, 120, 40, math.floor(50 * pulse))))
+        nvgFill(nvg)
+
+        -- ⑤ 旋转风线（2条弧形风线在画面上旋转）
+        for w = 1, 2 do
+            local wcx = l.x + l.w * (0.3 + w * 0.25)
+            local wcy = l.y + l.h * 0.5
+            local wr = l.w * 0.25
+            local wspin = furyTime * (2.0 + w * 0.5) * (w % 2 == 0 and -1 or 1)
+            nvgBeginPath(nvg)
+            nvgArc(nvg, wcx, wcy, wr, wspin, wspin + math.pi * 0.8, 1)
+            nvgStrokeColor(nvg, nvgRGBA(230, 190, 90, math.floor(40 * pulse)))
+            nvgStrokeWidth(nvg, 2.5)
+            nvgStroke(nvg)
+        end
+
+        -- ⑥ 顶部状态栏：风沙剩余回合数
+        local barW = 170
+        local barH = 30
+        local barX = l.x + l.w / 2 - barW / 2
+        local barY = l.y + 36
+        nvgBeginPath(nvg)
+        nvgRoundedRect(nvg, barX, barY, barW, barH, 15)
+        nvgFillColor(nvg, nvgRGBA(50, 35, 10, 200))
+        nvgFill(nvg)
+        nvgStrokeColor(nvg, nvgRGBA(230, 180, 60, 180))
+        nvgStrokeWidth(nvg, 1.5)
+        nvgStroke(nvg)
+        nvgFontFace(nvg, "sans")
+        nvgFontSize(nvg, 17)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(nvg, nvgRGBA(255, 220, 80, 240))
+        nvgText(nvg, barX + barW / 2, barY + barH / 2,
+            string.format("🌪️ 风沙肆虐 %d回合", turnsLeft))
+    end
+
     -- 9.8 连击奖励全屏公告
     local ann = G.battle.comboAnnouncement
     if ann and ann.timer > 0 then
@@ -77,12 +166,12 @@ function BoardWidget_Overlays.Render(ctx)
         if alpha > 5 then
             local centerX = l.x + l.w / 2
             -- 放在击杀目标条下方，不遮挡棋盘
-            -- 如果 Boss 技能公告正在播放，下移避让（技能横幅高度约 128px）
+            -- 如果 Boss 技能公告正在播放，下移避让（技能横幅高度约 120px，起始 y+50）
             local hasBossAnn = (G.battle.bossSkillAnnounce and G.battle.bossSkillAnnounce.timer > 0)
             -- killBar 高度约 44+36=80px，公告放在其下方
             local hasKillBar = (G.killBar and G.killBar:IsVisible())
             local baseY = hasKillBar and (l.y + 145) or (l.y + 105)
-            local centerY = hasBossAnn and (baseY + 45) or baseY
+            local centerY = hasBossAnn and (baseY + 100) or baseY
             -- 淡出时上飘
             if progress > 0.75 then
                 centerY = centerY - (progress - 0.75) / 0.25 * 25
@@ -297,7 +386,7 @@ function BoardWidget_Overlays.Render(ctx)
         if alpha > 5 then
             -- 右上角位置：距顶部约 12%，连击公告激活时下移
             local badgeCY = l.y + l.h * 0.12 + goldBadgeExtraY
-            local subText = string.format("连击 %d → %d", cmAnn.oldCombo, cmAnn.newCombo)
+            local subText = string.format("连击 %d -> %d", cmAnn.oldCombo, cmAnn.newCombo)
             drawGoldBadge(cmAnn, "🔥 连击心得发动!", subText, badgeCY, alpha, scaleF, progress)
         end
     end
@@ -324,7 +413,7 @@ function BoardWidget_Overlays.Render(ctx)
             if lpAnn and lpAnn.timer and lpAnn.timer > 0 then offsetY = offsetY + 70 end
             local badgeCY = l.y + l.h * 0.12 + goldBadgeExtraY + offsetY
             local stacks = shAnn.stacks or (G.battle.setEffects and G.battle.setEffects.bloodRageStacks) or 1
-            drawGoldBadge(shAnn, "🩸 嗜血猎魂发动!", string.format("血怒 ATK×1.5  叠层×%d", stacks), badgeCY, alpha, scaleF, progress)
+            drawGoldBadge(shAnn, "🩸 嗜血猎魂发动!", string.format("血怒 ATKx1.5  叠层x%d", stacks), badgeCY, alpha, scaleF, progress)
         end
     end
 
@@ -470,9 +559,9 @@ function BoardWidget_Overlays.Render(ctx)
         if alpha > 3 then
             nvgSave(nvg)
 
-            -- 横幅参数：覆盖棋盘上方大区域
+            -- 横幅参数：覆盖棋盘上方大区域（留出顶部间距）
             local bannerH = 120 * scaleY
-            local bannerY = l.y + 8
+            local bannerY = l.y + 50
             local bannerX = l.x
             local bannerW = l.w
             local centerX = bannerX + bannerW / 2
@@ -536,26 +625,26 @@ function BoardWidget_Overlays.Render(ctx)
             nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
 
             -- 6) 技能图标（大号，居中偏左）
-            local iconSize = 38
+            local iconSize = 48
             nvgFontSize(nvg, iconSize)
             nvgFillColor(nvg, nvgRGBA(255, 255, 255, alpha))
-            nvgText(nvg, centerX - 80, centerY - 8, ska.icon)
+            nvgText(nvg, centerX - 100, centerY - 8, ska.icon)
 
             -- 7) 技能名称（大字，发光效果）
-            nvgFontSize(nvg, 28)
+            nvgFontSize(nvg, 36)
             -- 外发光
-            nvgFontBlur(nvg, 8)
+            nvgFontBlur(nvg, 10)
             nvgFillColor(nvg, nvgRGBA(cr, cg, cb, math.floor(alpha * 0.7)))
-            nvgText(nvg, centerX + 10, centerY - 16, ska.skillName)
+            nvgText(nvg, centerX + 10, centerY - 18, ska.skillName)
             -- 实体字
             nvgFontBlur(nvg, 0)
             nvgFillColor(nvg, nvgRGBA(255, 255, 255, alpha))
-            nvgText(nvg, centerX + 10, centerY - 16, ska.skillName)
+            nvgText(nvg, centerX + 10, centerY - 18, ska.skillName)
 
             -- 8) 技能描述
-            nvgFontSize(nvg, 16)
+            nvgFontSize(nvg, 20)
             nvgFillColor(nvg, nvgRGBA(220, 210, 200, math.floor(alpha * 0.85)))
-            nvgText(nvg, centerX + 10, centerY + 16, ska.desc)
+            nvgText(nvg, centerX + 10, centerY + 20, ska.desc)
 
             -- 9) Boss名称（右下角小字）
             if ska.bossName and #ska.bossName > 0 then
@@ -570,8 +659,8 @@ function BoardWidget_Overlays.Render(ctx)
             local triA = math.floor(alpha * (0.4 + math.sin(gt * 6.0) * 0.2))
             nvgFontSize(nvg, 20)
             nvgFillColor(nvg, nvgRGBA(cr, cg, cb, triA))
-            nvgText(nvg, bannerX + 24, centerY, "◆")
-            nvgText(nvg, bannerX + bannerW - 24, centerY, "◆")
+            nvgText(nvg, bannerX + 24, centerY, "<>")
+            nvgText(nvg, bannerX + bannerW - 24, centerY, "<>")
 
             nvgRestore(nvg)
         end
@@ -674,8 +763,8 @@ function BoardWidget_Overlays.Render(ctx)
             local dA = math.floor(alpha * (0.5 + math.sin(gt * 8.0) * 0.3))
             nvgFontSize(nvg, 22)
             nvgFillColor(nvg, nvgRGBA(255, 40, 40, dA))
-            nvgText(nvg, bannerX + 30, centerY, "◆")
-            nvgText(nvg, bannerX + bannerW - 30, centerY, "◆")
+            nvgText(nvg, bannerX + 30, centerY, "<>")
+            nvgText(nvg, bannerX + bannerW - 30, centerY, "<>")
 
             nvgRestore(nvg)
         end

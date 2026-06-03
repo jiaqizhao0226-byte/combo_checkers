@@ -42,8 +42,8 @@ Equipment.RARITIES = {
 
 Equipment.RARITY_MULT = {
     blue   = 1.0,
-    purple = 1.5,
-    gold   = 2.0,
+    purple = 1.7,
+    gold   = 2.5,
 }
 
 Equipment.RARITY_DECOMPOSE = {
@@ -117,31 +117,31 @@ end
 
 Equipment.ITEMS = {
     -- ==================== 套装1: 飞跃先锋 🦅 ====================
-    -- 均衡型套装：中等攻击、中等暴击、坚实防御
-    { id = "leap_axe",       name = "先锋战斧", nameBlue = "铁斧",   namePurple = "精钢斧",   icon = "🦅", iconId = "equip_item_frost",  slot = "weapon",       setId = "leap_pioneer",  stats = { atk = 5 },  desc = "开拓者的巨斧" },
-    { id = "leap_charm",     name = "先锋护符", nameBlue = "木护符", namePurple = "翡翠护符", icon = "🦅", iconId = "equip_item_frost",  slot = "necklace",     setId = "leap_pioneer",  stats = { crit = 3 }, desc = "先锋之力护符" },
+    -- 坦克型套装：高HP/DEF，中等ATK，少量暴击
+    { id = "leap_axe",       name = "先锋战斧", nameBlue = "铁斧",   namePurple = "精钢斧",   icon = "🦅", iconId = "equip_item_frost",  slot = "weapon",       setId = "leap_pioneer",  stats = { atk = 7 },  desc = "开拓者的巨斧" },
+    { id = "leap_charm",     name = "先锋护符", nameBlue = "木护符", namePurple = "翡翠护符", icon = "🦅", iconId = "equip_item_frost",  slot = "necklace",     setId = "leap_pioneer",  stats = { crit = 4 }, desc = "先锋之力护符" },
     { id = "leap_helm",      name = "先锋角盔", nameBlue = "皮盔",   namePurple = "银角盔",   icon = "🦅", iconId = "equip_item_frost",  slot = "helmet",       setId = "leap_pioneer",  stats = { def = 3 },  desc = "冲锋号角头盔" },
-    { id = "leap_plate",     name = "先锋铠甲", nameBlue = "链甲",   namePurple = "秘银甲",   icon = "🦅", iconId = "equip_item_frost",  slot = "top_armor",    setId = "leap_pioneer",  stats = { def = 4 },  desc = "先锋者的重甲" },
-    { id = "leap_guards",    name = "先锋战裙", nameBlue = "布裙甲", namePurple = "锁环裙甲", icon = "🦅", iconId = "equip_item_frost",  slot = "bottom_armor", setId = "leap_pioneer",  stats = { hp = 15 },  desc = "先锋者的裙甲" },
-    { id = "leap_boots",     name = "先锋跃靴", nameBlue = "草鞋",   namePurple = "疾风靴",   icon = "🦅", iconId = "equip_item_frost",  slot = "shoes",        setId = "leap_pioneer",  stats = { hp = 12 },  desc = "弹跳增强之靴" },
+    { id = "leap_plate",     name = "先锋铠甲", nameBlue = "链甲",   namePurple = "秘银甲",   icon = "🦅", iconId = "equip_item_frost",  slot = "top_armor",    setId = "leap_pioneer",  stats = { def = 3 },  desc = "先锋者的重甲" },
+    { id = "leap_guards",    name = "先锋战裙", nameBlue = "布裙甲", namePurple = "锁环裙甲", icon = "🦅", iconId = "equip_item_frost",  slot = "bottom_armor", setId = "leap_pioneer",  stats = { hp = 28 },  desc = "先锋者的裙甲" },
+    { id = "leap_boots",     name = "先锋跃靴", nameBlue = "草鞋",   namePurple = "疾风靴",   icon = "🦅", iconId = "equip_item_frost",  slot = "shoes",        setId = "leap_pioneer",  stats = { hp = 22 },  desc = "弹跳增强之靴" },
 
     -- ==================== 套装2: 连击心得 🔥 ====================
-    -- 轻装型套装：较低基础数值、适中暴击
-    { id = "combo_sword",    name = "心得之剑", nameBlue = "短剑",   namePurple = "利刃剑",   icon = "🔥", iconId = "equip_item_health_ring", slot = "weapon",       setId = "combo_mastery", stats = { atk = 4 },  desc = "领悟连击的剑" },
-    { id = "combo_trinket",  name = "心得挂饰", nameBlue = "铜挂饰", namePurple = "琥珀挂饰", icon = "🔥", iconId = "equip_item_health_ring", slot = "necklace",     setId = "combo_mastery", stats = { crit = 2 }, desc = "连击经验之饰" },
+    -- 暴击型套装：高暴击、适中ATK/HP，较低DEF
+    { id = "combo_sword",    name = "心得之剑", nameBlue = "短剑",   namePurple = "利刃剑",   icon = "🔥", iconId = "equip_item_health_ring", slot = "weapon",       setId = "combo_mastery", stats = { atk = 5 },  desc = "领悟连击的剑" },
+    { id = "combo_trinket",  name = "心得挂饰", nameBlue = "铜挂饰", namePurple = "琥珀挂饰", icon = "🔥", iconId = "equip_item_health_ring", slot = "necklace",     setId = "combo_mastery", stats = { crit = 6 }, desc = "连击经验之饰" },
     { id = "combo_band",     name = "心得发带", nameBlue = "麻发带", namePurple = "丝绒发带", icon = "🔥", iconId = "equip_item_health_ring", slot = "helmet",       setId = "combo_mastery", stats = { def = 2 },  desc = "专注连击的发带" },
-    { id = "combo_vest",     name = "心得战衣", nameBlue = "粗布衣", namePurple = "织锦衣",   icon = "🔥", iconId = "equip_item_health_ring", slot = "top_armor",    setId = "combo_mastery", stats = { def = 3 },  desc = "轻便的战斗衣" },
-    { id = "combo_belt",     name = "心得腰带", nameBlue = "皮腰带", namePurple = "镶石腰带", icon = "🔥", iconId = "equip_item_health_ring", slot = "bottom_armor", setId = "combo_mastery", stats = { hp = 12 },  desc = "连击者的腰带" },
-    { id = "combo_kicks",    name = "心得快靴", nameBlue = "布靴",   namePurple = "轻羽靴",   icon = "🔥", iconId = "equip_item_health_ring", slot = "shoes",        setId = "combo_mastery", stats = { hp = 10 },  desc = "快速反应之靴" },
+    { id = "combo_vest",     name = "心得战衣", nameBlue = "粗布衣", namePurple = "织锦衣",   icon = "🔥", iconId = "equip_item_health_ring", slot = "top_armor",    setId = "combo_mastery", stats = { def = 2 },  desc = "轻便的战斗衣" },
+    { id = "combo_belt",     name = "心得腰带", nameBlue = "皮腰带", namePurple = "镶石腰带", icon = "🔥", iconId = "equip_item_health_ring", slot = "bottom_armor", setId = "combo_mastery", stats = { hp = 20 },  desc = "连击者的腰带" },
+    { id = "combo_kicks",    name = "心得快靴", nameBlue = "布靴",   namePurple = "轻羽靴",   icon = "🔥", iconId = "equip_item_health_ring", slot = "shoes",        setId = "combo_mastery", stats = { hp = 16 },  desc = "快速反应之靴" },
 
     -- ==================== 套装3: 猎魂·嗜血 🩸 ====================
-    -- 攻击型套装：高攻击、高暴击、中等生存
-    { id = "soul_scythe",    name = "猎魂镰",   nameBlue = "铁镰刀", namePurple = "猩红镰刀", icon = "��", iconId = "equip_item_health_ring", slot = "weapon",       setId = "soul_hunter",   stats = { atk = 6 },  desc = "饮血方能长鸣" },
-    { id = "soul_pendant",   name = "血滴吊坠", nameBlue = "骨头坠", namePurple = "红玉坠",   icon = "🩸", iconId = "equip_item_health_ring", slot = "necklace",     setId = "soul_hunter",   stats = { crit = 4 }, desc = "凝固的鲜血吊坠" },
-    { id = "soul_mask",      name = "嗜血面罩", nameBlue = "皮面罩", namePurple = "铁牙面罩", icon = "🩸", iconId = "equip_item_health_ring", slot = "helmet",       setId = "soul_hunter",   stats = { def = 3 },  desc = "猎手的血色面罩" },
-    { id = "soul_armor",     name = "猎魂战甲", nameBlue = "皮甲",   namePurple = "血纹甲",   icon = "🩸", iconId = "equip_item_health_ring", slot = "top_armor",    setId = "soul_hunter",   stats = { def = 4 },  desc = "以猎物血肉锻造" },
-    { id = "soul_greaves",   name = "猩红护腿", nameBlue = "布护腿", namePurple = "猩红裙甲", icon = "🩸", iconId = "equip_item_health_ring", slot = "bottom_armor", setId = "soul_hunter",   stats = { hp = 15 },  desc = "染红的猎手护腿" },
-    { id = "soul_boots",     name = "猩血战靴", nameBlue = "软皮靴", namePurple = "血迹战靴", icon = "🩸", iconId = "equip_item_health_ring", slot = "shoes",        setId = "soul_hunter",   stats = { hp = 12 },  desc = "踏血而行的战靴" },
+    -- 攻击型套装：最高ATK、中等暴击/HP，较低DEF
+    { id = "soul_scythe",    name = "猎魂镰",   nameBlue = "铁镰刀", namePurple = "猩红镰刀", icon = "��", iconId = "equip_item_health_ring", slot = "weapon",       setId = "soul_hunter",   stats = { atk = 9 },  desc = "饮血方能长鸣" },
+    { id = "soul_pendant",   name = "血滴吊坠", nameBlue = "骨头坠", namePurple = "红玉坠",   icon = "🩸", iconId = "equip_item_health_ring", slot = "necklace",     setId = "soul_hunter",   stats = { crit = 5 }, desc = "凝固的鲜血吊坠" },
+    { id = "soul_mask",      name = "嗜血面罩", nameBlue = "皮面罩", namePurple = "铁牙面罩", icon = "🩸", iconId = "equip_item_health_ring", slot = "helmet",       setId = "soul_hunter",   stats = { def = 2 },  desc = "猎手的血色面罩" },
+    { id = "soul_armor",     name = "猎魂战甲", nameBlue = "皮甲",   namePurple = "血纹甲",   icon = "🩸", iconId = "equip_item_health_ring", slot = "top_armor",    setId = "soul_hunter",   stats = { def = 3 },  desc = "以猎物血肉锻造" },
+    { id = "soul_greaves",   name = "猩红护腿", nameBlue = "布护腿", namePurple = "猩红裙甲", icon = "🩸", iconId = "equip_item_health_ring", slot = "bottom_armor", setId = "soul_hunter",   stats = { hp = 22 },  desc = "染红的猎手护腿" },
+    { id = "soul_boots",     name = "猩血战靴", nameBlue = "软皮靴", namePurple = "血迹战靴", icon = "🩸", iconId = "equip_item_health_ring", slot = "shoes",        setId = "soul_hunter",   stats = { hp = 18 },  desc = "踏血而行的战靴" },
 }
 
 --- 获取装备定义
@@ -323,8 +323,23 @@ local function rollPityGold(playerData)
     return { id = pick.id, rarity = "gold" }
 end
 
-local function rollOneItem()
+local function rollOneItem(playerData)
     local rarity = rollRarity()
+    if rarity == "gold" and playerData then
+        -- 金色时优先给玩家未拥有的装备
+        local owned = collectOwnedGoldIds(playerData)
+        local candidates = {}
+        for _, itemDef in ipairs(Equipment.ITEMS) do
+            if not owned[itemDef.id] then
+                candidates[#candidates + 1] = itemDef
+            end
+        end
+        if #candidates > 0 then
+            local pick = candidates[math.random(1, #candidates)]
+            return { id = pick.id, rarity = "gold" }
+        end
+        -- 全部集齐则随机一个
+    end
     local itemDef = Equipment.ITEMS[math.random(1, #Equipment.ITEMS)]
     return {
         id = itemDef.id,
@@ -351,7 +366,7 @@ function Equipment.Pull(playerData, count)
             playerData.pityCounter = 0
             log:Write(LOG_INFO, "[Gacha] 保底触发! 获得金色: " .. item.id)
         else
-            item = rollOneItem()
+            item = rollOneItem(playerData)
             -- 自然出金时也重置计数器
             if item.rarity == "gold" then
                 playerData.pityCounter = 0

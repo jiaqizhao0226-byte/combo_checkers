@@ -80,7 +80,7 @@ function SettingsPopup.Show()
                     type = "linear", direction = "to-bottom",
                     from = {38, 32, 68, 255}, to = {22, 18, 45, 255},
                 },
-                borderRadius = 16,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {90, 70, 160, 150},
                 paddingTop = 20, paddingBottom = 20,
@@ -213,7 +213,7 @@ function SettingsPopup.Show()
                                             fontSize = 16,
                                             flexGrow = 1,
                                             paddingTop = 7, paddingBottom = 7,
-                                            borderRadius = 12,
+                                            borderRadius = 0,
                                             borderWidth = 1,
                                             borderColor = isActive
                                                 and {255, 200, 60, 200}
@@ -299,7 +299,7 @@ function SettingsPopup.Show()
                                             fontSize = 16,
                                             paddingLeft = 12, paddingRight = 12,
                                             paddingTop = 7, paddingBottom = 7,
-                                            borderRadius = 12,
+                                            borderRadius = 0,
                                             borderWidth = 1,
                                             borderColor = isActive
                                                 and {255, 200, 60, 200}
@@ -351,7 +351,7 @@ function SettingsPopup.Show()
                         text = "关闭",
                         fontSize = 19, fontWeight = "bold",
                         width = "100%", height = 42,
-                        borderRadius = 12,
+                        borderRadius = 0,
                         backgroundGradient = {
                             type = "linear", direction = "to-bottom",
                             from = {70, 55, 130, 255}, to = {45, 35, 90, 255},

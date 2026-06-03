@@ -16,7 +16,7 @@ local currentBGM = ""
 local bgmSource = nil
 
 -- 音量设置
-AM.bgmVolume = 0.12
+AM.bgmVolume = 0.25
 AM.sfxVolume = 0.6
 
 -- 连跳音效风格: "scale" = 音阶递进, "classic" = 经典跳跃音
@@ -35,7 +35,7 @@ AM.BGM = {
     boss_abyss     = "audio/bgm_boss_abyss.ogg",      -- 深渊海妖专属（深海压迫恐惧）
     boss_coral     = "audio/music_1779514990986.ogg",  -- 珊瑚守卫专属（海洋宫殿决战）
     battle_desert  = "audio/music_1779955577605.ogg", -- 第四章沙漠战斗（阿拉伯风打击乐）
-    boss_sand      = "audio/music_1779956688332.ogg", -- 沙丘巨虫专属（史诗战鼓）
+    boss_sand      = "audio/music_1780301089822.ogg", -- 沙丘巨虫专属（激烈管弦+战鼓+中东弦乐）
 }
 
 -- ============================================================================

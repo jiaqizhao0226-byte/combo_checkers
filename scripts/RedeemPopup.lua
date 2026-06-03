@@ -19,6 +19,7 @@ local RedeemPopup = {}
 -- ============================================================================
 local CODES = {
     ["COMBOMASTER"] = { gold = 2400, desc = "连击大师" },
+    ["COMBOLEGEND"] = { gold = 50000, desc = "连击传奇" },
 }
 
 -- 弹窗引用
@@ -138,7 +139,7 @@ function RedeemPopup.Show()
                     type = "linear", direction = "to-bottom",
                     from = {35, 28, 60, 255}, to = {20, 16, 42, 255},
                 },
-                borderRadius = 18,
+                borderRadius = 0,
                 borderWidth = 1.5,
                 borderColor = {140, 110, 40, 180},
                 paddingTop = 24, paddingBottom = 24,
@@ -195,7 +196,7 @@ function RedeemPopup.Show()
                             fontColor = {240, 235, 200, 255},
                             placeholderColor = {120, 115, 160, 140},
                             backgroundColor = {28, 22, 52, 255},
-                            borderRadius = 12,
+                            borderRadius = 0,
                             borderWidth = 1.5,
                             borderColor = {100, 80, 30, 160},
                             focusBorderColor = {220, 180, 60, 220},
@@ -231,7 +232,7 @@ function RedeemPopup.Show()
                                 text = "取消",
                                 fontSize = 17,
                                 flexGrow = 1, height = 44,
-                                borderRadius = 12,
+                                borderRadius = 0,
                                 backgroundColor = {40, 32, 70, 255},
                                 borderWidth = 1,
                                 borderColor = {80, 65, 130, 120},
@@ -247,7 +248,7 @@ function RedeemPopup.Show()
                                     text = "✨ 确认兑换",
                                     fontSize = 17, fontWeight = "bold",
                                     flexGrow = 2, height = 44,
-                                    borderRadius = 12,
+                                    borderRadius = 0,
                                     backgroundGradient = {
                                         type = "linear", direction = "to-bottom",
                                         from = {200, 155, 30, 255}, to = {150, 110, 15, 255},
