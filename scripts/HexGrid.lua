@@ -1,3 +1,4 @@
+---@diagnostic disable: return-type-mismatch
 -- ============================================================================
 -- HexGrid.lua - 六角格核心模块
 -- 坐标系: pointy-top, odd-r offset (1-based)
@@ -322,18 +323,10 @@ end
 
 --- 获取指定位置的"可跳跃支点"（障碍物 OR 活跃祭坛），用于飞跃先锋
 function HexGrid.GetJumpSupportAt(board, col, row)
-    -- 先检查障碍物
+    -- 只检查障碍物（岩石等）作为跳跃支点
+    -- 祭坛是特殊格子，不能被当做跳板
     local obs = HexGrid.GetObstacleAt(board, col, row)
     if obs then return obs end
-    -- 再检查祭坛（第二章火焰祭坛）
-    if board.altars then
-        for _, alt in ipairs(board.altars) do
-            if alt.active and alt.col == col and alt.row == row then
-                alt.isAltar = true  -- 标记为祭坛，跳跃处理时区分
-                return alt
-            end
-        end
-    end
     return nil
 end
 
@@ -633,6 +626,7 @@ end
 function HexGrid.FindValidJumps(board, col, row, maxJumpOver, opts)
     maxJumpOver = maxJumpOver or 1
     local ch3Rocks = opts and opts.ch3Rocks  -- 第三章：先锋飞跃落点石头可被突破
+    local scarecrow = opts and opts.scarecrow  -- 稻草人可作为跳跃支撑点（友方目标）
     local jumps = {}
     local hx, hy, hz = HexGrid.OffsetToCube(col, row)
 
@@ -841,6 +835,38 @@ function HexGrid.FindValidJumps(board, col, row, maxJumpOver, opts)
 
             -- 第四章: 流沙区阻断方向扫描（不可飞越）
             if HexGrid.IsInQuicksandZone(board, ec, er) then break end
+
+            -- 稻草人: 友方目标，可作为跳跃支撑点（同岩石逻辑，不造成伤害）
+            if scarecrow and scarecrow.col == ec and scarecrow.row == er then
+                local lx = ex + dir[1] * dist
+                local ly = ey + dir[2] * dist
+                local lz = ez + dir[3] * dist
+                local lc, lr = HexGrid.CubeToOffset(lx, ly, lz)
+                if HexGrid.InBounds(lc, lr) and not HexGrid.IsBlocked(board, lc, lr) then
+                    local landingClear = true
+                    for step = 1, dist - 1 do
+                        local mx = ex + dir[1] * step
+                        local my = ey + dir[2] * step
+                        local mz = ez + dir[3] * step
+                        local mc, mr = HexGrid.CubeToOffset(mx, my, mz)
+                        if HexGrid.IsBlocked(board, mc, mr) or HexGrid.GetItemAt(board, mc, mr) then
+                            landingClear = false
+                            break
+                        end
+                    end
+                    if landingClear then
+                        jumps[#jumps + 1] = {
+                            col = lc, row = lr,
+                            enemy = nil,
+                            jumpedCol = ec, jumpedRow = er,
+                            isRockJump = true,
+                            isScarecrowJump = true,
+                            dist = dist,
+                        }
+                    end
+                end
+                break  -- 稻草人阻断此方向继续扫描
+            end
 
             -- 棋子/怪物检查（优先于道具，防止道具覆盖怪物判断）
             local piece = HexGrid.GetPieceAt(board, ec, er)
@@ -1162,14 +1188,13 @@ local ENEMY_FRAMES = {
     sand_scorpion    = "image/enemy_sand_scorpion_idle_20260528082515.png",
     quicksand_worm   = "image/enemy_quicksand_worm_idle_20260528082519.png",
     sand_hawk        = "image/enemy_sand_hawk_idle_20260528082518.png",
+    sand_strider     = "image/enemy_sand_strider_idle_20260604061442.png",
+    sand_rattler     = "image/enemy_sand_rattler_idle_20260604061452.png",
+    venom_lizard     = "image/enemy_venom_lizard_idle_20260604061425.png",
 }
 
 --- Boss 精灵图资源路径 (bossType → {normal, enraged})
 local BOSS_FRAMES = {
-    shadow_knight = {
-        normal  = "image/boss_shadow_knight_normal_20260424093441.png",
-        enraged = "image/boss_shadow_knight_enraged_20260424093436.png",
-    },
     abyss_kraken = {
         normal  = "image/boss_abyss_kraken_normal_20260424093442.png",
         enraged = "image/boss_abyss_kraken_enraged_20260424093438.png",
@@ -1184,7 +1209,7 @@ local BOSS_FRAMES = {
     },
     sand_worm = {
         normal  = "image/sandworm_head_new_20260601072952.png",
-        enraged = "image/sandworm_head_new_20260601072952.png",  -- 暂用同一张，后续可替换狂暴版
+        enraged = "image/boss_sand_worm_enraged_20260604061426.png",
         body    = "image/sandworm_body_20260529063642.png",
     },
 }

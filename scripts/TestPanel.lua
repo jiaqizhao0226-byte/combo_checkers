@@ -1,3 +1,4 @@
+---@diagnostic disable: param-type-mismatch, assign-type-mismatch
 -- ============================================================================
 -- TestPanel.lua - 套装试用面板
 -- 一键穿戴金色6件套 → 重开当前关卡 → 实战体验套装效果
@@ -42,11 +43,11 @@ local function equipFullGoldSet(setId)
     end
 end
 
---- 卸下所有装备
+--- 卸下所有装备（装备移回背包，不会丢失）
 local function unequipAll()
     if not G.playerData then return end
     for _, slot in ipairs(Equipment.SLOT_ORDER) do
-        G.playerData.equipment[slot] = nil
+        PlayerData.UnequipItem(G.playerData, slot)
     end
 end
 
@@ -579,6 +580,57 @@ function TestPanel.Show()
                     -- 分隔线
                     UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 60} },
 
+                    -- 道具系统测试
+                    UI.Panel {
+                        width = "100%", gap = 6,
+                        children = {
+                            UI.Label {
+                                text = "🎒 道具系统测试",
+                                fontSize = 14, fontWeight = "bold",
+                                fontColor = {200, 195, 230, 230},
+                            },
+                            UI.Label {
+                                text = "所有道具摆在英雄周围，走过去拾取测试",
+                                fontSize = 11, fontColor = {140, 135, 175, 140},
+                            },
+                            UI.Panel {
+                                width = "100%",
+                                flexDirection = "row", gap = 8,
+                                children = {
+                                    UI.Button {
+                                        text = "🎒 道具测试",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {50, 80, 50, 255}, to = {30, 60, 80, 255},
+                                        },
+                                        fontColor = {180, 255, 200, 255},
+                                        borderWidth = 1,
+                                        borderColor = {100, 180, 120, 150},
+                                        pressedBackgroundColor = {40, 60, 40, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            TestPanel.Close()
+                                            local TurnFlow = require "TurnFlow"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            Battle.GenerateTestLevel_Items(G.battle)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+
+                    -- 分隔线
+                    UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 60} },
+
                     -- 组合技测试
                     UI.Panel {
                         width = "100%", gap = 6,
@@ -660,6 +712,148 @@ function TestPanel.Show()
                                             TurnFlow.ClearPlan()
                                             if G.resultPanel then G.resultPanel:SetVisible(false) end
                                             TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+
+                    -- 分隔线
+                    UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 60} },
+
+                    -- 新技能测试（每点一次升1级，首次点击生成测试关）
+                    UI.Panel {
+                        width = "100%", gap = 6,
+                        children = {
+                            UI.Label {
+                                text = "🆕 新技能测试",
+                                fontSize = 14, fontWeight = "bold",
+                                fontColor = {200, 195, 230, 230},
+                            },
+                            UI.Label {
+                                text = "每点一次+1级(最高Lv5)，首次点击生成测试关",
+                                fontSize = 11, fontColor = {140, 135, 175, 140},
+                            },
+                            UI.Panel {
+                                width = "100%",
+                                flexDirection = "row", gap = 8,
+                                children = {
+                                    -- 冰霜印记
+                                    UI.Button {
+                                        text = "❄ 冰霜印记",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {30, 80, 140, 255}, to = {20, 50, 100, 255},
+                                        },
+                                        fontColor = {140, 220, 255, 255},
+                                        borderWidth = 1,
+                                        borderColor = {80, 160, 220, 150},
+                                        pressedBackgroundColor = {20, 50, 90, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["frost_mark"] = 1
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["frost_mark"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["frost_mark"] = newLv
+                                                self:SetText("❄ 冰霜Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
+                                        end,
+                                    },
+                                    -- 棋步
+                                    UI.Button {
+                                        text = "♟ 棋步",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {100, 80, 30, 255}, to = {70, 55, 20, 255},
+                                        },
+                                        fontColor = {255, 220, 120, 255},
+                                        borderWidth = 1,
+                                        borderColor = {200, 170, 60, 150},
+                                        pressedBackgroundColor = {70, 55, 15, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["kingmaker"] = 1
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["kingmaker"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["kingmaker"] = newLv
+                                                self:SetText("♟ 棋步Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
+                                        end,
+                                    },
+                                    -- 引力
+                                    UI.Button {
+                                        text = "⬇ 引力",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {70, 30, 120, 255}, to = {50, 20, 90, 255},
+                                        },
+                                        fontColor = {200, 140, 255, 255},
+                                        borderWidth = 1,
+                                        borderColor = {140, 80, 220, 150},
+                                        pressedBackgroundColor = {50, 20, 80, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["gravity_pull"] = 1
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["gravity_pull"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["gravity_pull"] = newLv
+                                                self:SetText("⬇ 引力Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
                                         end,
                                     },
                                 },

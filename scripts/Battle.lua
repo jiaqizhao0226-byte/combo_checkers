@@ -62,6 +62,10 @@ function Battle.CalcEnemyDmg(atk, def)
     local d = def or 0
     local reduction = d / (d + 100)
     local dmg = math.ceil(atk * (1 - reduction))
+    -- 厄运轮盘: 脆弱诅咒期间承伤+30%
+    if G and G.battle and G.battle.doomDamageTakenTurns and G.battle.doomDamageTakenTurns > 0 then
+        dmg = math.ceil(dmg * 1.3)
+    end
     return math.max(1, dmg)  -- 最低保底1点伤害
 end
 
@@ -944,8 +948,8 @@ local function placeBossForTest(state, bossKey, chapter)
 
     local boss = Battle.CreatePiece(bossTemplate, bossCol, bossRow)
     -- 与正式关卡相同的缩放
-    local bossHpScale = 1.0 + 0.15 * (chapter - 1)
-    local bossAtkScale = 1.0 + 0.1 * (chapter - 1)
+    local bossHpScale = 1.0 + 0.25 * (chapter - 1)
+    local bossAtkScale = 1.0 + 0.18 * (chapter - 1)
     boss.hp = math.floor(boss.hp * bossHpScale)
     boss.maxHp = boss.hp
     boss.atk = math.floor(boss.atk * bossAtkScale)
@@ -955,7 +959,6 @@ local function placeBossForTest(state, bossKey, chapter)
 
     -- Boss 入场公告
     local bossIcons = {
-        shadow_knight = "🗡️",
         lava_lord = "🌋",
         abyss_kraken = "🐙",
         coral_guardian = "🪸",
@@ -980,8 +983,8 @@ end
 ---@param usedPositions table 已占用位置集合
 local function placeMinionsForTest(state, enemyTypes, count, chapter, usedPositions)
     local board = state.board
-    local bossHpScaleM = 1.0 + 0.12 * (chapter - 1)
-    local bossAtkScaleM = 1.0 + 0.08 * (chapter - 1)
+    local bossHpScaleM = 1.0 + 0.20 * (chapter - 1)
+    local bossAtkScaleM = 1.0 + 0.15 * (chapter - 1)
 
     -- 收集空位，优先中间环带
     local candidates = {}
@@ -1029,7 +1032,7 @@ function Battle.GenerateTestLevel_Boss_AbyssKraken(state)
     usedPositions[boss.col .. "," .. boss.row] = true
 
     -- 第一章小怪
-    placeMinionsForTest(state, { "slime", "skeleton", "jellyfish", "iron_turtle" }, 5, 1, usedPositions)
+    placeMinionsForTest(state, { "jellyfish", "iron_turtle", "vortex_eel", "archerfish", "electric_ray" }, 5, 1, usedPositions)
 
     -- 道具
     Battle.TrySpawnItems(state, 2)
@@ -1326,6 +1329,106 @@ function Battle.GenerateTestLevel_StepStrike(state)
     Battle.AddLog(state, "注意: 踏步斩在每步移动/每次跳跃落地时各触发一次")
 end
 
+-- ============================================================================
+-- 道具系统测试关卡：棋盘上摆放所有种类道具供逐个拾取测试
+-- ============================================================================
+function Battle.GenerateTestLevel_Items(state)
+    state.level = 1
+    state.testMode = "items"
+    local board = state.board
+
+    board.pieces      = {}
+    board.obstacles   = {}
+    board.items       = {}
+    board.poisonTiles = {}
+    board.wards       = {}
+    board.frostTiles  = {}
+
+    HexGrid.ResetToHexagon()
+    board.cols = HexGrid.COLS
+    board.rows = HexGrid.ROWS
+
+    state.kills          = 0
+    state.killTarget     = 999
+    state.comboKillCount = 0
+    state.comboAtkBonus  = 0
+    state.boss           = nil
+
+    -- 英雄放在棋盘中心
+    local heroCol = HexGrid.CENTER_COL
+    local heroRow = HexGrid.CENTER_ROW
+    if not state.hero then
+        state.hero = Battle.CreatePiece(HERO_TEMPLATE, heroCol, heroRow)
+        local bs = state.bonusStats or {}
+        state.hero.atk   = math.floor(state.hero.atk  + (bs.atk or 0))
+        state.hero.def   = math.floor(state.hero.def  + (bs.def or 0))
+        state.hero.hp    = math.floor(state.hero.hp   + (bs.hp  or 0))
+        state.hero.maxHp = math.floor(state.hero.maxHp + (bs.hp or 0))
+    else
+        state.hero.col = heroCol
+        state.hero.row = heroRow
+    end
+    -- 让英雄掉一些血，方便测试回复道具
+    state.hero.hp = math.max(1, math.floor(state.hero.maxHp * 0.4))
+
+    if G.playerData then
+        state.critRate  = PlayerData.GetCritRate(G.playerData)
+        state.goldBonus = PlayerData.GetGoldBonus(G.playerData)
+        state.setEffects = SetEffects.Init(G.playerData.equipment, state.critRate)
+    end
+
+    HexGrid.AddPiece(board, state.hero)
+
+    -- 道具测试布局：靶子在英雄相邻格，道具在跳过靶子后的落点上
+    -- 英雄(5,5) → 跳过靶子(相邻) → 落在道具格(距离2)
+    -- 六方向对应的 靶子位置 和 落点位置:
+    --   方向右:     英雄(5,5) → 靶子(6,5) → 落点(7,5)
+    --   方向左:     英雄(5,5) → 靶子(4,5) → 落点(3,5)
+    --   方向右上:   英雄(5,5) → 靶子(5,4) → 落点(5,3)
+    --   方向左上:   英雄(5,5) → 靶子(4,4) → 落点(4,3)
+    --   方向右下:   英雄(5,5) → 靶子(5,6) → 落点(5,7)
+    --   方向左下:   英雄(5,5) → 靶子(4,6) → 落点(4,7)
+    local itemPlacements = {
+        { col = 7, row = 5, type = "lucky_wheel" },   -- 跳过右侧靶子(6,5)后落地
+        { col = 3, row = 5, type = "doom_wheel" },    -- 跳过左侧靶子(4,5)后落地
+        { col = 6, row = 3, type = "health_potion" }, -- 跳过右上靶子(5,4)后落地 (cube: 2*enemy-hero)
+        { col = 4, row = 3, type = "gold_bag" },      -- 跳过左上靶子(4,4)后落地
+        { col = 6, row = 7, type = "lucky_wheel" },   -- 跳过右下靶子(5,6)后落地 (cube: 2*enemy-hero)
+        { col = 4, row = 7, type = "shield" },        -- 跳过左下靶子(4,6)后落地
+    }
+
+    for _, item in ipairs(itemPlacements) do
+        if HexGrid.InBounds(item.col, item.row) then
+            HexGrid.AddItem(board, { col = item.col, row = item.row, type = item.type })
+        end
+    end
+
+    -- 靶子放在英雄相邻格（英雄可以跳过它们）
+    local weakTemplate = {
+        team = "enemy", enemyType = "slime",
+        hp = 80, maxHp = 80, atk = 3, attackRange = 1,
+        attackLabel = "轻击", name = "靶子",
+    }
+    local enemyPositions = {
+        { col = 6, row = 5 },  -- 右
+        { col = 4, row = 5 },  -- 左
+        { col = 5, row = 4 },  -- 右上
+        { col = 4, row = 4 },  -- 左上
+        { col = 5, row = 6 },  -- 右下
+        { col = 4, row = 6 },  -- 左下
+    }
+    for _, pos in ipairs(enemyPositions) do
+        if HexGrid.InBounds(pos.col, pos.row) then
+            HexGrid.AddPiece(board, Battle.CreatePiece(weakTemplate, pos.col, pos.row))
+        end
+    end
+
+    Battle.AddLog(state, "=== 🎒 道具系统测试关卡 ===")
+    Battle.AddLog(state, "棋盘中央有各种道具，走过去拾取测试效果")
+    Battle.AddLog(state, "道具: 小血瓶/大血瓶/金币袋/护盾/幸运轮盘/厄运轮盘")
+    Battle.AddLog(state, "四角放了靶子(HP80)用于测试幸运一击等需要敌人的效果")
+end
+
 --- 刷新所有敌人的祭坛减伤状态
 --- 1个祭坛笼罩=80%减伤，2个及以上=90%减伤
 function Battle.UpdateAltarShields(state)
@@ -1504,7 +1607,11 @@ function Battle.GenerateLevel(state, level)
         if Battle.IsBossLevel(level) then
             state.killTarget = 999  -- Boss关: 击杀Boss即过关
         else
-            state.killTarget = 6 + ch + math.floor(stg / 2)
+            state.killTarget = 4 + ch + math.floor(stg / 2)
+        end
+        -- 每章第1关重置厄运转盘刷出计数（每章最多1个）
+        if stg == 1 then
+            state.doomWheelSpawnedThisChapter = 0
         end
     end
 
@@ -1628,15 +1735,37 @@ function Battle.GenerateLevel(state, level)
         claimPos(bossCol, bossRow)
 
         local boss = Battle.CreatePiece(bossTemplate, bossCol, bossRow)
-        -- Boss 按章节缩放（比普通敌人温和）
-        local bossHpScale = 1.0 + 0.15 * (chapter - 1)
-        local bossAtkScale = 1.0 + 0.1 * (chapter - 1)
+        -- Boss 按章节缩放（每章递增显著）
+        local bossHpScale = 1.0 + 0.25 * (chapter - 1)
+        local bossAtkScale = 1.0 + 0.18 * (chapter - 1)
         boss.hp = math.floor(boss.hp * bossHpScale)
         boss.maxHp = boss.hp
         boss.atk = math.floor(boss.atk * bossAtkScale)
         boss.shieldMax = math.floor(boss.shieldMax * bossHpScale)
         HexGrid.AddPiece(board, boss)
         state.boss = boss
+
+        -- === Boss初始技能CD：让技能错开就绪，前几回合Boss以移动/普攻为主 ===
+        -- 全局CD机制保证"技能→普攻→技能"交替，初始CD确保开场安全期
+        boss.skillGlobalCD = 2  -- 开场前2回合只普攻/移动
+        if bossKey == "abyss_kraken" then
+            boss.abyssClawCooldown  = 2   -- 近身重击
+            boss.tentacleCooldown   = 4   -- 触手障碍
+            boss.whirlpoolCooldown  = 6   -- 漩涡牵引
+        elseif bossKey == "lava_lord" then
+            boss.lavaFistCooldown   = 2   -- 熔岩重拳
+            boss.flameBoltCooldown  = 4   -- 火焰弹射
+            boss.eruptionCooldown   = 6   -- 火山爆发
+            boss.shieldRegenCooldown = 5  -- 护盾再生
+        elseif bossKey == "coral_guardian" then
+            boss.tideSurgeCooldown  = 3   -- 潮汐冲击
+            boss.coralThrowCooldown = 5   -- 珊瑚投掷
+            boss.coralSealCooldown  = 7   -- 珊瑚封印
+        elseif bossKey == "sand_worm" then
+            boss.burrowCooldown     = 4   -- 钻地
+            boss.tailWhipCooldown   = 2   -- 尾鞭
+            boss.sandFuryCooldown   = 7   -- 沙暴狂怒
+        end
 
         -- === 第四章沙虫: 创建6个身体段（head已经是boss本体） ===
         if bossKey == "sand_worm" then
@@ -1701,9 +1830,9 @@ function Battle.GenerateLevel(state, level)
         end
 
         -- 按距离分散放置：优先离Boss和英雄都有一定距离的位置
-        local minionCount = 3 + math.min(chapter, 3)  -- 3/4/5/6 随章节递增（减少视觉负担）
-        local bossHpScaleM = 1.0 + 0.12 * (chapter - 1)
-        local bossAtkScaleM = 1.0 + 0.08 * (chapter - 1)
+        local minionCount = 2 + math.min(chapter, 2)  -- 2/3/4/4 随章节递增（Boss战聚焦Boss本身）
+        local bossHpScaleM = 1.0 + 0.20 * (chapter - 1)
+        local bossAtkScaleM = 1.0 + 0.15 * (chapter - 1)
 
         -- 收集所有空位并按离中心距离排序（优先中间环带，避免全挤在边缘或中心）
         local minionCandidates = {}
@@ -1747,7 +1876,7 @@ function Battle.GenerateLevel(state, level)
         if potC then
             HexGrid.AddItem(board, { col = potC, row = potR, type = "health_potion_big" })
         end
-        Battle.TrySpawnItems(state, 2)  -- Boss关多给一些道具
+        Battle.TrySpawnItems(state, 2, { noWheel = true })  -- Boss关不出轮盘
 
         -- 第2章Boss战：放置3个火焰祭坛（全灭破盾机制）
         if chapter == 2 then
@@ -1833,7 +1962,6 @@ function Battle.GenerateLevel(state, level)
 
         -- Boss 入场全屏公告
         local bossIcons = {
-            shadow_knight = "🗡️",
             lava_lord = "🌋",
             abyss_kraken = "🐙",
             coral_guardian = "🪸",
@@ -1857,21 +1985,21 @@ function Battle.GenerateLevel(state, level)
         local stgAccel = (stageInChapter - 1) / 8  -- 0~1 范围
         local accelBonus = stgAccel * stgAccel      -- 二次方加速：S1=0, S5=0.25, S7=0.56, S9=1.0
         if chapter == 1 then
-            -- 第一章: 平缓线性 + 章内加速（最多额外+30% HP, +20% ATK）
-            hpScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.30 * accelBonus
-            atkScale = 1.0 + 0.07 * (stageInChapter - 1) + 0.20 * accelBonus
+            -- 第一章: 平缓线性 + 章内加速（最多额外+20% HP, +15% ATK）
+            hpScale = 1.0 + 0.08 * (stageInChapter - 1) + 0.20 * accelBonus
+            atkScale = 1.0 + 0.05 * (stageInChapter - 1) + 0.15 * accelBonus
         elseif chapter == 2 then
-            -- 第二章: 中等线性 + 章内加速（最多额外+35% HP, +25% ATK）
-            hpScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.35 * accelBonus
-            atkScale = 1.0 + 0.08 * (stageInChapter - 1) + 0.25 * accelBonus
-        elseif chapter == 3 then
-            -- 第三章: 较高线性 + 章内加速（最多额外+50% HP, +35% ATK）
-            hpScale = 1.0 + 0.15 * (stageInChapter - 1) + 0.50 * accelBonus
-            atkScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.35 * accelBonus
-        else
-            -- 第四章: 高线性 + 章内加速（最多额外+60% HP, +40% ATK）
-            hpScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.60 * accelBonus
+            -- 第二章: 中高线性 + 章内加速（最多额外+55% HP, +40% ATK）
+            hpScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.55 * accelBonus
             atkScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.40 * accelBonus
+        elseif chapter == 3 then
+            -- 第三章: 高线性 + 章内加速（最多额外+75% HP, +55% ATK）
+            hpScale = 1.0 + 0.22 * (stageInChapter - 1) + 0.75 * accelBonus
+            atkScale = 1.0 + 0.15 * (stageInChapter - 1) + 0.55 * accelBonus
+        else
+            -- 第四章: 极高线性 + 章内加速（最多额外+95% HP, +70% ATK）
+            hpScale = 1.0 + 0.28 * (stageInChapter - 1) + 0.95 * accelBonus
+            atkScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.70 * accelBonus
         end
 
         -- 敌人数量: 保持平稳（怪多反而容易连击，不加难度）
@@ -1894,8 +2022,8 @@ function Battle.GenerateLevel(state, level)
             elseif stageInChapter <= 7 then
                 enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "archerfish", "electric_ray" }
             else
-                -- S8-S9: 高威胁怪权重更高（幽灵鲨、电鳐出现概率翻倍）
-                enemyTypes = { "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "ghost_shark", "archerfish", "electric_ray", "electric_ray" }
+                -- S8-S9: 保留多样性，高威胁怪适度出现（避免难度过高）
+                enemyTypes = { "jellyfish", "iron_turtle", "vortex_eel", "hermit_crab", "ghost_shark", "archerfish", "electric_ray" }
             end
         elseif chapter == 2 then
             -- 第二章: 火灵、熔岩巨人为主，后期加入蘑菇和裂焰精
@@ -1922,7 +2050,7 @@ function Battle.GenerateLevel(state, level)
                 enemyTypes = { "coral_snapper", "spine_anemone", "spine_anemone", "coral_priest", "coral_priest", "splitting_urchin", "splitting_urchin" }
             end
         elseif chapter == 4 then
-            -- 第四章: 沙漠系敌人，流沙虫可填坑，后期加入特殊机制怪
+            -- 第四章: 沙漠系敌人，后期加入特殊机制怪
             enemyTypes = { "sand_scorpion", "sand_scorpion", "quicksand_worm", "sand_hawk" }
             if stageInChapter >= 3 then
                 enemyTypes = { "sand_scorpion", "quicksand_worm", "sand_hawk", "venom_lizard" }
@@ -1957,10 +2085,19 @@ function Battle.GenerateLevel(state, level)
         end
 
         -- 放置敌人
+        local ghostSharkCount = 0
+        local GHOST_SHARK_CAP = 2  -- 第一章同屏隐形鲨上限
         for i = 1, enemyCount do
             local c, r = claimRandomPos()
             if c then
                 local etype = enemyTypes[math.random(1, #enemyTypes)]
+                -- 第一章: 限制隐形鲨同屏最多3只
+                if chapter == 1 and etype == "ghost_shark" and ghostSharkCount >= GHOST_SHARK_CAP then
+                    -- 已达上限，换成其他怪物
+                    local fallback = { "jellyfish", "iron_turtle", "vortex_eel", "hermit_crab" }
+                    etype = fallback[math.random(1, #fallback)]
+                end
+                if etype == "ghost_shark" then ghostSharkCount = ghostSharkCount + 1 end
                 local template = ENEMY_TEMPLATES[etype]
                 local piece = Battle.CreatePiece(template, c, r)
                 piece.hp = math.floor(piece.hp * hpScale)
@@ -2105,8 +2242,9 @@ function Battle.GenerateLevel(state, level)
             board.altars = {}  -- 无祭坛关卡，确保数据干净
         end
 
-        -- 随机生成道具
-        Battle.TrySpawnItems(state, 1)
+        -- 随机生成道具（每章第1关不刷轮盘，2-9关可刷轮盘）
+        local itemOpts = stageInChapter <= 1 and { noWheel = true } or nil
+        Battle.TrySpawnItems(state, 1, itemOpts)
 
         Battle.AddLog(state, string.format("=== 第%d章 第%d关开始！===", chapter, stageInChapter))
     end
@@ -2172,7 +2310,7 @@ function Battle.GenerateEndlessWave(state, wave)
 
     -- 重置击杀计数和目标（随波次快速增加）
     state.kills = 0
-    state.killTarget = 9 + math.floor((wave - 1) / 2)
+    state.killTarget = 7 + math.floor((wave - 1) / 2)
     state.rescueTarget = 0
     state.rescueCount = 0
 
@@ -2351,7 +2489,7 @@ function Battle.ContinueLevel(state, nextLevel)
         if Battle.IsBossLevel(nextLevel) then
             state.killTarget = 999
         else
-            state.killTarget = 6 + ch + math.floor(stg / 2)
+            state.killTarget = 4 + ch + math.floor(stg / 2)
         end
     end
 
@@ -2422,14 +2560,14 @@ function Battle.ContinueLevel(state, nextLevel)
         hpScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.30 * accelBonus
         atkScale = 1.0 + 0.07 * (stageInChapter - 1) + 0.20 * accelBonus
     elseif chapter == 2 then
-        hpScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.35 * accelBonus
-        atkScale = 1.0 + 0.08 * (stageInChapter - 1) + 0.25 * accelBonus
-    elseif chapter == 3 then
-        hpScale = 1.0 + 0.15 * (stageInChapter - 1) + 0.50 * accelBonus
-        atkScale = 1.0 + 0.10 * (stageInChapter - 1) + 0.35 * accelBonus
-    else
-        hpScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.60 * accelBonus
+        hpScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.55 * accelBonus
         atkScale = 1.0 + 0.12 * (stageInChapter - 1) + 0.40 * accelBonus
+    elseif chapter == 3 then
+        hpScale = 1.0 + 0.22 * (stageInChapter - 1) + 0.75 * accelBonus
+        atkScale = 1.0 + 0.15 * (stageInChapter - 1) + 0.55 * accelBonus
+    else
+        hpScale = 1.0 + 0.28 * (stageInChapter - 1) + 0.95 * accelBonus
+        atkScale = 1.0 + 0.18 * (stageInChapter - 1) + 0.70 * accelBonus
     end
 
     -- 目标敌人总数（和 GenerateLevel 一致）
@@ -2661,8 +2799,9 @@ function Battle.ContinueLevel(state, nextLevel)
         state.rescueCount = 0
     end
 
-    -- 补充道具
-    Battle.TrySpawnItems(state, 1)
+    -- 补充道具（每章第1关不刷轮盘，2-9关可刷轮盘）
+    local transItemOpts = stageInChapter <= 1 and { noWheel = true } or nil
+    Battle.TrySpawnItems(state, 1, transItemOpts)
 
     Battle.AddFloatingText(state, state.hero.col, state.hero.row,
         "🔄 新目标!", {100, 255, 200, 255}, "combo")
@@ -2670,8 +2809,8 @@ function Battle.ContinueLevel(state, nextLevel)
         chapter, stageInChapter, state.killTarget))
 end
 
---- 随机刷新道具 (最多 maxCount 个)
-function Battle.TrySpawnItems(state, maxCount)
+--- 随机刷新道具 (最多 maxCount 个, opts.noWheel=true 时排除轮盘)
+function Battle.TrySpawnItems(state, maxCount, opts)
     local board = state.board
     local currentItemCount = #board.items
     local toSpawn = maxCount - currentItemCount
@@ -2693,13 +2832,21 @@ function Battle.TrySpawnItems(state, maxCount)
     end
 
     -- 从打乱后的候选中加权随机选取道具
-    -- 小血瓶概率高(30%)，大血瓶概率低(5%)，金币袋(35%)，护盾(30%)
+    local noWheel = opts and opts.noWheel
+    -- 厄运转盘每章最多1个：检查本章是否已刷出
+    local noDoomWheel = (state.doomWheelSpawnedThisChapter or 0) >= 1
     local weightedTypes = {
-        { type = "health_potion",     weight = 30 },
+        { type = "health_potion",     weight = 25 },
         { type = "health_potion_big", weight = 5  },
-        { type = "gold_bag",          weight = 35 },
-        { type = "shield",            weight = 30 },
+        { type = "gold_bag",          weight = 30 },
+        { type = "shield",            weight = 25 },
     }
+    if not noWheel then
+        weightedTypes[#weightedTypes + 1] = { type = "lucky_wheel", weight = 18 }
+        if not noDoomWheel then
+            weightedTypes[#weightedTypes + 1] = { type = "doom_wheel",  weight = 9  }
+        end
+    end
     local totalWeight = 0
     for _, wt in ipairs(weightedTypes) do totalWeight = totalWeight + wt.weight end
 
@@ -2720,6 +2867,10 @@ function Battle.TrySpawnItems(state, maxCount)
             col = pos.col, row = pos.row,
             type = itemType,
         })
+        -- 追踪厄运转盘刷出数量（每章限1个）
+        if itemType == "doom_wheel" then
+            state.doomWheelSpawnedThisChapter = (state.doomWheelSpawnedThisChapter or 0) + 1
+        end
         spawned = spawned + 1
     end
 end
@@ -2909,8 +3060,8 @@ function Battle.TrySpawnEnemies(state)
         return
     end
     local isBoss = state.boss ~= nil
-    -- 普通关每2回合，Boss关每回合都刷
-    if not isBoss and state.turn % 2 ~= 0 then return end
+    -- 普通关和Boss关都每2回合刷一次
+    if state.turn % 2 ~= 0 then return end
 
     local board = state.board
     local chapter, stageInChapter = Battle.GetChapterInfo(state.level)
@@ -2921,7 +3072,8 @@ function Battle.TrySpawnEnemies(state)
     for _, e in ipairs(aliveEnemies) do
         if not e.isBoss then nonBossCount = nonBossCount + 1 end
     end
-    local maxEnemies = isBoss and 8 or 10  -- Boss关小怪上限更严格，防止棋盘拥挤
+    -- Boss关小怪上限4只（保持战斗聚焦Boss本身），普通关上限10
+    local maxEnemies = isBoss and 4 or 10
     if nonBossCount >= maxEnemies then return end
 
     -- 按章节选择敌人类型池（与GenerateLevel保持一致）
@@ -2969,6 +3121,21 @@ function Battle.TrySpawnEnemies(state)
         enemyTypes = { "sand_scorpion", "sand_hawk" }
     end
 
+    -- Boss关：使用专用安全小怪池（排除ghost_shark等高难度/隐身类怪物）
+    if isBoss then
+        if chapter == 1 then
+            enemyTypes = { "jellyfish", "iron_turtle", "archerfish", "electric_ray" }
+        elseif chapter == 2 then
+            enemyTypes = { "fire_sprite", "lava_giant" }
+        elseif chapter == 3 then
+            enemyTypes = { "coral_snapper", "sea_urchin", "reef_starfish" }
+        elseif chapter == 4 then
+            enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard" }
+        else
+            enemyTypes = { "sand_scorpion", "sand_hawk" }
+        end
+    end
+
     -- 获取外围空位
     local outerEmpty = Battle.GetOuterRingEmpty(board)
     if #outerEmpty == 0 then return end
@@ -2979,9 +3146,9 @@ function Battle.TrySpawnEnemies(state)
         outerEmpty[i], outerEmpty[j] = outerEmpty[j], outerEmpty[i]
     end
 
-    -- 刷新1-2个敌人（不超过上限差值）
+    -- 刷新敌人数量：Boss关每次只刷1个，普通关1-2个（不超过上限差值）
     local spawnSlots = maxEnemies - nonBossCount
-    local maxSpawn = math.min(2, spawnSlots, #outerEmpty)
+    local maxSpawn = math.min(isBoss and 1 or 2, spawnSlots, #outerEmpty)
     if maxSpawn <= 0 then return end
     local spawnCount = math.random(1, maxSpawn)
 
@@ -2994,19 +3161,35 @@ function Battle.TrySpawnEnemies(state)
         hpScale = 1.0 + 0.10 * (spawnStage - 1) + 0.30 * spawnAccelBonus
         atkScale = 1.0 + 0.07 * (spawnStage - 1) + 0.20 * spawnAccelBonus
     elseif spawnChapter == 2 then
-        hpScale = 1.0 + 0.12 * (spawnStage - 1) + 0.35 * spawnAccelBonus
-        atkScale = 1.0 + 0.08 * (spawnStage - 1) + 0.25 * spawnAccelBonus
-    elseif spawnChapter == 3 then
-        hpScale = 1.0 + 0.15 * (spawnStage - 1) + 0.50 * spawnAccelBonus
-        atkScale = 1.0 + 0.10 * (spawnStage - 1) + 0.35 * spawnAccelBonus
-    else
-        hpScale = 1.0 + 0.18 * (spawnStage - 1) + 0.60 * spawnAccelBonus
+        hpScale = 1.0 + 0.18 * (spawnStage - 1) + 0.55 * spawnAccelBonus
         atkScale = 1.0 + 0.12 * (spawnStage - 1) + 0.40 * spawnAccelBonus
+    elseif spawnChapter == 3 then
+        hpScale = 1.0 + 0.22 * (spawnStage - 1) + 0.75 * spawnAccelBonus
+        atkScale = 1.0 + 0.15 * (spawnStage - 1) + 0.55 * spawnAccelBonus
+    else
+        hpScale = 1.0 + 0.28 * (spawnStage - 1) + 0.95 * spawnAccelBonus
+        atkScale = 1.0 + 0.18 * (spawnStage - 1) + 0.70 * spawnAccelBonus
+    end
+
+    -- 第一章: 统计当前场上隐形鲨数量，限制上限2只
+    local currentGhostSharks = 0
+    if chapter == 1 then
+        for _, p in ipairs(board.pieces or {}) do
+            if p.enemyType == "ghost_shark" and (p.hp or 0) > 0 then
+                currentGhostSharks = currentGhostSharks + 1
+            end
+        end
     end
 
     for i = 1, spawnCount do
         local pos = outerEmpty[i]
         local etype = enemyTypes[math.random(1, #enemyTypes)]
+        -- 第一章: 限制隐形鲨同屏最多2只
+        if chapter == 1 and etype == "ghost_shark" and currentGhostSharks >= 2 then
+            local fallback = { "jellyfish", "iron_turtle", "vortex_eel" }
+            etype = fallback[math.random(1, #fallback)]
+        end
+        if etype == "ghost_shark" then currentGhostSharks = currentGhostSharks + 1 end
         local template = ENEMY_TEMPLATES[etype]
         local piece = Battle.CreatePiece(template, pos.col, pos.row)
         piece.hp = math.floor(piece.hp * hpScale)
@@ -3128,7 +3311,7 @@ function Battle.CheckItemPickup(state, col, row)
     local def = ITEM_TYPES[item.type]
 
     if item.type == "health_potion" then
-        local heal = 20
+        local heal = 40
         hero.hp = math.min(hero.maxHp, hero.hp + heal)
         Battle.AddFloatingText(state, hero.col, hero.row, "+" .. heal, {80, 255, 100, 255}, "heal", 3.0)
         Battle.AddVFX(state, "heal_pickup", { col = hero.col, row = hero.row, duration = 1.0 })
@@ -3146,7 +3329,12 @@ function Battle.CheckItemPickup(state, col, row)
     elseif item.type == "gold_bag" then
         local goldOverflow = (state.kills or 0) - (state.killTarget or 999)
         local bagBlocked = (goldOverflow > 5) and not Battle.IsBossLevel(state.level)
-        local bagGold = bagBlocked and 1 or 3
+        local bagGold = bagBlocked and 2 or 10
+        -- 金币袋享受点金手天赋加成
+        if (state.goldBonus or 0) > 0 then
+            local bonusAmt = math.floor(bagGold * state.goldBonus / 100)
+            bagGold = bagGold + bonusAmt
+        end
         state.gold = state.gold + bagGold
         Battle.AddFloatingText(state, col, row, "+" .. bagGold .. "💰", {255, 215, 0, 255}, nil, 2.5)
         Battle.AddLog(state, "拾取 " .. def.name .. "，获得" .. bagGold .. "金币")
@@ -3157,6 +3345,14 @@ function Battle.CheckItemPickup(state, col, row)
         Battle.AddFloatingText(state, col, row, "🛡️护盾!", {120, 180, 255, 255}, nil, 2.5)
         Battle.AddLog(state, "拾取 " .. def.name .. "，下次受击伤害减半")
         AM.PlaySFX("shield_ward")
+
+    elseif item.type == "lucky_wheel" or item.type == "doom_wheel" then
+        -- 轮盘道具：标记待弹窗，TurnFlow 中处理弹出
+        local wType = (item.type == "lucky_wheel") and "lucky" or "doom"
+        state.pendingWheel = wType
+        log:Write(LOG_INFO, "[Wheel] pendingWheel set to '" .. wType .. "' at (" .. col .. "," .. row .. ")")
+        Battle.AddLog(state, "拾取 " .. def.name .. "！")
+        AM.PlaySFX("item_pickup", 0.8)
     end
 
     HexGrid.RemoveItemAt(state.board, col, row)
@@ -3307,6 +3503,7 @@ end
 ---@return table|nil 被攻击的敌人(岩石跳跃返回nil)
 function Battle.ExecuteJump(state, jumpInfo, isLastStep)
     local hero = state.hero
+    state._isKingmakerJump = nil  -- 重置棋步跳标记
 
     -- 记录跳跃出发位置（用于地刺陷阱）
     local jumpFromCol, jumpFromRow = hero.col, hero.row
@@ -3344,7 +3541,15 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
             state.maxCombo = state.combo
         end
 
-        if isShellJump then
+        if jumpInfo.isScarecrowJump then
+            -- 稻草人跳：显示专属文字
+            local comboText = state.combo >= 2
+                and string.format("🎃跳! %dx", state.combo)
+                or "🎃跳!"
+            Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
+                comboText, {255, 180, 80, 255})
+            Battle.AddLog(state, string.format("跳过稻草人到 (%d,%d)", jumpInfo.col, jumpInfo.row))
+        elseif isShellJump then
             -- 贝壳跳：显示不同文字
             local comboText = state.combo >= 2
                 and string.format("🐚跳! %dx", state.combo)
@@ -3519,6 +3724,27 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         state.maxCombo = state.combo
     end
 
+    -- === 棋步: 有效跳跃计数（每轮combo chain只算1次，第一跳时计数） ===
+    local kmLv = Skills.Level(state.skills, "kingmaker")
+    if kmLv >= 1 and state.combo == 1 then
+        state._kingmakerCount = (state._kingmakerCount or 0) + 1
+        -- 计算间隔: Lv1=7, Lv2=6, Lv3=5, Lv4=4, Lv5=4
+        local kmInterval
+        if kmLv <= 3 then
+            kmInterval = 8 - kmLv  -- Lv1=7, Lv2=6, Lv3=5
+        else
+            kmInterval = 5 - math.floor((kmLv - 3) / 2)  -- Lv4=4, Lv5=4
+        end
+        if state._kingmakerCount >= kmInterval then
+            state._kingmakerReady = true
+            state._kingmakerJustTriggered = true  -- 本跳刚触发，不在本跳消耗
+            state._kingmakerCount = 0
+            Battle.AddFloatingText(state, state.hero.col, state.hero.row,
+                "♟棋步就绪!", {220, 180, 60, 255}, "combo")
+            Battle.AddLog(state, "♟ 棋步就绪！下次跳跃可到达任意位置！")
+        end
+    end
+
     -- === 连跳过程中的递进反馈（combo越高越爽） ===
     if state.combo >= 3 then
         -- 每跳落地微震：3连=0.08, 4连=0.12, 5连=0.16, 6+=0.20
@@ -3534,6 +3760,14 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
 
     -- 计算伤害: ATK × (1.0 + (combo-1) × multiplierRate)
     local baseDmg = hero.atk + state.comboAtkBonus
+    -- 厄运轮盘: 力量枯竭期间输出-30%
+    if state.doomOutputDownTurns and state.doomOutputDownTurns > 0 then
+        baseDmg = math.ceil(baseDmg * 0.7)
+    end
+    -- 幸运轮盘: 战意高涨期间输出+30%
+    if state.luckyAtkUpTurns and state.luckyAtkUpTurns > 0 then
+        baseDmg = math.ceil(baseDmg * 1.3)
+    end
 
     -- 血怒: HP低时ATK加成 (Lv1-4: <50%→+26~44%, Lv5: <30%→ATK翻倍+50%)
     local rageLv = Skills.Level(state.skills, "blood_rage")
@@ -3628,6 +3862,41 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         end
     end
 
+    -- === 冰霜印记Lv5: 冻结中的敌人受伤+30% ===
+    local frostLv = Skills.Level(state.skills, "frost_mark")
+    if frostLv >= 5 and enemy._frozenTurns and enemy._frozenTurns > 0 then
+        damage = math.floor(damage * 1.3)
+        Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
+            "❄+30%", {100, 200, 255, 255})
+    end
+
+    -- === 棋步: 消耗棋步状态并应用伤害加成 ===
+    if state._kingmakerJustTriggered then
+        -- 本跳刚触发棋步就绪，不消耗，等下次跳跃
+        state._kingmakerJustTriggered = nil
+    elseif state._kingmakerReady and jumpInfo.isKingmaker then
+        state._kingmakerReady = false
+        state._isKingmakerJump = true  -- 标记本次为棋步跳（用于后续逻辑）
+        local kmLv2 = Skills.Level(state.skills, "kingmaker")
+        -- Lv3+: 棋步跳伤害+20%
+        if kmLv2 >= 3 then
+            damage = math.floor(damage * 1.2)
+            Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
+                "♟+20%", {220, 180, 60, 255})
+        end
+        -- Lv5: 棋步跳无视防御（额外加回被扣除的DEF部分）
+        if kmLv2 >= 5 and (enemy.def or 0) > 0 then
+            local defBonus = enemy.def
+            damage = damage + defBonus
+            Battle.AddFloatingText(state, jumpInfo.jumpedCol, jumpInfo.jumpedRow,
+                "♟破防+" .. defBonus, {255, 220, 60, 255})
+        end
+        Battle.AddFloatingText(state, jumpInfo.col, jumpInfo.row,
+            "♟棋步!", {220, 180, 60, 255}, "combo")
+        AM.PlaySFX("kingmaker_jump", 1.8, 1.15)
+        Battle.AddVFX(state, "kingmaker_burst", {col = jumpInfo.col, row = jumpInfo.row, duration = 0.7})
+    end
+
     -- 祭坛减伤: 被祭坛笼罩的敌人获得百分比减伤（统一入口）
     damage = Battle.ApplyAltarReduction(state, enemy, damage)
 
@@ -3669,10 +3938,12 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         state.totalDamage = state.totalDamage + damage
     end
     enemy.hitFlash = 0.2  -- per-piece 受击闪白
-    -- 打击音效随combo递进：音调升高+音量加大，打击感更强
-    local hitGain = math.min(1.0 + state.combo * 0.06, 1.5)
-    local hitPitch = 1.0 + math.min(state.combo, 8) * 0.03
-    AM.PlaySFX("attack_hit", hitGain, hitPitch)
+    -- 打击音效随combo递进：音调升高+音量加大，打击感更强（棋步跳有专属音效，跳过通用音效）
+    if not state._isKingmakerJump then
+        local hitGain = math.min(1.0 + state.combo * 0.06, 1.5)
+        local hitPitch = 1.0 + math.min(state.combo, 8) * 0.03
+        AM.PlaySFX("attack_hit", hitGain, hitPitch)
+    end
 
     -- 英雄攻击动画 (精灵图帧切换用)
     hero._attackAnim = 0.35
@@ -3748,6 +4019,34 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
             Battle.AddFloatingText(state, enemy.col, enemy.row,
                 "🐍狂怒!", {255, 80, 40, 255})
             Battle.AddLog(state, enemy.name .. " 被激怒了！下回合攻击力翻倍！")
+        end
+    end
+
+    -- === 冰霜印记: 攻击叠加冰霜层数，满层冻结 ===
+    if damage > 0 and enemy.hp > 0 then
+        local frostMarkLv = Skills.Level(state.skills, "frost_mark")
+        if frostMarkLv >= 1 then
+            -- 计算冻结所需层数: Lv1=4, Lv2=3, Lv3=3, Lv4=2, Lv5=2
+            local maxStacks
+            if frostMarkLv <= 2 then
+                maxStacks = 4 - (frostMarkLv - 1)  -- Lv1=4, Lv2=3
+            else
+                maxStacks = 3 - math.floor((frostMarkLv - 3) / 2)  -- Lv3=3, Lv4=2, Lv5=2
+            end
+            -- 叠加层数
+            enemy._frostStacks = (enemy._frostStacks or 0) + 1
+            Battle.AddFloatingText(state, enemy.col, enemy.row,
+                "❄" .. enemy._frostStacks .. "/" .. maxStacks, {100, 200, 255, 255})
+            -- 达到阈值：冻结
+            if enemy._frostStacks >= maxStacks then
+                enemy._frostStacks = 0  -- 重置层数
+                local freezeDur = frostMarkLv >= 3 and 2 or 1
+                enemy._frozenTurns = (enemy._frozenTurns or 0) + freezeDur
+                Battle.AddFloatingText(state, enemy.col, enemy.row,
+                    "❄冻结!" .. freezeDur .. "回合", {80, 180, 255, 255}, "combo")
+                Battle.AddLog(state, string.format("❄ %s 被冰霜印记冻结%d回合！", enemy.name, freezeDur))
+                AM.PlaySFX("frost_freeze", 1.0, 1.0)
+            end
         end
     end
 
@@ -3996,6 +4295,11 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
 
     -- 地刺陷阱: 在跳跃出发位置周围放置地刺
     Battle.PlaceSpikeTraps(state, jumpFromCol, jumpFromRow)
+
+    -- === 引力: 落地后拉近周围敌人 ===
+    if isLastStep then
+        Battle.ApplyGravityPull(state, jumpInfo.col, jumpInfo.row)
+    end
 
     -- 连击奖励已移至 TurnFlow.FinishExecution（落地后触发）
 
@@ -4255,7 +4559,7 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         jellyfish = {100, 200, 255}, iron_turtle = {150, 170, 190}, vortex_eel = {80, 120, 255},
         hermit_crab = {200, 140, 60}, fire_sprite = {255, 120, 30}, lava_giant = {255, 80, 0},
 
-        shadow_knight = {180, 30, 50}, abyss_kraken = {100, 20, 160}, lava_lord = {255, 100, 0},
+        abyss_kraken = {100, 20, 160}, lava_lord = {255, 100, 0},
         ghost_shark = {100, 140, 200}, spine_anemone = {200, 80, 150},
         coral_priest = {255, 180, 120}, fission_flame = {255, 100, 30}, flame_shard = {255, 160, 60},
         splitting_urchin = {200, 100, 220},
@@ -4414,14 +4718,14 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
                     hpScale = 1 + 0.08 * (stageInChapter - 1)
                     atkScale = 1 + 0.05 * (stageInChapter - 1)
                 elseif chapter == 2 then
-                    hpScale = 1 + 0.10 * (stageInChapter - 1)
-                    atkScale = 1 + 0.06 * (stageInChapter - 1)
-                elseif chapter == 3 then
-                    hpScale = 1 + 0.12 * (stageInChapter - 1)
-                    atkScale = 1 + 0.08 * (stageInChapter - 1)
-                else
-                    hpScale = 1 + 0.14 * (stageInChapter - 1)
+                    hpScale = 1 + 0.16 * (stageInChapter - 1)
                     atkScale = 1 + 0.10 * (stageInChapter - 1)
+                elseif chapter == 3 then
+                    hpScale = 1 + 0.20 * (stageInChapter - 1)
+                    atkScale = 1 + 0.14 * (stageInChapter - 1)
+                else
+                    hpScale = 1 + 0.25 * (stageInChapter - 1)
+                    atkScale = 1 + 0.16 * (stageInChapter - 1)
                 end
                 shard.hp = math.floor(shard.hp * hpScale)
                 shard.maxHp = shard.hp
@@ -4443,7 +4747,7 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
     local ch4 = Battle.GetChapterInfo(state.level)
     local zoneCount = state.board.quicksandZones and #state.board.quicksandZones or 0
     if ch4 == 4 and not enemy.isSegment and not enemy.isBoss and zoneCount < 3 then
-        local sandProb = 0.5
+        local sandProb = 0.3
         if math.random() < sandProb then
             local zoneCenter = { col = enemy.col, row = enemy.row }
             HexGrid.AddQuicksandZone(state.board, zoneCenter.col, zoneCenter.row)
@@ -4715,6 +5019,84 @@ function Battle.ApplyHunterMarks(state)
     end
 end
 
+--- 引力: 落地后拉近周围敌人（2格内拉到1格内，已在1格内不拉）
+function Battle.ApplyGravityPull(state, heroCol, heroRow)
+    local gravLv = Skills.Level(state.skills, "gravity_pull")
+    if gravLv < 1 then return end
+
+    local range = gravLv >= 3 and 3 or 2  -- Lv3+: 感应范围3格
+    local enemies = HexGrid.GetTeamPieces(state.board, "enemy")
+    local pulled = 0
+
+    for _, enemy in ipairs(enemies) do
+        if enemy.hp <= 0 then goto continue_grav end
+        local dist = HexGrid.CubeDistance(enemy.col, enemy.row, heroCol, heroRow)
+        -- 已在1格内不拉；超出感应范围不拉
+        if dist <= 1 or dist > range then goto continue_grav end
+
+        -- 找到一个离英雄距离恰好为1的空相邻格（拉到英雄身边）
+        local neighbors = HexGrid.GetNeighbors(enemy.col, enemy.row)
+        local bestNb = nil
+        local bestDist = dist
+        for _, nb in ipairs(neighbors) do
+            if not HexGrid.IsBlocked(state.board, nb.col, nb.row) then
+                local d = HexGrid.CubeDistance(nb.col, nb.row, heroCol, heroRow)
+                if d < bestDist then
+                    bestDist = d
+                    bestNb = nb
+                end
+            end
+        end
+
+        if bestNb then
+            -- 设置移动动画（从当前位置滑到目标位置）
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.35
+            enemy.animMaxTimer = 0.35
+            -- 记录拉动前位置（用于VFX轨迹）
+            enemy._gravPullFromCol = enemy.col
+            enemy._gravPullFromRow = enemy.row
+            -- 移动敌人
+            enemy.col = bestNb.col
+            enemy.row = bestNb.row
+            pulled = pulled + 1
+            Battle.AddFloatingText(state, bestNb.col, bestNb.row,
+                "🌀引力", {100, 60, 200, 255})
+
+            -- Lv4: 被拉动的敌人受5点伤害
+            if gravLv >= 4 then
+                local pullDmg = 5
+                enemy.hp = enemy.hp - pullDmg
+                state.totalDamage = state.totalDamage + pullDmg
+                Battle.AddFloatingText(state, bestNb.col, bestNb.row,
+                    "-" .. pullDmg .. "🌀", {180, 100, 255, 255})
+                if enemy.hp <= 0 then
+                    Battle.HandleEnemyDeath(state, enemy, false)
+                end
+            end
+
+            -- Lv5: 被拉到英雄身边（距离1格）的敌人眩晕1回合
+            if gravLv >= 5 and bestDist <= 1 then
+                enemy._stunnedTurns = (enemy._stunnedTurns or 0) + 1
+                Battle.AddFloatingText(state, bestNb.col, bestNb.row,
+                    "💫眩晕!", {255, 200, 0, 255})
+            end
+        end
+
+        ::continue_grav::
+    end
+
+    if pulled > 0 then
+        Battle.AddLog(state, string.format("🌀 引力拉近%d个敌人！", pulled))
+        Battle.AddVFX(state, "gravity_pull", {
+            col = heroCol, row = heroRow, duration = 0.8, range = range,
+            pulled = pulled,
+        })
+        AM.PlaySFX("gravity_pull", 1.0, 1.0)
+    end
+end
+
 --- 地刺陷阱: 跳跃落地后在起点周围空格放置地刺
 function Battle.PlaceSpikeTraps(state, fromCol, fromRow)
     local spikeLv = Skills.Level(state.skills, "spike_trap")
@@ -4855,6 +5237,10 @@ function Battle.PeekDartTarget(state)
     for _, it in ipairs(board.items) do
         dartTargets[#dartTargets + 1] = { kind = "item", col = it.col, row = it.row }
     end
+    -- 停沙格也可作为飞镖目标（拾取后清除全场流沙）
+    if board.sandStopTile then
+        dartTargets[#dartTargets + 1] = { kind = "sandStop", col = board.sandStopTile.col, row = board.sandStopTile.row }
+    end
     if #dartTargets > 0 then
         -- 优先选离主角最近的目标（教学展示直观）
         local hero = state.hero
@@ -4974,7 +5360,7 @@ function Battle.ExecuteComboReward(state, threshold)
                 aliveEnemies[#aliveEnemies + 1] = e
             end
         end
-        -- 收集所有可用目标：敌人 + 道具
+        -- 收集所有可用目标：敌人 + 道具 + 停沙格
         ---@type table[]
         local dartTargets = {}
         for _, e in ipairs(aliveEnemies) do
@@ -4982,6 +5368,10 @@ function Battle.ExecuteComboReward(state, threshold)
         end
         for _, it in ipairs(board.items) do
             dartTargets[#dartTargets + 1] = { kind = "item", obj = it, col = it.col, row = it.row }
+        end
+        -- 停沙格也可作为飞镖目标（拾取后清除全场流沙）
+        if board.sandStopTile then
+            dartTargets[#dartTargets + 1] = { kind = "sandStop", obj = board.sandStopTile, col = board.sandStopTile.col, row = board.sandStopTile.row }
         end
 
         if #dartTargets > 0 then
@@ -5021,6 +5411,12 @@ function Battle.ExecuteComboReward(state, threshold)
                         -- 刷新HUD显示
                         local GameUI = require "GameUI"
                         pcall(GameUI.UpdateHUD)
+                    elseif capturedPick.kind == "sandStop" then
+                        -- 飞镖命中停沙格：触发清除全场流沙
+                        Battle.CheckSandStopTile(capturedState, capturedPick.col, capturedPick.row)
+                        Battle.AddFloatingText(capturedState, capturedPick.col, capturedPick.row,
+                            "🗡️飞镖触发停沙!", {100, 220, 255, 255}, "combo", 2.8)
+                        Battle.AddLog(capturedState, "🗡️ 飞镖命中停沙格，全场流沙消除！")
                     else
                         local item = capturedPick.obj
                         local itemDef = ITEM_TYPES[item.type]
@@ -5516,7 +5912,7 @@ function Battle.ProcessBossAura(state)
                         e.name, aura.name, actualDmg, dist))
                     -- 光环技能公告
                     local auraSkillMap = {
-                        abyss_kraken = "aura_abyss", shadow_knight = "aura_shadow",
+                        abyss_kraken = "aura_abyss",
                         lava_lord = "aura_lava", coral_guardian = "aura_coral",
                     }
                     local auraKey = auraSkillMap[e.bossType]
@@ -5684,7 +6080,7 @@ function Battle.ProcessEnemyTurn(state)
             if not ok then
                 -- AI 异常：记录错误，敌人本回合跳过，不阻断 state.turn 递增
                 Battle.AddLog(state, string.format("[错误] %s AI 异常: %s", tostring(enemy.enemyType), tostring(action)))
-                action = { type = "idle", enemy = enemy }
+                action = { type = "idle", enemy = enemy } ---@diagnostic disable-line: assign-type-mismatch
             end
             if action then
                 actions[#actions + 1] = action
@@ -5949,6 +6345,15 @@ function Battle.TickSealDebuff(state)
                     "💫眩晕解除", {200, 200, 100, 255})
             end
         end
+        -- 冰霜印记冻结回合递减
+        if enemy._frozenTurns and enemy._frozenTurns > 0 then
+            enemy._frozenTurns = enemy._frozenTurns - 1
+            if enemy._frozenTurns <= 0 then
+                enemy._frozenTurns = nil
+                Battle.AddFloatingText(state, enemy.col, enemy.row,
+                    "❄冻结解除", {150, 220, 255, 255})
+            end
+        end
     end
 end
 
@@ -6001,6 +6406,13 @@ function Battle.EnemyAct(state, enemy)
         Battle.AddFloatingText(state, enemy.col, enemy.row,
             "💫眩晕中", {255, 200, 0, 255})
         return { type = "stunned", enemy = enemy }
+    end
+
+    -- === 冰霜印记: 被冻结的敌人完全跳过行动 ===
+    if enemy._frozenTurns and enemy._frozenTurns > 0 then
+        Battle.AddFloatingText(state, enemy.col, enemy.row,
+            "❄冻结中", {100, 200, 255, 255})
+        return { type = "frozen", enemy = enemy }
     end
 
     -- === 六芒封印: 被封印的敌人无法移动，可攻击但伤害降低 ===
@@ -7580,7 +7992,6 @@ local function _initBattleBoss()
     Battle.BossBasicAttack       = BattleBoss.BossBasicAttack
     Battle.BossMoveToHero        = BattleBoss.BossMoveToHero
     Battle.BossEnrageCheck       = BattleBoss.BossEnrageCheck
-    Battle.BossAct_ShadowKnight  = BattleBoss.BossAct_ShadowKnight
     Battle.BossAct_LavaLord      = BattleBoss.BossAct_LavaLord
     Battle.BossAct_AbyssKraken   = BattleBoss.BossAct_AbyssKraken
     Battle.BossAct_CoralGuardian = BattleBoss.BossAct_CoralGuardian

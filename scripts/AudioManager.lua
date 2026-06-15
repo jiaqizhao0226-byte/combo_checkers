@@ -33,9 +33,9 @@ AM.BGM = {
     boss           = "audio/bgm_boss.ogg",            -- 通用Boss BGM
     boss_lava      = "audio/bgm_boss_lava.ogg",       -- 熔岩领主专属（史诗管弦+战鼓）
     boss_abyss     = "audio/bgm_boss_abyss.ogg",      -- 深渊海妖专属（深海压迫恐惧）
-    boss_coral     = "audio/music_1779514990986.ogg",  -- 珊瑚守卫专属（海洋宫殿决战）
+    boss_coral     = "audio/music_1780643113805.ogg",  -- 珊瑚守卫专属（8bit激烈水下Boss战）
     battle_desert  = "audio/music_1779955577605.ogg", -- 第四章沙漠战斗（阿拉伯风打击乐）
-    boss_sand      = "audio/music_1780301089822.ogg", -- 沙丘巨虫专属（激烈管弦+战鼓+中东弦乐）
+    boss_sand      = "audio/music_1780643223086.ogg", -- 沙丘巨虫专属（8bit激烈沙漠Boss战）
 }
 
 -- ============================================================================
@@ -59,6 +59,9 @@ AM.SFX = {
     combo_mid      = "audio/sfx/sfx_combo_mid.ogg",
     combo_high     = "audio/sfx/sfx_combo_high.ogg",
     item_pickup    = "audio/sfx/sfx_item_pickup.ogg",
+    wheel_spin     = "audio/sfx/wheel_spin.ogg",
+    wheel_lucky    = "audio/sfx/wheel_lucky_new.ogg",
+    wheel_doom     = "audio/sfx/wheel_doom_new.ogg",
     hero_damage    = "audio/sfx/sfx_hero_damage.ogg",
     victory        = "audio/sfx/sfx_victory.ogg",
     defeat         = "audio/sfx/sfx_defeat.ogg",
@@ -102,18 +105,35 @@ AM.SFX = {
     split_shot       = "audio/sfx/sfx_attack_hit.ogg",
     -- 踏步斩专属音效
     step_strike      = "audio/sfx/sfx_step_strike.ogg",
-    -- 深渊海妖新技能专属音效
+    -- 深渊海妖专属音效
     abyss_claw_hit       = "audio/sfx/abyss_claw_hit.ogg",
     abyss_venom_spray    = "audio/sfx/abyss_venom_spray.ogg",
-    -- 熔岩领主新技能专属音效
+    abyss_tentacle_rise  = "audio/sfx/abyss_tentacle_rise.ogg",
+    abyss_whirlpool_pull = "audio/sfx/abyss_whirlpool_pull.ogg",
+    abyss_shrink_collapse= "audio/sfx/abyss_shrink_collapse.ogg",
+    -- 熔岩领主专属音效
     lava_fist_smash      = "audio/sfx/lava_fist_smash.ogg",
     flame_bolt_impact    = "audio/sfx/flame_bolt_impact.ogg",
-    -- 珊瑚守卫新技能专属音效
+    -- 珊瑚守卫专属音效
     coral_spike_pierce   = "audio/sfx/coral_spike_pierce.ogg",
-    -- 沙丘巨虫Boss专属音效
+    coral_throw_impact   = "audio/sfx/coral_throw_impact.ogg",
+    coral_seal_enclosure = "audio/sfx/coral_seal_enclosure.ogg",
+    coral_tide_surge     = "audio/sfx/coral_tide_surge.ogg",
+    coral_regen_armor    = "audio/sfx/coral_regen_armor.ogg",
+    -- 沙丘巨虫专属音效
+    sandworm_burrow_emerge = "audio/sfx/sandworm_burrow_emerge.ogg",
+    sandworm_tail_whip   = "audio/sfx/sandworm_tail_whip.ogg",
+    sandworm_rock_throw  = "audio/sfx/sandworm_rock_throw.ogg",
+    sandworm_sand_fury   = "audio/sfx/sandworm_sand_fury.ogg",
     boss_aoe             = "audio/sfx/boss_aoe.ogg",
     boss_stomp           = "audio/sfx/boss_stomp.ogg",
     quicksand_spawn      = "audio/sfx/quicksand_spawn.ogg",
+    -- 冰霜印记
+    frost_freeze         = "audio/sfx/frost_freeze.ogg",
+    -- 棋步跳跃
+    kingmaker_jump       = "audio/sfx/kingmaker_jump.ogg",
+    -- 引力拉扯
+    gravity_pull         = "audio/sfx/gravity_pull_new.ogg",
     -- 未注册补录
     combo_shield_gain    = "audio/sfx/combo_shield_gain.ogg",
     vampiric_drain       = "audio/sfx/vampiric_drain.ogg",

@@ -35,38 +35,27 @@ local BattleBoss = {}
 --- Boss 技能描述配置（每个技能的名称、图标、说明、颜色）
 local BOSS_SKILL_INFO = {
     -- 深渊海妖
-    tentacle    = { name = "深渊触手",   icon = "🦑", desc = "在你周围伸出触手，阻断逃跑路线！",       color = {120, 60, 180} },
+    tentacle    = { name = "深渊触手",   icon = "🦑", desc = "触手从英雄周围伸出，形成包围！跳过会受伤！", color = {120, 60, 180} },
     whirlpool   = { name = "漩涡牵引",   icon = "🌊", desc = "释放漩涡将你拉向Boss，造成伤害！",       color = {50, 120, 220} },
-    shrink      = { name = "深渊收缩",   icon = "🕳️", desc = "棋盘边缘崩塌！可活动范围缩小！",        color = {100, 0, 140} },
-    abyss_shield= { name = "深渊护盾",   icon = "🛡️", desc = "Boss展开护盾，必须先击破护盾！",         color = {50, 80, 180} },
     abyss_claw  = { name = "触手重击",   icon = "🦑", desc = "巨大触手猛力横扫，近距离造成重击伤害！",  color = {120, 40, 180} },
-    abyss_venom = { name = "深渊喷毒",   icon = "☠️", desc = "喷射深渊毒液，造成伤害并附加持续中毒！",  color = {80, 30, 140} },
-    -- 暗影骑士
-    shadow_aoe  = { name = "暗影爆发",   icon = "🌑", desc = "释放暗影能量，伤害周围并散布毒雾！",     color = {140, 50, 180} },
-    shadow_shield={name = "暗影护盾",    icon = "🛡️", desc = "暗影骑士重新凝聚护盾！",                 color = {100, 60, 160} },
-    shadow_summon={name = "暗影召唤",    icon = "👥", desc = "召唤暗影仆从协助作战！",                  color = {130, 50, 160} },
+
     -- 熔岩领主
-    eruption    = { name = "熔岩喷发",   icon = "🌋", desc = "地面喷出岩浆，踩到将持续灼烧！",         color = {255, 80, 0} },
+    eruption    = { name = "地脉喷发",   icon = "🌋", desc = "唤醒地脉裂缝，沿十字线爆发高温岩浆！",   color = {255, 80, 0} },
     lava_shield = { name = "岩石护甲",   icon = "🛡️", desc = "熔岩领主重新凝聚岩石护甲！",             color = {180, 100, 30} },
     altar_break_shield = { name = "祭坛破盾", icon = "💥", desc = "所有火焰祭坛熄灭，Boss护盾被击碎！", color = {255, 50, 50} },
     lava_fist   = { name = "熔岩重拳",   icon = "🔥", desc = "举起炽热拳头猛砸英雄，留下灼烧地形！",   color = {255, 60, 0} },
     flame_bolt  = { name = "火焰弹射",   icon = "💥", desc = "精准射出火球直击英雄，周边格子也受波及！", color = {255, 140, 0} },
     -- 珊瑚守卫
-    coral_throw     = { name = "珊瑚投掷", icon = "🪸", desc = "抛出巨大珊瑚块砸向英雄，碎片封堵退路！", color = {255, 120,  60} },
+    coral_throw     = { name = "珊瑚雨",   icon = "🪸", desc = "蓄力后召唤大范围珊瑚雨，砸落并生成障碍！", color = {255, 120,  60} },
     coral_seal      = { name = "珊瑚封印", icon = "🔇", desc = "珊瑚将你重重包围，沉默你使其无法攻击！",  color = {200, 100, 255} },
     tide_surge      = { name = "潮汐冲击", icon = "🌊", desc = "汹涌潮汐将你推离，途经格子均受到伤害！", color = {80,  190, 230} },
-    coral_regen     = { name = "珊瑚护甲", icon = "🛡️", desc = "珊瑚护甲重新凝聚，护盾完全恢复！",      color = {255, 180, 210} },
-    coral_spike     = { name = "珊瑚刺击", icon = "⚡", desc = "飞速刺出珊瑚长矛，贯穿英雄并留下毒刺！", color = {100, 220, 180} },
     -- 光环技能
     aura_abyss   = { name = "深渊压迫",   icon = "🌊", desc = "深渊之力侵蚀周围，靠近Boss会持续受伤！", color = {60, 120, 200} },
-    aura_shadow  = { name = "暗影侵蚀",   icon = "🌑", desc = "暗影能量腐蚀周围，靠近Boss会持续受伤！", color = {180, 60, 200} },
-    -- aura_lava 已移除（灼烧光环改为祭坛破盾机制）
-    aura_coral   = { name = "珊瑚荆棘",   icon = "🪸", desc = "珊瑚荆棘刺伤周围，靠近Boss会持续受伤！", color = {255, 150, 200} },
     -- 沙丘巨虫
     burrow_start  = { name = "遁地准备",   icon = "⏳", desc = "巨虫身体下沉，准备钻入地下伏击！",       color = {180, 140, 60} },
     burrow_emerge = { name = "钻地突袭",   icon = "🕳️", desc = "巨虫从地下猛烈钻出，重创周围一切！",     color = {210, 160, 40} },
     tail_whip     = { name = "尾鞭横扫",   icon = "🌊", desc = "巨大尾巴横扫，击飞英雄并中断连跳！",     color = {180, 150, 80} },
-    sandstorm     = { name = "巨岩投掷",   icon = "🪨", desc = "掷出巨大沙岩，对目标造成重创并留下碎石！", color = {180, 140, 80} },
+    -- sandstorm（巨岩投掷）已移除
     sand_fury     = { name = "呼唤风沙",   icon = "🌪️", desc = "召唤持续狂风沙暴笼罩全场，每回合造成伤害！持续3回合！", color = {230, 160, 50} },
     -- 通用
     boss_attack = { name = "Boss攻击",   icon = "⚔️", desc = "Boss发动普通攻击！",                     color = {220, 50, 50} },
@@ -93,20 +82,14 @@ local function PredictNextSkill_AbyssKraken(state, boss)
     local hero = state.hero
     local dist = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
     local clawNext      = math.max(0, (boss.abyssClawCooldown  or 0) - 1)
-    local venomNext     = math.max(0, (boss.abyssVenomCooldown or 0) - 1)
     local tentacleNext  = math.max(0, (boss.tentacleCooldown   or 0) - 1)
     local whirlpoolNext = math.max(0, (boss.whirlpoolCooldown  or 0) - 1)
-    local shrinkNext    = math.max(0, (boss.shrinkCooldown     or 0) - 1)
     if clawNext <= 0 and dist <= 2 then
         BattleBoss.SetBossNextSkill(boss, "abyss_claw")
-    elseif venomNext <= 0 and dist <= 5 then
-        BattleBoss.SetBossNextSkill(boss, "abyss_venom")
     elseif tentacleNext <= 0 then
         BattleBoss.SetBossNextSkill(boss, "tentacle")
     elseif whirlpoolNext <= 0 and dist > 1 then
         BattleBoss.SetBossNextSkill(boss, "whirlpool")
-    elseif shrinkNext <= 0 and boss.enraged and (boss.shrinkCount or 0) < 2 then
-        BattleBoss.SetBossNextSkill(boss, "shrink")
     else
         BattleBoss.SetBossNextSkill(boss, nil)
     end
@@ -137,16 +120,10 @@ end
 local function PredictNextSkill_CoralGuardian(state, boss)
     local hero = state.hero
     local dist = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
-    local shieldNext     = math.max(0, (boss.shieldRegenCooldown or 0) - 1)
-    local spikeNext      = math.max(0, (boss.coralSpikeCooldown  or 0) - 1)
     local tideNext       = math.max(0, (boss.tideSurgeCooldown   or 0) - 1)
     local throwNext      = math.max(0, (boss.coralThrowCooldown  or 0) - 1)
     local sealNext       = math.max(0, (boss.coralSealCooldown   or 0) - 1)
-    if shieldNext <= 0 and (not boss.shieldHp or boss.shieldHp <= 0) then
-        BattleBoss.SetBossNextSkill(boss, "coral_regen")
-    elseif spikeNext <= 0 and dist <= 2 then
-        BattleBoss.SetBossNextSkill(boss, "coral_spike")
-    elseif tideNext <= 0 and dist <= 4 then
+    if tideNext <= 0 and dist <= 4 then
         BattleBoss.SetBossNextSkill(boss, "tide_surge")
     elseif throwNext <= 0 then
         BattleBoss.SetBossNextSkill(boss, "coral_throw")
@@ -172,8 +149,8 @@ function BattleBoss.AddBossSkillAnnounce(state, skillKey, bossName)
         desc = info.desc,
         color = info.color or {200, 50, 50},
         bossName = bossName or "",
-        timer = 3.0,
-        maxTimer = 3.0,
+        timer = 4.5,
+        maxTimer = 4.5,
     }
 end
 
@@ -192,32 +169,14 @@ local function FindBoss(state)
     return nil
 end
 
---- 预判暗影骑士本回合将释放的技能（纯决策，无副作用）
-local function PredictCurrentSkill_ShadowKnight(state, boss)
-    local hero = state.hero
-    local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
-    -- 护盾再生
-    if boss.enraged and (boss.shieldHp or 0) <= 0 and (boss.aoeCooldown or 0) <= 1 then
-        return "shadow_shield"
-    end
-    -- 召唤仆从
-    local minionCount = 0
-    local allEnemies = HexGrid.GetTeamPieces(state.board, "enemy")
-    for _, e in ipairs(allEnemies) do
-        if e ~= boss and e.hp > 0 then minionCount = minionCount + 1 end
-    end
-    if (boss.summonCooldown or 0) <= 1 and minionCount < 2 then
-        return "shadow_summon"
-    end
-    -- AOE
-    if (boss.aoeCooldown or 0) <= 1 and distToHero <= 4 then
-        return "shadow_aoe"
-    end
-    return nil  -- 普通攻击/移动，不需要前摇
-end
+
 
 --- 预判熔岩领主本回合将释放的技能
 local function PredictCurrentSkill_LavaLord(state, boss)
+    -- 全局技能间隔期间不会释放技能（包括狂暴状态）
+    if boss.skillGlobalCD and boss.skillGlobalCD > 0 then
+        return nil
+    end
     local hero = state.hero
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
     if (boss.lavaFistCooldown or 0) <= 1 and distToHero <= 2 then
@@ -237,13 +196,14 @@ end
 
 --- 预判深渊海妖本回合将释放的技能
 local function PredictCurrentSkill_AbyssKraken(state, boss)
+    -- 全局技能间隔期间不会释放技能（包括狂暴状态）
+    if boss.skillGlobalCD and boss.skillGlobalCD > 0 then
+        return nil
+    end
     local hero = state.hero
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
     if (boss.abyssClawCooldown or 0) <= 1 and distToHero <= 2 then
         return "abyss_claw"
-    end
-    if (boss.abyssVenomCooldown or 0) <= 1 and distToHero <= 5 then
-        return "abyss_venom"
     end
     if (boss.tentacleCooldown or 0) <= 1 then
         return "tentacle"
@@ -251,25 +211,17 @@ local function PredictCurrentSkill_AbyssKraken(state, boss)
     if (boss.whirlpoolCooldown or 0) <= 1 and distToHero > 1 then
         return "whirlpool"
     end
-    if boss.enraged and (boss.shrinkCooldown or 0) <= 1 and (boss.shrinkCount or 0) < 2 then
-        return "shrink"
-    end
-    if boss.enraged and (boss.shieldHp or 0) <= 0 then
-        return "abyss_shield"
-    end
     return nil
 end
 
 --- 预判珊瑚守卫本回合将释放的技能
 local function PredictCurrentSkill_CoralGuardian(state, boss)
+    -- 全局技能间隔期间不会释放技能（包括狂暴状态）
+    if boss.skillGlobalCD and boss.skillGlobalCD > 0 then
+        return nil
+    end
     local hero = state.hero
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
-    if (boss.shieldRegenCooldown or 0) <= 1 and (not boss.shieldHp or boss.shieldHp <= 0) then
-        return "coral_regen"
-    end
-    if (boss.coralSpikeCooldown or 0) <= 1 and distToHero <= 2 then
-        return "coral_spike"
-    end
     if (boss.tideSurgeCooldown or 0) <= 1 and distToHero <= 4 then
         return "tide_surge"
     end
@@ -284,6 +236,10 @@ end
 
 --- 预判沙丘巨虫本回合将释放的技能
 local function PredictCurrentSkill_SandWorm(state, boss)
+    -- 全局技能间隔期间不会释放技能（包括狂暴状态）
+    if boss.skillGlobalCD and boss.skillGlobalCD > 0 then
+        return nil
+    end
     local hero = state.hero
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
     -- 遁地读条中 → 下回合正式遁地（不需要前摇公告）
@@ -312,10 +268,6 @@ local function PredictCurrentSkill_SandWorm(state, boss)
     if (boss.sandFuryCooldown or 0) <= 1 and not state.sandFuryActive then
         return "sand_fury"
     end
-    -- 巨岩投掷
-    if (boss.sandstormCooldown or 0) <= 1 then
-        return "sandstorm"
-    end
     return nil
 end
 
@@ -337,8 +289,6 @@ function BattleBoss.PreCastAnnounce(state)
         skillKey = PredictCurrentSkill_CoralGuardian(state, boss)
     elseif bt == "sand_worm" then
         skillKey = PredictCurrentSkill_SandWorm(state, boss)
-    else
-        skillKey = PredictCurrentSkill_ShadowKnight(state, boss)
     end
 
     if not skillKey then return false end
@@ -359,24 +309,288 @@ function BattleBoss.PreCastAnnounce(state)
 end
 
 -- ============================================================================
--- Boss 特殊行动系统 (暗影骑士)
+-- 预警AOE系统（通用）
+-- state.bossAoeWarning = { type, tiles, timer, damage, ... }
+-- timer: 每回合递减，到0时引爆
 -- ============================================================================
 
---- Boss行动入口（在EnemyAct中调用）
---- Boss行动入口（分发到具体Boss）
-function BattleBoss.BossAct(state, boss)
+--- 获取扇形区域格子（从origin朝target方向，扩散角度约120°，距离maxDist）
+local function GetConeTiles(originCol, originRow, targetCol, targetRow, maxDist)
+    local ox, oy, oz = HexGrid.OffsetToCube(originCol, originRow)
+    local tx, ty, tz = HexGrid.OffsetToCube(targetCol, targetRow)
+    local dx, dy, dz = tx - ox, ty - oy, tz - oz
+    -- 归一化方向（取主方向）
+    local adx, ady, adz = math.abs(dx), math.abs(dy), math.abs(dz)
+    local maxAbs = math.max(adx, ady, adz)
+    if maxAbs == 0 then return {} end
+    -- 主方向
+    local ndx = dx > 0 and 1 or (dx < 0 and -1 or 0)
+    local ndy = dy > 0 and 1 or (dy < 0 and -1 or 0)
+    local ndz = dz > 0 and 1 or (dz < 0 and -1 or 0)
+    -- 收集锥形范围内的格子（用cube坐标向量夹角判断）
+    local tiles = {}
+    for r = 1, HexGrid.ROWS do
+        for c = 1, HexGrid.COLS do
+            if HexGrid.InBounds(c, r) then
+                local cx, cy, cz = HexGrid.OffsetToCube(c, r)
+                local vx, vy, vz = cx - ox, cy - oy, cz - oz
+                local dist = HexGrid.CubeDistance(originCol, originRow, c, r)
+                if dist >= 1 and dist <= maxDist then
+                    -- 点积判断方向一致性（>0表示同侧）
+                    local dot = vx * dx + vy * dy + vz * dz
+                    if dot > 0 then
+                        -- 宽松锥形：点积占比 > 0.3（约120°扇形）
+                        local lenV = math.sqrt(vx*vx + vy*vy + vz*vz)
+                        local lenD = math.sqrt(dx*dx + dy*dy + dz*dz)
+                        local cosAngle = dot / (lenV * lenD + 0.001)
+                        if cosAngle > 0.3 then
+                            tiles[#tiles + 1] = { col = c, row = r }
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return tiles
+end
+
+--- 获取十字线格子（从center沿3条hex轴线延伸）
+local function GetCrossTiles(centerCol, centerRow, maxDist)
+    local cx, cy, cz = HexGrid.OffsetToCube(centerCol, centerRow)
+    local tiles = {}
+    local added = {}
+    -- 6方向CUBE_DIRS，取3条轴（每条包含正反两个方向）
+    local DIRS = {
+        { 1, -1,  0},
+        { 1,  0, -1},
+        { 0,  1, -1},
+    }
+    for _, dir in ipairs(DIRS) do
+        for sign = -1, 1, 2 do
+            for step = 1, maxDist do
+                local nx = cx + dir[1] * sign * step
+                local ny = cy + dir[2] * sign * step
+                local nz = cz + dir[3] * sign * step
+                local nc, nr = HexGrid.CubeToOffset(nx, ny, nz)
+                local key = nc .. "," .. nr
+                if HexGrid.InBounds(nc, nr) and not added[key] then
+                    added[key] = true
+                    tiles[#tiles + 1] = { col = nc, row = nr }
+                end
+            end
+        end
+    end
+    return tiles
+end
+
+--- 获取圆形区域格子
+local function GetCircleTiles(centerCol, centerRow, radius)
+    local tiles = {}
+    for r = 1, HexGrid.ROWS do
+        for c = 1, HexGrid.COLS do
+            if HexGrid.InBounds(c, r) then
+                local d = HexGrid.CubeDistance(c, r, centerCol, centerRow)
+                if d >= 1 and d <= radius then
+                    tiles[#tiles + 1] = { col = c, row = r }
+                end
+            end
+        end
+    end
+    return tiles
+end
+
+--- Boss回合开始时：检查并引爆待引爆的预警AOE
+--- 返回 action result 如果引爆了，否则返回 nil
+function BattleBoss.DetonateAoeWarning(state, boss)
+    local warn = state.bossAoeWarning
+    if not warn then return nil end
+
+    warn.timer = (warn.timer or 1) - 1
+    if warn.timer > 0 then return nil end
+
+    -- 引爆！
+    local hero = state.hero
+    local heroKey = hero.col .. "," .. hero.row
+    local heroHit = false
+
+    -- 检查英雄是否在AOE范围内
+    for _, tile in ipairs(warn.tiles or {}) do
+        if tile.col == hero.col and tile.row == hero.row then
+            heroHit = true
+            break
+        end
+    end
+
+    local warnType = warn.type
+
+    if warnType == "venom_aoe" then
+        -- 深渊海妖：毒液AOE引爆 + 留下毒区
+        local venomDmg = warn.damage or 15
+        if heroHit then
+            hero.hp = hero.hp - venomDmg
+            AddFloatingText(state, hero.col, hero.row,
+                "☠️-" .. venomDmg .. "毒液!", {100, 20, 160, 255}, "hit")
+        end
+        -- 在AOE区域放置毒区（持续3回合）
+        local poisonTurns = warn.poisonTurns or 3
+        local poisonDmg = warn.poisonDmg or 5
+        for _, tile in ipairs(warn.tiles or {}) do
+            HexGrid.AddPoison(state.board, tile.col, tile.row, poisonTurns)
+            local pt = HexGrid.GetPoisonAt(state.board, tile.col, tile.row)
+            if pt then pt.damage = poisonDmg; pt.isVenom = true end
+        end
+        AddFloatingText(state, warn.centerCol or boss.col, warn.centerRow or boss.row,
+            "☠️毒液扩散!", {100, 20, 160, 255}, "combo")
+        BattleBoss.AddBossSkillAnnounce(state, "abyss_venom", boss.name)
+        AddVFX(state, "abyss_venom", { col = warn.centerCol or hero.col, row = warn.centerRow or hero.row, duration = 1.0 })
+        state.screenShake = (state.screenShake or 0) + 0.4
+        AM.PlaySFX("abyss_venom_spray", 1.0)
+        AddLog(state, string.format("毒液喷涌而出！%s", heroHit and ("英雄受到" .. venomDmg .. "点伤害！") or "英雄成功闪避！"))
+        state.bossAoeWarning = nil
+        return { type = "boss_aoe_detonate", skill = "venom_aoe", hit = heroHit }
+
+    elseif warnType == "eruption_cross" then
+        -- 熔岩领主：十字线岩浆爆发
+        local eruptDmg = warn.damage or 25
+        if heroHit then
+            hero.hp = hero.hp - eruptDmg
+            AddFloatingText(state, hero.col, hero.row,
+                "🌋-" .. eruptDmg .. "喷发!", {255, 80, 0, 255}, "hit")
+        end
+        -- 十字线上放短暂岩浆（1回合）
+        for _, tile in ipairs(warn.tiles or {}) do
+            HexGrid.AddPoison(state.board, tile.col, tile.row, 1)
+            local pt = HexGrid.GetPoisonAt(state.board, tile.col, tile.row)
+            if pt then pt.damage = 8; pt.isLava = true end
+        end
+        AddFloatingText(state, warn.centerCol or boss.col, warn.centerRow or boss.row,
+            "🌋地脉喷发!", {255, 80, 0, 255}, "combo")
+        BattleBoss.AddBossSkillAnnounce(state, "eruption", boss.name)
+        AddVFX(state, "lava_eruption", { col = warn.centerCol or hero.col, row = warn.centerRow or hero.row, duration = 1.0 })
+        AddVFX(state, "shockwave", { col = warn.centerCol or boss.col, row = warn.centerRow or boss.row, duration = 0.8 })
+        state.screenShake = (state.screenShake or 0) + 0.6
+        AM.PlaySFX("lava_eruption", 1.0)
+        AddLog(state, string.format("地脉沿裂缝喷发！%s", heroHit and ("英雄受到" .. eruptDmg .. "点伤害！") or "英雄成功闪避！"))
+        state.bossAoeWarning = nil
+        return { type = "boss_aoe_detonate", skill = "eruption_cross", hit = heroHit }
+
+    elseif warnType == "coral_rain" then
+        -- 珊瑚守卫：珊瑚雨砸落
+        local throwDmg = warn.damage or 20
+        if heroHit then
+            hero.hp = hero.hp - throwDmg
+            AddFloatingText(state, hero.col, hero.row,
+                "🪸-" .. throwDmg .. "珊瑚雨!", {255, 120, 60, 255}, "hit")
+        end
+        -- 在AOE内随机放2~3个珊瑚障碍
+        local obstacleCount = warn.obstacleCount or 2
+        local validTiles = {}
+        for _, tile in ipairs(warn.tiles or {}) do
+            if not HexGrid.IsBlocked(state.board, tile.col, tile.row)
+               and not HexGrid.GetPieceAt(state.board, tile.col, tile.row)
+               and not (tile.col == hero.col and tile.row == hero.row)
+               and not (tile.col == boss.col and tile.row == boss.row) then
+                validTiles[#validTiles + 1] = tile
+            end
+        end
+        -- 随机打乱
+        for i = #validTiles, 2, -1 do
+            local j = math.random(1, i)
+            validTiles[i], validTiles[j] = validTiles[j], validTiles[i]
+        end
+        for i = 1, math.min(obstacleCount, #validTiles) do
+            HexGrid.AddObstacle(state.board, validTiles[i].col, validTiles[i].row)
+            AddVFX(state, "spawn_puff", { col = validTiles[i].col, row = validTiles[i].row, duration = 0.6 })
+        end
+        AddFloatingText(state, warn.centerCol or boss.col, warn.centerRow or boss.row,
+            "🪸珊瑚雨!", {255, 120, 60, 255}, "combo")
+        BattleBoss.AddBossSkillAnnounce(state, "coral_throw", boss.name)
+        state.screenShake = (state.screenShake or 0) + 0.5
+        AM.PlaySFX("coral_throw_impact", 0.9)
+        AddLog(state, string.format("珊瑚雨从天而降！%s 生成了%d处珊瑚障碍！",
+            heroHit and ("英雄受到" .. throwDmg .. "点伤害！") or "英雄闪避成功！",
+            math.min(obstacleCount, #validTiles)))
+        state.bossAoeWarning = nil
+        return { type = "boss_aoe_detonate", skill = "coral_rain", hit = heroHit }
+    end
+
+    -- 未识别类型，清除
+    state.bossAoeWarning = nil
+    return nil
+end
+
+-- ============================================================================
+-- Boss 特殊行动系统
+-- ============================================================================
+
+--- 递减Boss个体技能冷却（每回合都应递减，不论是否被全局CD阻塞）
+local function TickBossCooldowns(boss)
     local bt = boss.bossType or "abyss_kraken"
     if bt == "lava_lord" then
-        return BattleBoss.BossAct_LavaLord(state, boss)
+        if boss.eruptionCooldown    and boss.eruptionCooldown    > 0 then boss.eruptionCooldown    = boss.eruptionCooldown    - 1 end
+        if boss.shieldRegenCooldown and boss.shieldRegenCooldown > 0 then boss.shieldRegenCooldown = boss.shieldRegenCooldown - 1 end
+        if boss.lavaFistCooldown    and boss.lavaFistCooldown    > 0 then boss.lavaFistCooldown    = boss.lavaFistCooldown    - 1 end
+        if boss.flameBoltCooldown   and boss.flameBoltCooldown   > 0 then boss.flameBoltCooldown   = boss.flameBoltCooldown   - 1 end
     elseif bt == "abyss_kraken" then
-        return BattleBoss.BossAct_AbyssKraken(state, boss)
+        if boss.tentacleCooldown  and boss.tentacleCooldown  > 0 then boss.tentacleCooldown  = boss.tentacleCooldown  - 1 end
+        if boss.whirlpoolCooldown and boss.whirlpoolCooldown > 0 then boss.whirlpoolCooldown = boss.whirlpoolCooldown - 1 end
+        if boss.abyssClawCooldown and boss.abyssClawCooldown > 0 then boss.abyssClawCooldown = boss.abyssClawCooldown - 1 end
     elseif bt == "coral_guardian" then
-        return BattleBoss.BossAct_CoralGuardian(state, boss)
+        if boss.tideSurgeCooldown  and boss.tideSurgeCooldown  > 0 then boss.tideSurgeCooldown  = boss.tideSurgeCooldown  - 1 end
+        if boss.coralThrowCooldown and boss.coralThrowCooldown > 0 then boss.coralThrowCooldown = boss.coralThrowCooldown - 1 end
+        if boss.coralSealCooldown  and boss.coralSealCooldown  > 0 then boss.coralSealCooldown  = boss.coralSealCooldown  - 1 end
     elseif bt == "sand_worm" then
-        return BattleBoss.BossAct_SandWorm(state, boss)
-    else
-        return BattleBoss.BossAct_ShadowKnight(state, boss)
+        boss.burrowCooldown   = (boss.burrowCooldown or 0) - 1
+        boss.tailWhipCooldown = (boss.tailWhipCooldown or 0) - 1
+        boss.sandFuryCooldown = (boss.sandFuryCooldown or 0) - 1
     end
+end
+
+--- Boss行动入口（分发到具体Boss）
+function BattleBoss.BossAct(state, boss)
+    -- 每回合统一递减个体技能冷却（无论全局CD是否阻塞）
+    TickBossCooldowns(boss)
+
+    -- 优先检查预警AOE引爆
+    local detonateResult = BattleBoss.DetonateAoeWarning(state, boss)
+    if detonateResult then
+        -- AOE引爆也算一次技能行动，设置全局CD确保下回合普攻
+        boss.skillGlobalCD = 1
+        return detonateResult
+    end
+
+    -- === 全局技能间隔机制（强制 技能→普攻→技能→普攻 交替节奏）===
+    -- 无论普通/狂暴/特殊状态，只要上回合释放了技能，本回合强制普攻
+    -- 唯一例外：SandWorm 遁地中（burrowed状态下只做等待/钻出，不是主动技能选择）
+    local isBurrowed = boss.burrowed  -- 遁地期间行为由内部状态机控制，不受CD约束
+    if not isBurrowed then
+        if boss.skillGlobalCD and boss.skillGlobalCD > 0 then
+            boss.skillGlobalCD = boss.skillGlobalCD - 1
+            -- 全局CD期间：只做普攻/移动
+            local atk = BattleBoss.BossBasicAttack(state, boss)
+            if atk then return atk end
+            return BattleBoss.BossMoveToHero(state, boss)
+        end
+    end
+
+    local bt = boss.bossType or "abyss_kraken"
+    local result
+    if bt == "lava_lord" then
+        result = BattleBoss.BossAct_LavaLord(state, boss)
+    elseif bt == "abyss_kraken" then
+        result = BattleBoss.BossAct_AbyssKraken(state, boss)
+    elseif bt == "coral_guardian" then
+        result = BattleBoss.BossAct_CoralGuardian(state, boss)
+    elseif bt == "sand_worm" then
+        result = BattleBoss.BossAct_SandWorm(state, boss)
+    end
+
+    -- 如果本回合释放了技能（非普攻/移动/等待），设置1回合全局冷却
+    if result and result.type ~= "attack" and result.type ~= "move" and result.type ~= "wait" then
+        boss.skillGlobalCD = 1
+    end
+
+    return result
 end
 
 --- Boss通用: 普通攻击英雄
@@ -480,7 +694,7 @@ end
 
 --- Boss通用: 狂暴检查
 function BattleBoss.BossEnrageCheck(state, boss, bossLabel)
-    if not boss.enraged and boss.hp <= boss.maxHp * 0.5 then
+    if not boss.enraged and boss.hp <= boss.maxHp * 0.25 then
         boss.enraged = true
         boss.phase = 2
         boss.atk = math.floor(boss.atk * 1.3)
@@ -488,7 +702,7 @@ function BattleBoss.BossEnrageCheck(state, boss, bossLabel)
             "💀 狂暴!", {255, 50, 50, 255}, "combo")
         AddLog(state, "⚠️ " .. bossLabel .. "进入狂暴状态！ATK提升！")
         local bossColors = {
-            shadow_knight = {180, 30, 50}, abyss_kraken = {100, 20, 160}, lava_lord = {255, 100, 0}, coral_guardian = {255, 120, 180},
+            abyss_kraken = {100, 20, 160}, lava_lord = {255, 100, 0}, coral_guardian = {255, 120, 180},
         }
         AddVFX(state, "boss_enrage", {
             col = boss.col, row = boss.row, duration = 1.0,
@@ -500,111 +714,11 @@ function BattleBoss.BossEnrageCheck(state, boss, bossLabel)
             timer = 2.5,
             maxTimer = 2.5,
         }
-        boss.shieldHp = boss.shieldMax or 0
-        if boss.shieldMax and boss.shieldMax > 0 then
-            AddFloatingText(state, boss.col, boss.row,
-                "🛡️+" .. boss.shieldMax, {100, 180, 255, 255})
-        end
+        -- 狂暴不再回盾，仅提升攻击力
     end
 end
 
 -- ============================================================================
--- 暗影骑士 Boss (第一章)
--- ============================================================================
-function BattleBoss.BossAct_ShadowKnight(state, boss)
-    local hero = state.hero
-    BattleBoss.BossEnrageCheck(state, boss, "暗影骑士")
-
-    -- 冷却递减
-    if boss.summonCooldown > 0 then boss.summonCooldown = boss.summonCooldown - 1 end
-    if boss.aoeCooldown > 0 then boss.aoeCooldown = boss.aoeCooldown - 1 end
-
-    -- 技能1: 护盾再生（狂暴时）
-    if boss.enraged and (boss.shieldHp or 0) <= 0 and boss.aoeCooldown <= 0 then
-        boss.shieldHp = boss.shieldMax
-        boss.aoeCooldown = 4
-        AddFloatingText(state, boss.col, boss.row,
-            "🛡️护盾再生!", {100, 180, 255, 255})
-        BattleBoss.AddBossSkillAnnounce(state, "shadow_shield", boss.name)
-        AddLog(state, "暗影骑士重新展开护盾！")
-        AddVFX(state, "ward_place", { col = boss.col, row = boss.row, duration = 0.6 })
-        return { type = "boss_shield", enemy = boss }
-    end
-
-    -- 技能2: 召唤暗影仆从
-    local minionCount = 0
-    local allEnemies = HexGrid.GetTeamPieces(state.board, "enemy")
-    for _, e in ipairs(allEnemies) do
-        if e ~= boss and e.hp > 0 then minionCount = minionCount + 1 end
-    end
-    if boss.summonCooldown <= 0 and minionCount < 2 then
-        boss.summonCooldown = boss.enraged and 4 or 5
-        local summonCount = boss.enraged and 2 or 1
-        local neighbors = HexGrid.GetNeighbors(boss.col, boss.row)
-        local spawned = 0
-        for _, n in ipairs(neighbors) do
-            if spawned >= summonCount then break end
-            if HexGrid.InBounds(n.col, n.row)
-               and not HexGrid.IsBlocked(state.board, n.col, n.row)
-               and not HexGrid.GetPieceAt(state.board, n.col, n.row) then
-                local minion = B().CreatePiece(ENEMY_TEMPLATES["slime"], n.col, n.row)
-                minion.hp = 20; minion.maxHp = 20; minion.atk = 5
-                minion.name = "暗影仆从"; minion.enemyType = "slime"
-                HexGrid.AddPiece(state.board, minion)
-                AddFloatingText(state, n.col, n.row, "👻召唤!", {180, 100, 255, 255})
-                spawned = spawned + 1
-            end
-        end
-        if spawned > 0 then
-            BattleBoss.AddBossSkillAnnounce(state, "shadow_summon", boss.name)
-            AddLog(state, string.format("暗影骑士召唤了 %d 个暗影仆从！", spawned))
-            AddVFX(state, "poison_puff", { col = boss.col, row = boss.row, duration = 0.7 })
-            return { type = "boss_summon", enemy = boss, count = spawned }
-        end
-    end
-
-    -- 技能3: 暗影冲击 AOE
-    local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
-    if boss.aoeCooldown <= 0 and distToHero <= 4 then
-        boss.aoeCooldown = boss.enraged and 2 or 3
-        local aoeDmg = boss.enraged and 15 or 10
-        local hitCells = { { col = hero.col, row = hero.row } }
-        local neighbors = HexGrid.GetNeighbors(hero.col, hero.row)
-        for _, n in ipairs(neighbors) do
-            if HexGrid.InBounds(n.col, n.row) then hitCells[#hitCells + 1] = n end
-        end
-        local actualDmg = math.max(1, math.floor(aoeDmg - (hero.def or 0)))
-        if state.hasShield then
-            actualDmg = math.floor(actualDmg / 2); state.hasShield = false
-            AddFloatingText(state, hero.col, hero.row,
-                "🛡️挡!", {120, 180, 255, 255})
-        elseif state.drainShield and state.drainShield > 0 then
-            local absorbed = math.min(state.drainShield, actualDmg)
-            actualDmg = actualDmg - absorbed
-            state.drainShield = state.drainShield - absorbed
-            AddFloatingText(state, hero.col, hero.row,
-                "🔮盾-" .. absorbed, {200, 80, 200, 255})
-            if state.drainShield <= 0 then state.drainShield = nil end
-        end
-        hero.hp = hero.hp - actualDmg
-        AddFloatingText(state, hero.col, hero.row,
-            "-" .. actualDmg .. "🌑", {180, 60, 200, 255}, "hit")
-        state.screenShake = (state.screenShake or 0) + 0.5
-        for _, cell in ipairs(hitCells) do
-            if math.random() < 0.4 then HexGrid.AddPoison(state.board, cell.col, cell.row, 2) end
-        end
-        BattleBoss.AddBossSkillAnnounce(state, "shadow_aoe", boss.name)
-        AddLog(state, string.format("🌑 暗影冲击！造成 %d 伤害！", actualDmg))
-        AddVFX(state, "shockwave", { col = hero.col, row = hero.row, duration = 0.6 })
-        return { type = "boss_aoe", enemy = boss, damage = actualDmg }
-    end
-
-    -- 普通攻击/移动
-    local atk = BattleBoss.BossBasicAttack(state, boss)
-    if atk then return atk end
-    return BattleBoss.BossMoveToHero(state, boss)
-end
-
 -- ============================================================================
 -- 熔岩领主 Boss (第三章)
 -- ============================================================================
@@ -612,17 +726,13 @@ function BattleBoss.BossAct_LavaLord(state, boss)
     local hero = state.hero
     BattleBoss.BossEnrageCheck(state, boss, "熔岩领主")
 
-    -- 冷却递减
-    if boss.eruptionCooldown    and boss.eruptionCooldown    > 0 then boss.eruptionCooldown    = boss.eruptionCooldown    - 1 end
-    if boss.shieldRegenCooldown and boss.shieldRegenCooldown > 0 then boss.shieldRegenCooldown = boss.shieldRegenCooldown - 1 end
-    if boss.lavaFistCooldown    and boss.lavaFistCooldown    > 0 then boss.lavaFistCooldown    = boss.lavaFistCooldown    - 1 end
-    if boss.flameBoltCooldown   and boss.flameBoltCooldown   > 0 then boss.flameBoltCooldown   = boss.flameBoltCooldown   - 1 end
+    -- 冷却递减已由 TickBossCooldowns 统一处理
 
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
 
-    -- 技能0a: 熔岩重拳 — 近身重击+留下熔岩（距离<=2，每2回合，狂暴1回合）
+    -- 技能0a: 熔岩重拳 — 近身重击+留下熔岩（距离<=2，每4回合，狂暴2回合）
     if (boss.lavaFistCooldown or 0) <= 0 and distToHero <= 2 then
-        boss.lavaFistCooldown = boss.enraged and 1 or 2
+        boss.lavaFistCooldown = boss.enraged and 2 or 4
         local fistDmg = boss.enraged and math.floor(boss.atk * 3.0) or math.floor(boss.atk * 2.4)
         hero.hp = hero.hp - fistDmg
         AddFloatingText(state, hero.col, hero.row, "🔥-" .. fistDmg .. "重拳!", {255, 80, 0, 255}, "hit")
@@ -642,9 +752,9 @@ function BattleBoss.BossAct_LavaLord(state, boss)
         return { type = "boss_lava_fist", enemy = boss }
     end
 
-    -- 技能0b: 火焰弹射 — 精准打击英雄位置+溅射（距离<=6，每3回合，狂暴2回合）
+    -- 技能0b: 火焰弹射 — 精准打击英雄位置+溅射（距离<=6，每5回合，狂暴3回合）
     if (boss.flameBoltCooldown or 0) <= 0 and distToHero <= 6 then
-        boss.flameBoltCooldown = boss.enraged and 2 or 3
+        boss.flameBoltCooldown = boss.enraged and 3 or 5
         local boltDmg = boss.enraged and math.floor(boss.atk * 1.8) or math.floor(boss.atk * 1.4)
         local splashDmg = math.floor(boltDmg * 0.5)
         -- 直击英雄
@@ -674,111 +784,41 @@ function BattleBoss.BossAct_LavaLord(state, boss)
         return { type = "boss_flame_bolt", enemy = boss }
     end
 
-    -- 技能1: 熔岩喷发 — 放置熔岩地形（支持单格和多格连片）（每3回合，狂暴1回合）
-    if (boss.eruptionCooldown or 0) <= 0 then
-        boss.eruptionCooldown = boss.enraged and 1 or 3
-        -- 决定熔岩区域数（每个区域可能是1-3格的连片）
-        local clusterCount = boss.enraged and 4 or 3
-        local allCells = HexGrid.GetAllValidCells(state.board)
-        if #allCells == 0 then
-            -- 棋盘无有效格，跳过熔岩喷发技能
-            return { type = "skill", skillName = "lava_burst_skip", enemy = boss }
-        end
-
-        -- 辅助：判断格子是否可放熔岩（不在Boss/英雄位置）
-        local function canPlaceLava(c, r)
-            if c == boss.col and r == boss.row then return false end
-            if c == hero.col and r == hero.row then return false end
-            return HexGrid.InBounds(c, r)
-        end
-
-        -- 辅助：在指定格放置熔岩并添加VFX
-        local erupted = 0
-        local function placeLava(c, r, delay)
-            HexGrid.AddPoison(state.board, c, r, 99)
-            local pt = HexGrid.GetPoisonAt(state.board, c, r)
-            if pt then pt.damage = 8; pt.isLava = true end
-            AddVFX(state, "lava_eruption", {
-                col = c, row = r, duration = 1.2,
-                delay = delay,
-            })
-            local d = HexGrid.CubeDistance(c, r, hero.col, hero.row)
-            if d <= 1 then
-                local eruptDmg = boss.enraged and 18 or 10
-                hero.hp = hero.hp - eruptDmg
-                AddFloatingText(state, hero.col, hero.row,
-                    "-" .. eruptDmg .. "🌋", {255, 100, 0, 255}, "hit")
-            end
-            erupted = erupted + 1
-        end
-
-        -- 放置多个熔岩区域
-        local placed = {}  -- 已放置的格子集合，key = "col,row"
-        for ci = 1, clusterCount do
-            -- 随机选一个中心格
-            local center = nil
-            for _ = 1, 20 do
-                local cell = allCells[math.random(1, #allCells)]
-                local key = cell.col .. "," .. cell.row
-                if canPlaceLava(cell.col, cell.row) and not placed[key] then
-                    center = cell
-                    break
-                end
-            end
-            if center then
-                -- 放置中心格
-                local key = center.col .. "," .. center.row
-                placed[key] = true
-                placeLava(center.col, center.row, (ci - 1) * 0.3)
-
-                -- 随机决定扩展大小：40%单格，35%双格，25%三格
-                local roll = math.random(1, 100)
-                local expandCount = roll <= 40 and 0 or (roll <= 75 and 1 or 2)
-                if boss.enraged then
-                    -- 狂暴时更容易出大片：20%单格，35%双格，45%三格
-                    expandCount = roll <= 20 and 0 or (roll <= 55 and 1 or 2)
-                end
-
-                -- 扩展相邻格
-                if expandCount > 0 then
-                    local neighbors = HexGrid.GetNeighbors(center.col, center.row)
-                    -- 随机打乱邻居顺序
-                    for i = #neighbors, 2, -1 do
-                        local j = math.random(1, i)
-                        neighbors[i], neighbors[j] = neighbors[j], neighbors[i]
-                    end
-                    local expanded = 0
-                    for _, nb in ipairs(neighbors) do
-                        if expanded >= expandCount then break end
-                        local nk = nb.col .. "," .. nb.row
-                        if canPlaceLava(nb.col, nb.row) and not placed[nk] then
-                            placed[nk] = true
-                            placeLava(nb.col, nb.row, (ci - 1) * 0.3 + (expanded + 1) * 0.1)
-                            expanded = expanded + 1
-                        end
-                    end
-                end
-            end
-        end
-
-        if erupted > 0 then
-            BattleBoss.AddBossSkillAnnounce(state, "eruption", boss.name)
-            AddFloatingText(state, boss.col, boss.row,
-                "🌋熔岩喷发!", {255, 80, 0, 255}, "combo")
-            AddLog(state, string.format("熔岩领主引发熔岩喷发！%d处新熔岩涌出！", erupted))
-            -- Boss位置冲击波 + 强震屏
-            AddVFX(state, "shockwave", { col = boss.col, row = boss.row, duration = 0.8 })
-            state.screenShake = (state.screenShake or 0) + 0.5
-            AM.PlaySFX("lava_eruption", 1.0)  -- 熔岩喷发专属音效
-            return { type = "boss_eruption", enemy = boss }
-        end
+    -- 技能1: 熔岩喷发 — 放置熔岩地形（支持单格和多格连片）（每7回合，狂暴4回合）
+    if (boss.eruptionCooldown or 0) <= 0 and not state.bossAoeWarning then
+        boss.eruptionCooldown = boss.enraged and 4 or 7
+        -- 预警AOE：十字线（以英雄当前位置为中心，沿3条hex轴延伸）
+        local crossDist = boss.enraged and 4 or 3
+        local crossTiles = GetCrossTiles(hero.col, hero.row, crossDist)
+        local eruptDmg = boss.enraged and math.floor(boss.atk * 2.2) or math.floor(boss.atk * 1.8)
+        -- 设置预警
+        state.bossAoeWarning = {
+            type = "eruption_cross",
+            tiles = crossTiles,
+            timer = 1,  -- 下回合引爆
+            damage = eruptDmg,
+            centerCol = hero.col,
+            centerRow = hero.row,
+            color = {255, 80, 0},  -- 橙红色预警
+            icon = "🌋",
+        }
+        AddFloatingText(state, boss.col, boss.row,
+            "🌋地脉蓄能!", {255, 80, 0, 255}, "combo")
+        AddFloatingText(state, hero.col, hero.row,
+            "⚠️地面裂开!", {255, 60, 20, 255})
+        AddLog(state, "熔岩领主唤醒地脉！英雄脚下出现十字形裂缝预警！")
+        BattleBoss.AddBossSkillAnnounce(state, "eruption", boss.name)
+        boss.skillAnimTimer    = 0.5
+        boss.skillAnimDuration = 0.5
+        boss.skillAnimType     = "eruption"
+        return { type = "boss_aoe_warning", enemy = boss, skill = "eruption_cross" }
     end
 
     -- 护盾再生（护盾被击碎后，冷却结束时重新生成）
     if (boss.shieldHp or 0) <= 0 and (boss.shieldRegenCooldown or 0) <= 0 then
-        -- 非狂暴恢复40护盾（4回合冷却），狂暴恢复满护盾（2回合冷却）
+        -- 非狂暴恢复40护盾（6回合冷却），狂暴恢复满护盾（3回合冷却）
         local regenAmount = boss.enraged and (boss.shieldMax or 70) or 40
-        boss.shieldRegenCooldown = boss.enraged and 2 or 4
+        boss.shieldRegenCooldown = boss.enraged and 3 or 6
         BattleBoss.AddBossSkillAnnounce(state, "lava_shield", boss.name)
         boss.shieldHp = regenAmount
         AddFloatingText(state, boss.col, boss.row,
@@ -806,23 +846,18 @@ function BattleBoss.BossAct_AbyssKraken(state, boss)
     local hero = state.hero
     BattleBoss.BossEnrageCheck(state, boss, "深渊海妖")
 
-    -- 冷却递减
-    if boss.tentacleCooldown and boss.tentacleCooldown > 0 then boss.tentacleCooldown = boss.tentacleCooldown - 1 end
-    if boss.whirlpoolCooldown and boss.whirlpoolCooldown > 0 then boss.whirlpoolCooldown = boss.whirlpoolCooldown - 1 end
-    if boss.shrinkCooldown    and boss.shrinkCooldown    > 0 then boss.shrinkCooldown    = boss.shrinkCooldown    - 1 end
-    if boss.abyssClawCooldown and boss.abyssClawCooldown > 0 then boss.abyssClawCooldown = boss.abyssClawCooldown - 1 end
-    if boss.abyssVenomCooldown and boss.abyssVenomCooldown > 0 then boss.abyssVenomCooldown = boss.abyssVenomCooldown - 1 end
+    -- 冷却递减已由 TickBossCooldowns 统一处理
 
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
 
     -- 技能0a: 触手重击 — 近距离重击（距离<=2）
     if (boss.abyssClawCooldown or 0) <= 0 and distToHero <= 2 then
-        boss.abyssClawCooldown = boss.enraged and 1 or 2
+        boss.abyssClawCooldown = boss.enraged and 3 or 4
         local clawDmg = boss.enraged and math.floor(boss.atk * 2.8) or math.floor(boss.atk * 2.2)
         hero.hp = hero.hp - clawDmg
         AddFloatingText(state, hero.col, hero.row, "🦑-" .. clawDmg .. "重击!", {150, 50, 220, 255}, "hit")
         BattleBoss.AddBossSkillAnnounce(state, "abyss_claw", boss.name)
-        AddVFX(state, "abyss_claw", { col = hero.col, row = hero.row, duration = 0.7 })
+        AddVFX(state, "abyss_claw", { col = hero.col, row = hero.row, fromCol = boss.col, fromRow = boss.row, duration = 0.8 })
         boss.skillAnimTimer    = 0.55
         boss.skillAnimDuration = 0.55
         boss.skillAnimType     = "claw"
@@ -832,52 +867,42 @@ function BattleBoss.BossAct_AbyssKraken(state, boss)
         return { type = "boss_claw", enemy = boss }
     end
 
-    -- 技能0b: 深渊喷毒 — 中距离毒液攻击（距离<=5，每3回合，狂暴2回合）
-    if (boss.abyssVenomCooldown or 0) <= 0 and distToHero <= 5 then
-        boss.abyssVenomCooldown = boss.enraged and 2 or 3
-        local venomDmg = boss.enraged and math.floor(boss.atk * 1.6) or math.floor(boss.atk * 1.2)
-        local poisonTurns = boss.enraged and 4 or 3
-        local poisonDmg = boss.enraged and 8 or 5
-        hero.hp = hero.hp - venomDmg
-        hero.poisonTurns = (hero.poisonTurns or 0) + poisonTurns
-        hero.poisonDmg   = math.max(hero.poisonDmg or 0, poisonDmg)
-        AddFloatingText(state, hero.col, hero.row, "☠️-" .. venomDmg .. "中毒!", {100, 20, 160, 255}, "hit")
-        AddFloatingText(state, hero.col, hero.row, "🤢中毒" .. poisonTurns .. "回合", {120, 50, 180, 255})
-        BattleBoss.AddBossSkillAnnounce(state, "abyss_venom", boss.name)
-        AddVFX(state, "abyss_venom", { col = hero.col, row = hero.row, duration = 1.0 })
-        boss.skillAnimTimer    = 0.7
-        boss.skillAnimDuration = 0.7
-        boss.skillAnimType     = "venom"
-        state.screenShake = (state.screenShake or 0) + 0.3
-        AM.PlaySFX("abyss_venom_spray", 1.0)
-        AddLog(state, string.format("深渊海妖喷射毒液！造成%d点伤害并附加%d回合中毒！", venomDmg, poisonTurns))
-        return { type = "boss_venom", enemy = boss }
-    end
-
-    -- 技能1: 触手障碍 — 在棋盘随机位置放置触手（每3回合，狂暴2回合）
+    -- 技能1: 触手障碍 — 包围英雄周围放置触手（每5回合，狂暴3回合）
     if (boss.tentacleCooldown or 0) <= 0 then
-        boss.tentacleCooldown = boss.enraged and 2 or 3
-        local tentacleCount = boss.enraged and 5 or 3
-        -- 收集棋盘上所有空位（排除英雄和Boss所在格）
+        boss.tentacleCooldown = boss.enraged and 3 or 5
+        local tentacleCount = boss.enraged and 5 or 4
+        -- 收集英雄附近1~3格范围内的空闲格子（随机散布，不再死板围一圈）
         local candidates = {}
-        for r = 1, state.board.rows do
-            for c = 1, state.board.cols do
-                if HexGrid.InBounds(c, r)
-                   and not HexGrid.IsBlocked(state.board, c, r)
-                   and not HexGrid.GetPieceAt(state.board, c, r)
-                   and not (c == hero.col and r == hero.row) then
-                    candidates[#candidates + 1] = { col = c, row = r }
+        for r = 1, HexGrid.ROWS do
+            for c = 1, HexGrid.COLS do
+                if HexGrid.InBounds(c, r) then
+                    local dist = HexGrid.CubeDistance(c, r, hero.col, hero.row)
+                    if dist >= 1 and dist <= 3
+                       and not HexGrid.IsBlocked(state.board, c, r)
+                       and not HexGrid.GetPieceAt(state.board, c, r)
+                       and not (c == boss.col and r == boss.row)
+                       and not (c == hero.col and r == hero.row) then
+                        -- 距离越近权重越高（更可能出现在身边但不绝对）
+                        local weight = (dist <= 1) and 3 or (dist <= 2 and 2 or 1)
+                        for _ = 1, weight do
+                            candidates[#candidates + 1] = { col = c, row = r }
+                        end
+                    end
                 end
             end
         end
-        -- Fisher-Yates 洗牌
+        -- Fisher-Yates 洗牌后取前 N 个
         for i = #candidates, 2, -1 do
             local j = math.random(1, i)
             candidates[i], candidates[j] = candidates[j], candidates[i]
         end
         local placed = 0
+        local placedSet = {}  -- 去重：加权候选可能重复
         for _, pos in ipairs(candidates) do
             if placed >= tentacleCount then break end
+            local key = pos.col * 100 + pos.row
+            if placedSet[key] then goto skip_tentacle end
+            placedSet[key] = true
             HexGrid.AddObstacle(state.board, pos.col, pos.row)
             -- 标记为触手障碍（普通3回合，狂暴4回合）
             local tentacleDuration = boss.enraged and 4 or 3
@@ -886,24 +911,40 @@ function BattleBoss.BossAct_AbyssKraken(state, boss)
                 if o.col == pos.col and o.row == pos.row then
                     o.isTentacle = true
                     o.turns = tentacleDuration
+                    o.spawnTime = _G.G and _G.G.time or 0  -- 出生时间戳，用于出生动画
                     break
                 end
             end
             AddFloatingText(state, pos.col, pos.row,
                 "🦑触手!", {100, 50, 150, 255})
             placed = placed + 1
+            ::skip_tentacle::
         end
         if placed > 0 then
+            -- 触手涌出时对英雄造成一次伤害（基础atk的40%，狂暴50%）
+            local tentacleDmg = math.floor(boss.atk * (boss.enraged and 0.5 or 0.4))
+            hero.hp = hero.hp - tentacleDmg
+            AddFloatingText(state, hero.col, hero.row,
+                "🦑-" .. tentacleDmg .. "缠绕!", {140, 60, 180, 255}, "hit")
+            -- 受击反馈：屏幕震动 + 英雄闪红
+            state.screenShake = (state.screenShake or 0) + 0.3
+            state.hitFlash = 0.25
             BattleBoss.AddBossSkillAnnounce(state, "tentacle", boss.name)
-            AddLog(state, string.format("深渊海妖伸出%d条触手阻断路线！", placed))
-            AddVFX(state, "poison_puff", { col = hero.col, row = hero.row, duration = 0.6 })
+            AM.PlaySFX("abyss_tentacle_rise", 0.9)
+            AddLog(state, string.format("深渊海妖伸出%d条触手包围英雄！造成%d点伤害！", placed, tentacleDmg))
+            -- 触手从Boss方向甩向英雄的攻击特效
+            AddVFX(state, "tentacle_strike", {
+                fromCol = boss.col, fromRow = boss.row,
+                toCol = hero.col, toRow = hero.row,
+                duration = 0.6
+            })
             return { type = "boss_tentacle", enemy = boss }
         end
     end
 
-    -- 技能2: 漩涡牵引 — 将英雄拉向Boss 1-2格（每5回合，狂暴3回合）
+    -- 技能2: 漩涡牵引 — 将英雄拉向Boss 1-2格（每7回合，狂暴4回合）
     if (boss.whirlpoolCooldown or 0) <= 0 and distToHero > 1 then
-        boss.whirlpoolCooldown = boss.enraged and 3 or 5
+        boss.whirlpoolCooldown = boss.enraged and 4 or 7
         -- 计算英雄朝Boss方向移动1格
         local hx, hy, hz = HexGrid.OffsetToCube(hero.col, hero.row)
         local bx, by, bz = HexGrid.OffsetToCube(boss.col, boss.row)
@@ -938,55 +979,10 @@ function BattleBoss.BossAct_AbyssKraken(state, boss)
             state.screenShake = (state.screenShake or 0) + 0.3
         end
         BattleBoss.AddBossSkillAnnounce(state, "whirlpool", boss.name)
+        AM.PlaySFX("abyss_whirlpool_pull", 0.8)
         AddLog(state, "🌊 深渊海妖释放漩涡，将英雄拉向自己！")
         AddVFX(state, "shockwave", { col = boss.col, row = boss.row, duration = 0.7 })
         return { type = "boss_whirlpool", enemy = boss }
-    end
-
-    -- 技能3: 深渊收缩 — 棋盘外圈变为不可通行（最多收缩2次）
-    if (boss.shrinkCooldown or 0) <= 0 and (boss.shrinkCount or 0) < 2 and boss.enraged then
-        boss.shrinkCooldown = 6
-        boss.shrinkCount = (boss.shrinkCount or 0) + 1
-        -- 在棋盘边缘添加障碍物
-        local shrinkCount = 0
-        local allCells = HexGrid.GetAllValidCells(state.board)
-        for _, cell in ipairs(allCells) do
-            -- 距离中心4格（边缘格）
-            local dist = HexGrid.CubeDistance(cell.col, cell.row, 5, 5)  -- 中心(5,5)
-            if dist >= 4 and not HexGrid.IsBlocked(state.board, cell.col, cell.row)
-               and not HexGrid.GetPieceAt(state.board, cell.col, cell.row) then
-                if math.random() < 0.5 then
-                    HexGrid.AddObstacle(state.board, cell.col, cell.row)
-                    local obs = state.board.obstacles
-                    for _, o in ipairs(obs) do
-                        if o.col == cell.col and o.row == cell.row then
-                            o.isAbyssCrack = true
-                            break
-                        end
-                    end
-                    shrinkCount = shrinkCount + 1
-                end
-            end
-        end
-        if shrinkCount > 0 then
-            BattleBoss.AddBossSkillAnnounce(state, "shrink", boss.name)
-            AddFloatingText(state, boss.col, boss.row,
-                "🕳️深渊收缩!", {80, 0, 120, 255}, "combo")
-            AddLog(state, string.format("深渊海妖引发板块崩塌！%d格被深渊吞没！", shrinkCount))
-            AddVFX(state, "shockwave", { col = boss.col, row = boss.row, duration = 1.0 })
-            state.screenShake = (state.screenShake or 0) + 0.6
-            return { type = "boss_shrink", enemy = boss }
-        end
-    end
-
-    -- 护盾再生（狂暴时）
-    if boss.enraged and (boss.shieldHp or 0) <= 0 then
-        BattleBoss.AddBossSkillAnnounce(state, "abyss_shield", boss.name)
-        boss.shieldHp = boss.shieldMax or 60
-        AddFloatingText(state, boss.col, boss.row,
-            "🛡️深渊护盾!", {50, 80, 180, 255})
-        AddLog(state, "深渊海妖展开深渊护盾！")
-        return { type = "boss_shield", enemy = boss }
     end
 
     -- 普通攻击/移动
@@ -1009,55 +1005,29 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
     local hero = state.hero
     BattleBoss.BossEnrageCheck(state, boss, "珊瑚守卫")
 
-    -- 冷却递减
-    if boss.shieldRegenCooldown and boss.shieldRegenCooldown > 0 then boss.shieldRegenCooldown = boss.shieldRegenCooldown - 1 end
-    if boss.tideSurgeCooldown   and boss.tideSurgeCooldown   > 0 then boss.tideSurgeCooldown   = boss.tideSurgeCooldown   - 1 end
-    if boss.coralThrowCooldown  and boss.coralThrowCooldown  > 0 then boss.coralThrowCooldown  = boss.coralThrowCooldown  - 1 end
-    if boss.coralSealCooldown   and boss.coralSealCooldown   > 0 then boss.coralSealCooldown   = boss.coralSealCooldown   - 1 end
-    if boss.coralSpikeCooldown  and boss.coralSpikeCooldown  > 0 then boss.coralSpikeCooldown  = boss.coralSpikeCooldown  - 1 end
+    -- 冷却递减已由 TickBossCooldowns 统一处理
 
     -- 字段兼容旧存档
-    if boss.shieldRegenCooldown == nil then boss.shieldRegenCooldown = 0 end
     if boss.tideSurgeCooldown   == nil then boss.tideSurgeCooldown   = 0 end
     if boss.coralThrowCooldown  == nil then boss.coralThrowCooldown  = 0 end
     if boss.coralSealCooldown   == nil then boss.coralSealCooldown   = 0 end
-    if boss.coralSpikeCooldown  == nil then boss.coralSpikeCooldown  = 0 end
 
     local distToHero = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
 
-    -- ── 优先级0: 珊瑚护甲重生（护盾耗尽后触发）───────────────────────────
-    if (not boss.shieldHp or boss.shieldHp <= 0) and boss.shieldRegenCooldown <= 0 then
-        boss.shieldHp = boss.shieldMax
-        boss.shieldRegenCooldown = boss.enraged and 3 or 5
-        BattleBoss.AddBossSkillAnnounce(state, "coral_regen", boss.name)
-        AddFloatingText(state, boss.col, boss.row,
-            "🛡️护甲重生!", {255, 180, 220, 255}, "combo")
-        AM.PlaySFX("shield_ward", 0.8)
-        AddLog(state, "珊瑚守卫的珊瑚护甲完全恢复！")
-        state.screenShake = 0.2
-        return { type = "skill", enemy = boss, skill = "coral_regen" }
+    -- ── 被动：未受伤回血（该回合若Boss未受到伤害，恢复10%最大生命）────────
+    if not boss.tookDamageThisTurn then
+        local regenAmt = math.floor((boss.maxHp or boss.hp) * 0.10)
+        local maxHp = boss.maxHp or boss.hp
+        if boss.hp < maxHp then
+            boss.hp = math.min(maxHp, boss.hp + regenAmt)
+            AddFloatingText(state, boss.col, boss.row,
+                "💚+" .. regenAmt .. "回血", {80, 220, 120, 255})
+            AddVFX(state, "coral_heal", { col = boss.col, row = boss.row, duration = 1.0 })
+            AM.PlaySFX("coral_regen_armor", 0.6)
+            AddLog(state, string.format("珊瑚守卫未受攻击，自然恢复%d点生命！", regenAmt))
+        end
     end
-
-    -- ── 优先级0.5: 珊瑚刺击 — 近身高伤+中毒（距离<=2，每2回合，狂暴1回合）──
-    if boss.coralSpikeCooldown <= 0 and distToHero <= 2 then
-        boss.coralSpikeCooldown = boss.enraged and 1 or 2
-        local spikeDmg = boss.enraged and math.floor(boss.atk * 2.6) or math.floor(boss.atk * 2.0)
-        local poisonTurns = boss.enraged and 3 or 2
-        hero.hp = hero.hp - spikeDmg
-        hero.poisonTurns = (hero.poisonTurns or 0) + poisonTurns
-        hero.poisonDmg   = math.max(hero.poisonDmg or 0, 6)
-        AddFloatingText(state, hero.col, hero.row, "⚡-" .. spikeDmg .. "刺击!", {100, 220, 180, 255}, "hit")
-        AddFloatingText(state, hero.col, hero.row, "🤢中毒" .. poisonTurns .. "回合", {80, 180, 140, 255})
-        BattleBoss.AddBossSkillAnnounce(state, "coral_spike", boss.name)
-        AddVFX(state, "coral_spike", { col = hero.col, row = hero.row, duration = 0.8 })
-        boss.skillAnimTimer    = 0.45
-        boss.skillAnimDuration = 0.45
-        boss.skillAnimType     = "spike"
-        state.screenShake = (state.screenShake or 0) + 0.45
-        AM.PlaySFX("coral_spike_pierce", 1.0)
-        AddLog(state, string.format("珊瑚守卫珊瑚刺击！造成%d点伤害并附加%d回合中毒！", spikeDmg, poisonTurns))
-        return { type = "skill", enemy = boss, skill = "coral_spike" }
-    end
+    boss.tookDamageThisTurn = false  -- 重置标记，留给本回合后续英雄攻击设置
 
     -- ── 优先级1: 潮汐冲击（英雄距离≤4时触发）────────────────────────────
     if boss.tideSurgeCooldown <= 0 and distToHero <= 4 then
@@ -1065,19 +1035,31 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
         local pushDmg   = boss.enraged and math.floor(boss.atk * 1.5) or math.floor(boss.atk * 1.2)
         local totalDmg  = 0
         local pushed    = 0
+        local hitCoral  = false  -- 是否撞到珊瑚（障碍物）
 
-        for _ = 1, pushSteps do
+        -- 先在Boss位播放潮汐发动VFX
+        AddVFX(state, "coral_tide_surge", { col = boss.col, row = boss.row, duration = 1.5 })
+        AM.PlaySFX("coral_tide_surge", 0.8)
+
+        for step = 1, pushSteps do
             -- 在英雄所有相邻格中，选离Boss最远的空格作为推送目标
             local neighbors = HexGrid.GetNeighbors(hero.col, hero.row)
             local bestCell, bestDist = nil, -1
+            local blockedByObstacle = false
             for _, nb in ipairs(neighbors) do
                 if HexGrid.InBounds(nb.col, nb.row)
-                   and not HexGrid.IsBlocked(state.board, nb.col, nb.row)
                    and not HexGrid.GetPieceAt(state.board, nb.col, nb.row) then
                     local d = HexGrid.CubeDistance(nb.col, nb.row, boss.col, boss.row)
-                    if d > bestDist then
-                        bestDist = d
-                        bestCell = nb
+                    if not HexGrid.IsBlocked(state.board, nb.col, nb.row) then
+                        if d > bestDist then
+                            bestDist = d
+                            bestCell = nb
+                        end
+                    else
+                        -- 该方向有障碍物（珊瑚），标记撞击
+                        if d > bestDist then
+                            blockedByObstacle = true
+                        end
                     end
                 end
             end
@@ -1087,61 +1069,69 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
                 pushed = pushed + 1
                 hero.hp = hero.hp - pushDmg
                 totalDmg = totalDmg + pushDmg
-                AddVFX(state, "spawn_puff", { col = hero.col, row = hero.row, duration = 0.4 })
+                AddVFX(state, "frost_puff", { col = hero.col, row = hero.row, duration = 0.5 })
             else
-                break  -- 无法继续推
+                -- 无法继续推 → 检查是否因为撞到珊瑚（障碍物）
+                if blockedByObstacle then
+                    hitCoral = true
+                end
+                break
             end
         end
 
-        if pushed > 0 then
+        -- 撞到珊瑚：额外+50%伤害
+        if hitCoral and totalDmg > 0 then
+            local coralBonusDmg = math.floor(totalDmg * 0.5)
+            hero.hp = hero.hp - coralBonusDmg
+            totalDmg = totalDmg + coralBonusDmg
+            AddFloatingText(state, hero.col, hero.row,
+                "💥撞击珊瑚-" .. coralBonusDmg, {255, 160, 60, 255}, "hit")
+            AddVFX(state, "coral_spike", { col = hero.col, row = hero.row, duration = 0.8 })
+            state.screenShake = (state.screenShake or 0) + 0.3
+        end
+
+        if pushed > 0 or hitCoral then
             BattleBoss.AddBossSkillAnnounce(state, "tide_surge", boss.name)
-            boss.tideSurgeCooldown = boss.enraged and 2 or 3
+            boss.tideSurgeCooldown = boss.enraged and 3 or 5
             AddFloatingText(state, hero.col, hero.row,
                 "🌊-" .. totalDmg, {80, 190, 230, 255}, "hit")
-            AM.PlaySFX("lightning", 0.5)
+            -- VFX: 英雄落点水花爆发
+            AddVFX(state, "shockwave", { col = hero.col, row = hero.row, duration = 0.6 })
             AddLog(state, string.format(
-                "珊瑚守卫潮汐冲击！英雄被推离%d格，受到%d点伤害！", pushed, totalDmg))
-            state.screenShake = 0.5
+                "珊瑚守卫潮汐冲击！英雄被推离%d格，受到%d点伤害！%s",
+                pushed, totalDmg, hitCoral and "撞击珊瑚受到额外伤害！" or ""))
+            state.screenShake = (state.screenShake or 0) + 0.5
             return { type = "skill", enemy = boss, skill = "tide_surge" }
         end
     end
 
-    -- ── 优先级1: 珊瑚投掷（向英雄抛出大珊瑚块，造成重击并堵路）─────────
-    if boss.coralThrowCooldown <= 0 then
-        local throwDmg = boss.enraged and math.floor(boss.atk * 2.5) or math.floor(boss.atk * 1.8)
-        hero.hp = hero.hp - throwDmg
-        AddFloatingText(state, hero.col, hero.row,
-            "🪸-" .. throwDmg, {255, 120, 60, 255}, "hit")
-        AddVFX(state, "spawn_puff", { col = hero.col, row = hero.row, duration = 0.5 })
+    -- ── 优先级1: 珊瑚投掷（预警AOE：大圆形珊瑚雨 + 珊瑚障碍）─────────
+    if boss.coralThrowCooldown <= 0 and not state.bossAoeWarning then
+        boss.coralThrowCooldown = boss.enraged and 4 or 6
+        local circleRadius = boss.enraged and 3 or 3
+        local circleTiles = GetCircleTiles(hero.col, hero.row, circleRadius)
+        local throwDmg = boss.enraged and math.floor(boss.atk * 2.2) or math.floor(boss.atk * 1.6)
+        local obstacleCount = boss.enraged and 3 or 2
 
-        -- 在英雄周围的随机空格放置1~2个珊瑚障碍（堵住退路）
-        local heroNeighbors = HexGrid.GetNeighbors(hero.col, hero.row)
-        local freeCells = {}
-        for _, nb in ipairs(heroNeighbors) do
-            if HexGrid.InBounds(nb.col, nb.row)
-               and not HexGrid.IsBlocked(state.board, nb.col, nb.row)
-               and not HexGrid.GetPieceAt(state.board, nb.col, nb.row) then
-                freeCells[#freeCells + 1] = nb
-            end
-        end
-        -- 打乱后放1~2块（狂暴放2块）
-        for i = #freeCells, 2, -1 do
-            local j = math.random(1, i)
-            freeCells[i], freeCells[j] = freeCells[j], freeCells[i]
-        end
-        local blockCount = boss.enraged and 2 or 1
-        for i = 1, math.min(blockCount, #freeCells) do
-            HexGrid.AddObstacle(state.board, freeCells[i].col, freeCells[i].row)
-            AddVFX(state, "spawn_puff",
-                { col = freeCells[i].col, row = freeCells[i].row, duration = 0.6 })
-        end
+        state.bossAoeWarning = {
+            type = "coral_rain",
+            tiles = circleTiles,
+            timer = 1,
+            damage = throwDmg,
+            obstacleCount = obstacleCount,
+            centerCol = hero.col,
+            centerRow = hero.row,
+            color = {255, 120, 60},
+            icon = "🪸",
+        }
 
+        AddFloatingText(state, boss.col, boss.row, "🪸珊瑚蓄力!", {255, 120, 60, 255}, "combo")
+        -- VFX: 蓄力阶段的能量聚集效果 + SFX
+        AddVFX(state, "coral_throw_charge", { col = boss.col, row = boss.row, duration = 1.5 })
+        AM.PlaySFX("coral_throw_impact", 0.6)
+        AddLog(state, "珊瑚守卫高举巨大珊瑚块瞄准英雄区域！下回合珊瑚雨将砸落！")
         BattleBoss.AddBossSkillAnnounce(state, "coral_throw", boss.name)
-        boss.coralThrowCooldown = boss.enraged and 1 or 2
-        AddLog(state, string.format(
-            "珊瑚守卫抛出巨大珊瑚块！英雄受到%d点伤害！", throwDmg))
-        state.screenShake = 0.5
-        return { type = "skill", enemy = boss, skill = "coral_throw" }
+        return { type = "skill_charge", enemy = boss, skill = "coral_throw" }
     end
 
     -- ── 优先级2: 珊瑚封印（在英雄周围召唤珊瑚群 + 沉默英雄）──────────
@@ -1179,8 +1169,8 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
         local placed = 0
         for i = 1, math.min(sealLimit, #sealCells) do
             HexGrid.AddObstacle(state.board, sealCells[i].col, sealCells[i].row)
-            AddVFX(state, "spawn_puff",
-                { col = sealCells[i].col, row = sealCells[i].row, duration = 0.8 })
+            AddVFX(state, "coral_spike",
+                { col = sealCells[i].col, row = sealCells[i].row, duration = 0.9, delay = i * 0.08 })
             placed = placed + 1
         end
 
@@ -1190,12 +1180,15 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
 
         if placed >= 2 then
             BattleBoss.AddBossSkillAnnounce(state, "coral_seal", boss.name)
-            boss.coralSealCooldown = boss.enraged and 2 or 4
+            boss.coralSealCooldown = boss.enraged and 4 or 7
             AddFloatingText(state, hero.col, hero.row,
                 "🔇沉默" .. silenceTurns .. "回合!", {200, 100, 255, 255}, "combo")
             AddFloatingText(state, boss.col, boss.row,
                 "🪸珊瑚封印!", {255, 150, 200, 255}, "combo")
-            AM.PlaySFX("shield_ward", 0.6)
+            -- VFX: 英雄位置紫色魔法封印阵 + Boss位置珊瑚刺击
+            AddVFX(state, "coral_seal_ring", { col = hero.col, row = hero.row, duration = 1.5 })
+            AddVFX(state, "coral_spike", { col = boss.col, row = boss.row, duration = 0.8 })
+            AM.PlaySFX("coral_seal_enclosure", 0.8)
             AddLog(state, string.format(
                 "珊瑚守卫施放珊瑚封印！召唤%d块珊瑚，英雄被沉默%d回合无法攻击！",
                 placed, silenceTurns))
@@ -1212,7 +1205,7 @@ function BattleBoss.BossAct_CoralGuardian(state, boss)
 end
 
 -- =============================================================================
--- 第四章: 沙丘巨虫 (sand_worm) — 蛇形移动 + 尾鞭 + 巨岩投掷 + 钻地
+-- 第四章: 沙丘巨虫 (sand_worm) — 蛇形移动 + 尾鞭 + 呼唤风沙 + 钻地 + 头弱体硬被动
 -- =============================================================================
 
 --- 沙虫蛇形移动: 头移动到新格，身体段依次跟随（仅限相邻1格移动）
@@ -1433,11 +1426,7 @@ function BattleBoss.BossAct_SandWorm(state, boss)
     local hero = state.hero
     BattleBoss.BossEnrageCheck(state, boss, "沙丘巨虫")
 
-    -- 冷却递减
-    boss.burrowCooldown    = (boss.burrowCooldown or 0) - 1
-    boss.tailWhipCooldown  = (boss.tailWhipCooldown or 0) - 1
-    boss.sandstormCooldown = (boss.sandstormCooldown or 0) - 1
-    boss.sandFuryCooldown  = (boss.sandFuryCooldown or 0) - 1
+    -- 冷却递减已由 TickBossCooldowns 统一处理
 
     -- 碎石障碍回合递减（2回合后消失）
     if state.boulderDebris then
@@ -1673,7 +1662,7 @@ function BattleBoss.BossAct_SandWorm(state, boss)
             AddVFX(state, "burrow_hole", { col = boss.col, row = boss.row, duration = 2.5 })
             AddVFX(state, "burrow_strike", { col = boss.col, row = boss.row, duration = 0.8 })
             state.screenShake = (state.screenShake or 0) + 1.2
-            AM.PlaySFX("boss_stomp", 1.0)
+            AM.PlaySFX("sandworm_burrow_emerge", 1.0)
             AddLog(state, string.format("沙丘巨虫从地下钻出！%s",
                 heroHit and ("造成 " .. burrowDmg .. " 伤害！") or "英雄闪避成功！"))
             return { type = "skill", enemy = boss, skill = "burrow_emerge" }
@@ -1695,7 +1684,7 @@ function BattleBoss.BossAct_SandWorm(state, boss)
         BattleBoss.AddBossSkillAnnounce(state, "burrow_start", boss.name)
         AddFloatingText(state, boss.col, boss.row, "⏳准备遁地...", {180, 140, 60, 255})
         AddVFX(state, "burrow_casting", { col = boss.col, row = boss.row, duration = 1.0 })
-        AM.PlaySFX("boss_aoe", 0.5)
+        AM.PlaySFX("sandworm_burrow_emerge", 0.5)
         AddLog(state, "沙丘巨虫身体下沉，准备钻入地下！")
         return { type = "skill", enemy = boss, skill = "burrow_casting" }
     end
@@ -1707,7 +1696,7 @@ function BattleBoss.BossAct_SandWorm(state, boss)
     end
     local distToTail = tailSeg and HexGrid.CubeDistance(tailSeg.col, tailSeg.row, hero.col, hero.row) or distToHero
     if boss.tailWhipCooldown <= 0 and distToTail <= 2 then
-        boss.tailWhipCooldown = boss.enraged and 2 or 4
+        boss.tailWhipCooldown = boss.enraged and 3 or 5
         local whipDmg = boss.enraged and math.floor(boss.atk * 1.4) or boss.atk
         hero.hp = hero.hp - whipDmg
         -- 弹到Boss附近的安全格（不是全场随机）
@@ -1734,7 +1723,7 @@ function BattleBoss.BossAct_SandWorm(state, boss)
             "💫连跳中断!", {255, 100, 100, 255})
         BattleBoss.AddBossSkillAnnounce(state, "tail_whip", boss.name)
         state.screenShake = (state.screenShake or 0) + 0.4
-        AM.PlaySFX("boss_stomp", 0.9)
+        AM.PlaySFX("sandworm_tail_whip", 0.9)
         AddLog(state, string.format("沙丘巨虫尾鞭横扫！造成 %d 伤害并中断连跳！", whipDmg))
         return { type = "skill", enemy = boss, skill = "tail_whip" }
     end
@@ -1752,56 +1741,9 @@ function BattleBoss.BossAct_SandWorm(state, boss)
             "🌪️风沙来袭!持续3回合", {230, 160, 50, 255})
         AddVFX(state, "sand_fury_start", { col = boss.col, row = boss.row, duration = 1.5 })
         state.screenShake = (state.screenShake or 0) + 0.5
-        AM.PlaySFX("boss_aoe", 1.0)
+        AM.PlaySFX("sandworm_sand_fury", 1.0)
         AddLog(state, "沙丘巨虫呼唤风沙！持续沙暴将笼罩全场3回合！")
         return { type = "skill", enemy = boss, skill = "sand_fury" }
-    end
-
-    -- ── 优先级2: 巨岩投掷（单点高伤害，砸向英雄）─────────────────────────
-    if boss.sandstormCooldown <= 0 then
-        boss.sandstormCooldown = boss.enraged and 3 or 5
-        local boulderDmg = boss.enraged and math.floor(boss.atk * 1.2) or math.floor(boss.atk * 0.8)
-        hero.hp = hero.hp - boulderDmg
-        -- 砸中的格子变成碎石障碍（1格，英雄脚下）
-        local debrisCol, debrisRow = hero.col, hero.row
-        -- 英雄被砸后弹到相邻安全格
-        local knockNb = HexGrid.GetNeighbors(hero.col, hero.row)
-        local safeSpots = {}
-        for _, nb in ipairs(knockNb) do
-            if HexGrid.InBounds(nb.col, nb.row)
-               and not HexGrid.GetPieceAt(state.board, nb.col, nb.row)
-               and not HexGrid.GetObstacleAt(state.board, nb.col, nb.row)
-               and (nb.col ~= boss.col or nb.row ~= boss.row) then
-                safeSpots[#safeSpots + 1] = nb
-            end
-        end
-        if #safeSpots > 0 then
-            local dest = safeSpots[math.random(1, #safeSpots)]
-            hero.col, hero.row = dest.col, dest.row
-        end
-        -- 在原位置放置碎石障碍（会在2回合后自动消失）
-        if not HexGrid.GetObstacleAt(state.board, debrisCol, debrisRow) then
-            state.board.obstacles[#state.board.obstacles + 1] = {
-                col = debrisCol, row = debrisRow, isBoulder = true
-            }
-            -- 记录碎石消失倒计时
-            state.boulderDebris = state.boulderDebris or {}
-            state.boulderDebris[#state.boulderDebris + 1] = {
-                col = debrisCol, row = debrisRow, turns = 2
-            }
-        end
-        AddFloatingText(state, debrisCol, debrisRow,
-            "🪨-" .. boulderDmg .. "巨岩!", {180, 140, 80, 255}, "hit")
-        BattleBoss.AddBossSkillAnnounce(state, "sandstorm", boss.name)
-        AddVFX(state, "sand_boulder", {
-            fromCol = boss.col, fromRow = boss.row,
-            toCol = debrisCol, toRow = debrisRow,
-            duration = 0.8
-        })
-        state.screenShake = (state.screenShake or 0) + 0.5
-        AM.PlaySFX("boss_stomp", 1.0)
-        AddLog(state, string.format("沙丘巨虫掷出巨岩！造成 %d 伤害并留下碎石！", boulderDmg))
-        return { type = "skill", enemy = boss, skill = "sandstorm" }
     end
 
     -- ── 蛇形移动 + 普通攻击 ─────────────────────────────────────────
@@ -1851,9 +1793,14 @@ end
 
 --- 对Boss造成伤害（考虑护盾）
 function BattleBoss.ApplyBossDamage(state, boss, damage)
-    -- 沙虫身体段: 伤害路由到头部
+    -- 沙虫头弱体硬：身体段50%伤害路由到头部，打头130%伤害
     if boss.snakeHead then
+        damage = math.floor(damage * 0.5)
         boss = boss.snakeHead
+        AddFloatingText(state, boss.col, boss.row, "体硬×0.5", {180, 180, 180, 200})
+    elseif boss.bossType == "sand_worm" and not boss.isSegment then
+        damage = math.floor(damage * 1.3)
+        AddFloatingText(state, boss.col, boss.row, "头弱×1.3!", {255, 80, 80, 255})
     end
     -- 遁地状态免疫伤害
     if boss.burrowed then
@@ -1882,6 +1829,7 @@ function BattleBoss.ApplyBossDamage(state, boss, damage)
     end
     if damage > 0 then
         boss.hp = boss.hp - damage
+        boss.tookDamageThisTurn = true  -- 标记本回合受伤（珊瑚守卫被动回血判定用）
     end
 end
 

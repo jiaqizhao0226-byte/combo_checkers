@@ -1,3 +1,4 @@
+---@diagnostic disable: assign-type-mismatch
 -- ============================================================================
 -- MenuSystem - 主菜单 UI 构建与 Tab 切换
 -- ============================================================================
@@ -333,8 +334,8 @@ function MenuSystem.RebuildMenuPage(tabId)
         -- 判断章节是否已解锁
         local function IsChapterUnlocked(ch)
             if ch == 0 then
-                -- 无尽模式：通关第3章后解锁
-                return (G.playerData.highestLevel or 1) > 3 * Battle.LEVELS_PER_CHAPTER
+                -- 无尽模式：永久开放
+                return true
             end
             if ch <= 1 then return true end
             -- 主线章节：必须通关上一章 Boss（highestLevel > 上一章末尾关卡）
@@ -352,6 +353,10 @@ function MenuSystem.RebuildMenuPage(tabId)
         local at = arrowThemes[G.selectedChapter] or arrowThemes[1]
 
         -- 更新箭头按钮可见性 + 主题色
+        if G.menuEndlessHint then
+            -- 只在第1章显示"无尽模式"提示（左滑可进入）
+            G.menuEndlessHint:SetVisible(G.selectedChapter == 1)
+        end
         if G.menuArrowLeft then
             G.menuArrowLeft:SetVisible(G.selectedChapter > 0)
             G.menuArrowLeft:SetStyle({
@@ -760,7 +765,7 @@ function MenuSystem.RebuildMenuPage(tabId)
                     isMe     = (uid == myUserId),
                 }
             end
-            -- 云端已按 adventure_rank 降序排列（复合分数：level*100000 + (99999-runs)）
+            -- 云端已按 adventure_rank 降序排列（复合分数：level*100000 + (99999-runsAtHighest)）
             -- 无需客户端二次排序，直接使用云端顺序即为正确排名
             return rankData
         end
@@ -2138,6 +2143,45 @@ function MenuSystem.CreateMenuUI()
                         end
                     end,
                 }
+                G.menuEndlessHint = UI.Panel {
+                    position = "absolute",
+                    left = 6, top = "24%",
+                    width = 32,
+                    alignItems = "center",
+                    gap = 4,
+                    zIndex = 10,
+                    children = {
+                        UI.Label {
+                            text = "*", fontSize = 10,
+                            fontColor = {255, 255, 255, 180},
+                            textAlign = "center",
+                        },
+                        UI.Label {
+                            text = "无\n尽\n模\n式",
+                            fontSize = 14,
+                            fontWeight = "bold",
+                            fontColor = {255, 255, 255, 255},
+                            textAlign = "center",
+                            textShadow = {
+                                { x = 0, y = 0, blur = 6, color = {200, 180, 255, 220} },
+                                { x = 0, y = 0, blur = 14, color = {160, 120, 255, 150} },
+                            },
+                        },
+                        UI.Label {
+                            text = "<", fontSize = 14,
+                            fontColor = {255, 255, 255, 220},
+                            textAlign = "center",
+                            textShadow = {
+                                { x = 0, y = 0, blur = 8, color = {200, 180, 255, 200} },
+                            },
+                        },
+                        UI.Label {
+                            text = "*", fontSize = 10,
+                            fontColor = {255, 255, 255, 180},
+                            textAlign = "center",
+                        },
+                    },
+                }
                 G.menuHeroArea = UI.Panel {
                     width = "100%", flexGrow = 1, flexShrink = 1,
                     onSwipeLeft = function(event, widget)
@@ -2158,6 +2202,7 @@ function MenuSystem.CreateMenuUI()
                         },
                         G.menuArrowLeft,
                         G.menuArrowRight,
+                        G.menuEndlessHint,
                     },
                 }
                 G.menuScrollView = UI.ScrollView {

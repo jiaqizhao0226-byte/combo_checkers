@@ -1,3 +1,4 @@
+---@diagnostic disable: assign-type-mismatch
 -- ============================================================================
 -- BoardWidget_Overlays - 全屏叠加层渲染（从 BoardWidget.lua 拆分）
 -- ctx 字段: nvg, l, t, hexSize, ox, oy, shakeX, shakeY, theme

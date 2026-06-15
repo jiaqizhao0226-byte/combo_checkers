@@ -1,7 +1,7 @@
 -- ============================================================================
 -- BoardWidget - 棋盘 NanoVG 渲染控件
 -- ============================================================================
----@diagnostic disable: redefined-local
+---@diagnostic disable: redefined-local, param-type-mismatch
 
 local UI = require("urhox-libs/UI")
 local HexGrid = require "HexGrid"
@@ -10,6 +10,8 @@ local G = require "GameState"
 local IconAtlas = require "IconAtlas"
 local BoardWidget_VFX      = require "BoardWidget_VFX"
 local BoardWidget_Overlays = require "BoardWidget_Overlays"
+local WheelPopup           = require "WheelPopup"
+local Skills               = require "Skills"
 
 -- 跨子模块共享的渲染上下文（复用 table 避免 GC 压力）
 local _ctx = {}
@@ -27,7 +29,7 @@ local ENEMY_COLORS = {
     lava_giant      = {255, 80, 0},
     shadow_ambusher = {120, 60, 180},
     smoke_master    = {150, 150, 180},
-    shadow_knight   = {180, 30, 50},
+
     abyss_kraken    = {100, 20, 160},
     lava_lord       = {255, 100, 0},
     coral_snapper   = {255, 120, 160},
@@ -898,47 +900,56 @@ function BoardWidget:Render(nvg)
         local cx, cy = HexGrid.HexToPixel(spike.col, spike.row, hexSize, ox, oy)
         if not IsCellOnScreen(cx, cy, hexSize, l.x, l.y, l.w, l.h) then goto cull_spike end
         do
-        -- 六边形深色底板 + 白色粗边框（任何棋盘都醒目）
+        -- 六边形底板：暗红渐变 + 微光边框（危险感但不突兀）
+        local spikeR = hexSize * 0.88
         nvgBeginPath(nvg)
         for i = 0, 5 do
             local angle = math.rad(60 * i - 90)
-            local vx = cx + hexSize * 0.88 * math.cos(angle)
-            local vy = cy + hexSize * 0.88 * math.sin(angle)
+            local vx = cx + spikeR * math.cos(angle)
+            local vy = cy + spikeR * math.sin(angle)
             if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
         end
         nvgClosePath(nvg)
-        nvgFillColor(nvg, nvgRGBA(20, 10, 10, 210))
+        -- 径向渐变：中心深红 → 边缘暗褐（不再纯黑）
+        local bgPaint = nvgRadialGradient(nvg, cx, cy, hexSize * 0.1, hexSize * 0.85,
+            nvgRGBA(80, 20, 15, 220), nvgRGBA(35, 15, 20, 200))
+        nvgFillPaint(nvg, bgPaint)
         nvgFill(nvg)
-        nvgStrokeColor(nvg, nvgRGBA(255, 255, 255, 200))
-        nvgStrokeWidth(nvg, 3.5)
+        -- 边框：暗红发光感（不再纯白）
+        nvgStrokeColor(nvg, nvgRGBA(200, 80, 60, 180))
+        nvgStrokeWidth(nvg, 2.5)
         nvgStroke(nvg)
-        -- 3根向上三角尖刺（鲜红色）
+        -- 3根向上三角尖刺（带发光感的红色）
         local spikeH = hexSize * 0.46
         local spikeW = hexSize * 0.16
         local offsets = {-0.25, 0, 0.25}
         local heights = {0.8, 1.0, 0.8}  -- 中间最高
+        local pulse = 0.85 + 0.15 * math.sin((G.time or 0) * 3.0)  -- 微呼吸
         for i = 1, 3 do
             local bx = cx + offsets[i] * hexSize
             local by = cy + hexSize * 0.14
-            local h = spikeH * heights[i]
+            local h = spikeH * heights[i] * pulse
             nvgBeginPath(nvg)
             nvgMoveTo(nvg, bx, by - h)         -- 尖端
             nvgLineTo(nvg, bx - spikeW, by)    -- 左底
             nvgLineTo(nvg, bx + spikeW, by)    -- 右底
             nvgClosePath(nvg)
-            nvgFillColor(nvg, nvgRGBA(230, 50, 40, 240))
+            -- 尖刺渐变：尖端亮橙 → 底部暗红
+            local spikePaint = nvgLinearGradient(nvg, bx, by - h, bx, by,
+                nvgRGBA(255, 160, 60, 250), nvgRGBA(200, 40, 30, 240))
+            nvgFillPaint(nvg, spikePaint)
             nvgFill(nvg)
-            nvgStrokeColor(nvg, nvgRGBA(255, 180, 150, 200))
-            nvgStrokeWidth(nvg, 1.5)
+            nvgStrokeColor(nvg, nvgRGBA(255, 200, 120, math.floor(160 * pulse)))
+            nvgStrokeWidth(nvg, 1.2)
             nvgStroke(nvg)
         end
-        -- 剩余回合数（加大字号 + 白色粗描边）
-        nvgFontSize(nvg, hexSize * 0.38)
+        -- 剩余回合数（暗底描边 + 亮色数字）
+        nvgFontSize(nvg, hexSize * 0.36)
         nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-        nvgFillColor(nvg, nvgRGBA(0, 0, 0, 240))
-        nvgText(nvg, cx + 1, cy - hexSize * 0.22 + 1, tostring(spike.turns))
-        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255))
-        nvgText(nvg, cx, cy - hexSize * 0.22, tostring(spike.turns))
+        nvgFillColor(nvg, nvgRGBA(0, 0, 0, 200))
+        nvgText(nvg, cx + 1, cy - hexSize * 0.24 + 1, tostring(spike.turns))
+        nvgFillColor(nvg, nvgRGBA(255, 220, 180, 255))
+        nvgText(nvg, cx, cy - hexSize * 0.24, tostring(spike.turns))
         end -- do
         ::cull_spike::
     end
@@ -1171,9 +1182,30 @@ function BoardWidget:Render(nvg)
             if imgHandle then
                 local tentW = hexSize * 1.4
                 local tentH = tentW * 1.8       -- 粉色版比例略宽
-                -- 蠕动摇晃 + 呼吸缩放
-                local tentSway = math.sin(tt * 2.0 + tentSeed) * 0.06
-                local tentScaleAnim = 0.97 + math.sin(tt * 3.0 + tentSeed) * 0.03
+                -- 出生动画（前0.8秒：猛烈弹出 + 砸击摇晃）
+                if not obs.spawnTime then obs.spawnTime = tt end  -- 首次渲染时补记
+                local spawnElapsed = tt - obs.spawnTime
+                local spawnDur = 0.8
+                local spawnT = math.min(1.0, spawnElapsed / spawnDur) -- 0→1
+                local spawnScale, spawnSway, spawnFlash = 1.0, 0, 0
+                if spawnT < 1.0 then
+                    -- 缩放：弹性过冲 0→1.5→0.85→1.0
+                    if spawnT < 0.35 then
+                        spawnScale = (spawnT / 0.35) * 1.5
+                    elseif spawnT < 0.6 then
+                        spawnScale = 1.5 - (spawnT - 0.35) / 0.25 * 0.65
+                    else
+                        spawnScale = 0.85 + (spawnT - 0.6) / 0.4 * 0.15
+                    end
+                    -- 攻击性摇晃（快速衰减正弦）
+                    local shakeFade = 1.0 - spawnT
+                    spawnSway = math.sin(spawnElapsed * 28) * 0.25 * shakeFade
+                    -- 闪光脉冲（前半段亮，后半段消退）
+                    spawnFlash = math.max(0, 1.0 - spawnT * 2.0)
+                end
+                -- 蠕动摇晃 + 呼吸缩放（常态动画）
+                local tentSway = math.sin(tt * 2.0 + tentSeed) * 0.06 + spawnSway
+                local tentScaleAnim = (0.97 + math.sin(tt * 3.0 + tentSeed) * 0.03) * spawnScale
                 local tentFloat = math.sin(tt * 1.5 + tentSeed * 0.7) * 1.5
                 local drawW = tentW * tentScaleAnim
                 local drawH = tentH * tentScaleAnim
@@ -1191,6 +1223,15 @@ function BoardWidget:Render(nvg)
                 nvgFillPaint(nvg, imgPaint)
                 nvgFill(nvg)
 
+                -- 出生闪光覆盖层（白紫色闪烁）
+                if spawnFlash > 0 then
+                    local flashA = math.floor(spawnFlash * 200)
+                    nvgBeginPath(nvg)
+                    nvgRect(nvg, imgX, imgY, drawW, drawH)
+                    nvgFillColor(nvg, nvgRGBA(240, 180, 255, flashA))
+                    nvgFill(nvg)
+                end
+
                 -- 下缘渐隐遮罩（让触手根部自然融入格子）
                 local fadeH = drawH * 0.2
                 local fadeY = bottomEdge - fadeH
@@ -1203,6 +1244,17 @@ function BoardWidget:Render(nvg)
                 nvgFill(nvg)
 
                 nvgRestore(nvg)
+
+                -- 出生冲击波（出生瞬间扩散圆环）
+                if spawnT < 1.0 then
+                    local ringR = hexSize * 0.3 + spawnT * hexSize * 0.9
+                    local ringA = math.floor((1.0 - spawnT) * 180)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, ringR)
+                    nvgStrokeColor(nvg, nvgRGBA(220, 100, 255, ringA))
+                    nvgStrokeWidth(nvg, 3 * (1.0 - spawnT) + 1)
+                    nvgStroke(nvg)
+                end
             end
 
             -- 底部发光（粉紫色根部光芒，更亮）
@@ -2038,6 +2090,56 @@ function BoardWidget:Render(nvg)
                             end
                         end
                     end
+
+                    -- (g) 外围伤害范围边界环（脉动虚线圆 + 外发光）
+                    local bossCX, bossCY = HexGrid.HexToPixel(e.col, e.row, hexSize, ox, oy)
+                    local outerRadius = (aura.range + 0.5) * hexSize * 1.73 * 0.5
+                    local borderPulse = math.sin(gt * 2.0) * 0.25 + 0.75
+                    local baseAlpha = isEnraged and 200 or 140
+
+                    -- 外发光（柔和宽光带）
+                    local glowWidth = hexSize * 0.4
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, bossCX, bossCY, outerRadius)
+                    nvgStrokeColor(nvg, nvgRGBA(ar, ag, ab, math.floor(baseAlpha * 0.3 * borderPulse)))
+                    nvgStrokeWidth(nvg, glowWidth)
+                    nvgStroke(nvg)
+
+                    -- 主边界线（实线脉动）
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, bossCX, bossCY, outerRadius)
+                    nvgStrokeColor(nvg, nvgRGBA(ar, ag, ab, math.floor(baseAlpha * borderPulse)))
+                    nvgStrokeWidth(nvg, 2.5)
+                    nvgStroke(nvg)
+
+                    -- 内层亮线（高光边界）
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, bossCX, bossCY, outerRadius - 1.5)
+                    nvgStrokeColor(nvg, nvgRGBA(
+                        math.min(255, ar + 80), math.min(255, ag + 80), math.min(255, ab + 80),
+                        math.floor(baseAlpha * 0.5 * borderPulse)))
+                    nvgStrokeWidth(nvg, 1.0)
+                    nvgStroke(nvg)
+
+                    -- 呼吸扩散环（从边界向外慢速扩张的薄圈，增强动态警示感）
+                    local expandT = (gt * 0.6) % 1.0
+                    local expandR = outerRadius + expandT * hexSize * 0.8
+                    local expandA = math.floor((1.0 - expandT) * baseAlpha * 0.5)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, bossCX, bossCY, expandR)
+                    nvgStrokeColor(nvg, nvgRGBA(ar, ag, ab, expandA))
+                    nvgStrokeWidth(nvg, 1.5 * (1.0 - expandT) + 0.5)
+                    nvgStroke(nvg)
+
+                    -- 第二层扩散环（错相位）
+                    local expandT2 = (gt * 0.6 + 0.5) % 1.0
+                    local expandR2 = outerRadius + expandT2 * hexSize * 0.8
+                    local expandA2 = math.floor((1.0 - expandT2) * baseAlpha * 0.35)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, bossCX, bossCY, expandR2)
+                    nvgStrokeColor(nvg, nvgRGBA(ar, ag, ab, expandA2))
+                    nvgStrokeWidth(nvg, 1.0 * (1.0 - expandT2) + 0.5)
+                    nvgStroke(nvg)
                 end
             end
         end
@@ -2051,7 +2153,16 @@ function BoardWidget:Render(nvg)
         do
         local def = Battle.ITEM_TYPES[item.type]
         if def then
-            -- 绿色菱形底标（区分于怪物的红色圆形）
+            -- 菱形底标颜色（轮盘道具用独特颜色区分）
+            local fillR, fillG, fillB = 40, 200, 100    -- 默认绿色
+            local strokeR, strokeG, strokeB = 80, 255, 140
+            if item.type == "lucky_wheel" then
+                fillR, fillG, fillB = 220, 180, 30       -- 金色
+                strokeR, strokeG, strokeB = 255, 215, 0
+            elseif item.type == "doom_wheel" then
+                fillR, fillG, fillB = 140, 40, 180       -- 紫色
+                strokeR, strokeG, strokeB = 180, 60, 255
+            end
             local dSize = hexSize * 0.45
             nvgBeginPath(nvg)
             nvgMoveTo(nvg, cx, cy - dSize)
@@ -2059,11 +2170,30 @@ function BoardWidget:Render(nvg)
             nvgLineTo(nvg, cx, cy + dSize)
             nvgLineTo(nvg, cx - dSize, cy)
             nvgClosePath(nvg)
-            nvgFillColor(nvg, nvgRGBA(40, 200, 100, 120 + math.floor(pulse * 80)))
+            nvgFillColor(nvg, nvgRGBA(fillR, fillG, fillB, 120 + math.floor(pulse * 80)))
             nvgFill(nvg)
-            nvgStrokeColor(nvg, nvgRGBA(80, 255, 140, 170 + math.floor(pulse * 60)))
+            nvgStrokeColor(nvg, nvgRGBA(strokeR, strokeG, strokeB, 170 + math.floor(pulse * 60)))
             nvgStrokeWidth(nvg, 2.0)
             nvgStroke(nvg)
+            -- 轮盘道具额外旋转光芒
+            if def.isWheel then
+                local spinAngle = (G.time or 0) * 1.5
+                nvgSave(nvg)
+                nvgTranslate(nvg, cx, cy)
+                nvgRotate(nvg, spinAngle)
+                nvgBeginPath(nvg)
+                for i = 0, 3 do
+                    local a = i * math.pi * 0.5
+                    local rx = math.cos(a) * dSize * 1.1
+                    local ry = math.sin(a) * dSize * 1.1
+                    nvgMoveTo(nvg, 0, 0)
+                    nvgLineTo(nvg, rx, ry)
+                end
+                nvgStrokeColor(nvg, nvgRGBA(strokeR, strokeG, strokeB, 80 + math.floor(pulse * 60)))
+                nvgStrokeWidth(nvg, 1.5)
+                nvgStroke(nvg)
+                nvgRestore(nvg)
+            end
             -- 道具图标（随呼吸微微浮动）
             local floatY = -pulse * 4
             IconAtlas.DrawNVG(nvg, def.icon, cx, cy + floatY, hexSize * 0.78)
@@ -2592,6 +2722,55 @@ function BoardWidget:Render(nvg)
         end
     end
 
+    -- 7.065 Boss AOE预警渲染（通用：剧毒喷射/地脉喷发/珊瑚雨）
+    if G.battle.bossAoeWarning then
+        local warn = G.battle.bossAoeWarning
+        local wColor = warn.color or {255, 80, 0}
+        local pulse = 0.6 + 0.4 * math.sin((G.time or 0) * 6)
+        for _, tile in ipairs(warn.tiles or {}) do
+            if HexGrid.InBounds(tile.col, tile.row) then
+                local tx, ty = HexGrid.HexToPixel(tile.col, tile.row, hexSize, ox, oy)
+                -- 描边六边形
+                nvgBeginPath(nvg)
+                local rWarn = hexSize * 0.52
+                for vi = 0, 5 do
+                    local angle = math.pi / 3 * vi - math.pi / 6
+                    local vx = tx + rWarn * math.cos(angle)
+                    local vy = ty + rWarn * math.sin(angle)
+                    if vi == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                local isCenter = (tile.col == warn.centerCol and tile.row == warn.centerRow)
+                local strokeAlpha = isCenter and math.floor(230 * pulse) or math.floor(160 * pulse)
+                local strokeW = isCenter and 3.5 or 2.0
+                nvgStrokeColor(nvg, nvgRGBA(wColor[1], wColor[2], wColor[3], strokeAlpha))
+                nvgStrokeWidth(nvg, strokeW)
+                nvgStroke(nvg)
+                -- 半透明填充
+                nvgBeginPath(nvg)
+                local rFill = hexSize * 0.46
+                for vi = 0, 5 do
+                    local angle = math.pi / 3 * vi - math.pi / 6
+                    local vx = tx + rFill * math.cos(angle)
+                    local vy = ty + rFill * math.sin(angle)
+                    if vi == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
+                end
+                nvgClosePath(nvg)
+                local fillAlpha = isCenter and math.floor(60 * pulse) or math.floor(30 * pulse)
+                nvgFillColor(nvg, nvgRGBA(wColor[1], wColor[2], wColor[3], fillAlpha))
+                nvgFill(nvg)
+                -- 中心格显示图标
+                if isCenter and warn.icon then
+                    nvgFontFace(nvg, "emoji")
+                    nvgFontSize(nvg, hexSize * 0.5)
+                    nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                    nvgFillColor(nvg, nvgRGBA(wColor[1], wColor[2], wColor[3], math.floor(220 * pulse)))
+                    nvgText(nvg, tx, ty, warn.icon)
+                end
+            end
+        end
+    end
+
     -- 7.07 沙虫钻出AOE红光高亮
     if G.battle.sandWormEmergeAOE and G.battle.sandWormEmergeAOE.timer > 0 then
         local aoeData = G.battle.sandWormEmergeAOE
@@ -2933,6 +3112,43 @@ function BoardWidget:Render(nvg)
                 p._diveScale = nil  -- 一次性字段，用完清理
             end
             HexGrid.DrawPiece(nvg, cx, cy, drawRadius, p)
+
+            -- 冰霜冻结蓝色遮罩（冻结中的敌人覆盖冰蓝色半透明层 + 冰晶边框）
+            if p.team == "enemy" and p.hp > 0 and (p._frozenTurns or 0) > 0 then
+                local ft = G.time or 0
+                local fPulse = math.sin(ft * 3.0) * 0.15 + 0.85
+                local frostR = drawRadius * 1.05
+
+                -- 冰蓝色半透明圆形遮罩
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, frostR)
+                nvgFillColor(nvg, nvgRGBA(60, 160, 255, math.floor(80 * fPulse)))
+                nvgFill(nvg)
+
+                -- 冰晶边框（双层）
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, frostR)
+                nvgStrokeColor(nvg, nvgRGBA(120, 200, 255, math.floor(200 * fPulse)))
+                nvgStrokeWidth(nvg, 2.5)
+                nvgStroke(nvg)
+
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, frostR * 1.1)
+                nvgStrokeColor(nvg, nvgRGBA(180, 230, 255, math.floor(100 * fPulse)))
+                nvgStrokeWidth(nvg, 1.2)
+                nvgStroke(nvg)
+
+                -- 小冰晶粒子装饰（围绕圆周 6 个点）
+                for i = 0, 5 do
+                    local angle = i * math.pi / 3 + ft * 0.5
+                    local px = cx + math.cos(angle) * frostR * 0.85
+                    local py = cy + math.sin(angle) * frostR * 0.85
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, px, py, 2.5 * fPulse)
+                    nvgFillColor(nvg, nvgRGBA(200, 240, 255, math.floor(180 * fPulse)))
+                    nvgFill(nvg)
+                end
+            end
         end
         ::continue_piece::
     end
@@ -3417,6 +3633,171 @@ function BoardWidget:Render(nvg)
         end
     end
 
+    -- 7.6.8.2 冰霜印记层数指示器（怪头上持续显示 ❄X/Y）
+    if G.battle.board then
+        local frostSkillLv = Skills.Level(G.battle.skills, "frost_mark")
+        if frostSkillLv >= 1 then
+            local maxStacks
+            if frostSkillLv <= 2 then
+                maxStacks = 4 - (frostSkillLv - 1)
+            else
+                maxStacks = 3 - math.floor((frostSkillLv - 3) / 2)
+            end
+            local enemies = HexGrid.GetTeamPieces(G.battle.board, "enemy")
+            for _, e in ipairs(enemies) do
+                if e.hp > 0 and (e._frostStacks or 0) > 0 then
+                    local ex, ey = HexGrid.HexToPixel(e.col, e.row, hexSize, ox, oy)
+                    local frostY = ey - hexSize * 0.72
+                    local t = G.time or 0
+                    local pulse = math.sin(t * 2.5) * 0.15 + 0.85
+
+                    -- 冰霜背景小圆
+                    nvgBeginPath(nvg)
+                    nvgRoundedRect(nvg, ex - hexSize * 0.35, frostY - hexSize * 0.16,
+                        hexSize * 0.7, hexSize * 0.32, 4)
+                    nvgFillColor(nvg, nvgRGBA(30, 80, 160, math.floor(140 * pulse)))
+                    nvgFill(nvg)
+
+                    -- 层数文字
+                    nvgFontFace(nvg, "sans")
+                    nvgFontSize(nvg, hexSize * 0.26)
+                    nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                    nvgFillColor(nvg, nvgRGBA(160, 230, 255, math.floor(240 * pulse)))
+                    nvgText(nvg, ex, frostY, "❄" .. e._frostStacks .. "/" .. maxStacks)
+                end
+
+                -- 冻结状态也显示
+                if e.hp > 0 and (e._frozenTurns or 0) > 0 then
+                    local ex, ey = HexGrid.HexToPixel(e.col, e.row, hexSize, ox, oy)
+                    local frzY = ey - hexSize * 0.48
+                    local t = G.time or 0
+                    local pulse = math.sin(t * 4.0) * 0.2 + 0.8
+
+                    nvgFontFace(nvg, "sans")
+                    nvgFontSize(nvg, hexSize * 0.24)
+                    nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                    nvgFillColor(nvg, nvgRGBA(100, 200, 255, math.floor(220 * pulse)))
+                    nvgText(nvg, ex, frzY, "🧊冻" .. e._frozenTurns .. "回合")
+                end
+            end
+        end
+    end
+
+    -- 7.6.8.5 沉默指示器（英雄被珊瑚封印沉默时，头顶显示🔇图标+紫色光环）
+    if G.battle.hero and (G.battle.hero.silencedTurns or 0) > 0 and G.battle.hero.hp > 0 then
+        local hero = G.battle.hero
+        local hx, hy
+        if hero.animTimer and hero.animTimer > 0 and hero.animFromCol then
+            local at = 1.0 - hero.animTimer / hero.animMaxTimer
+            at = 1.0 - (1.0 - at) * (1.0 - at)
+            local fx2, fy2 = HexGrid.HexToPixel(hero.animFromCol, hero.animFromRow, hexSize, ox, oy)
+            local tx2, ty2 = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+            hx = fx2 + (tx2 - fx2) * at
+            hy = fy2 + (ty2 - fy2) * at
+        else
+            hx, hy = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+        end
+        local gt = G.time or 0
+        local pulse = math.sin(gt * 3.5) * 0.25 + 0.75
+        local silenceY = hy - hexSize * 0.75
+
+        -- 紫色光环底座
+        nvgBeginPath(nvg)
+        nvgCircle(nvg, hx, silenceY, hexSize * 0.28 * pulse)
+        nvgFillPaint(nvg, nvgRadialGradient(nvg, hx, silenceY, 0, hexSize * 0.28 * pulse,
+            nvgRGBA(200, 80, 255, math.floor(80 * pulse)),
+            nvgRGBA(160, 40, 200, 0)))
+        nvgFill(nvg)
+
+        -- 沉默图标
+        nvgFontFace(nvg, "emoji")
+        nvgFontSize(nvg, hexSize * 0.4)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(nvg, nvgRGBA(220, 120, 255, math.floor(230 * pulse)))
+        nvgText(nvg, hx, silenceY, "🔇")
+
+        -- 剩余回合数
+        nvgFontFace(nvg, "sans")
+        nvgFontSize(nvg, hexSize * 0.22)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(nvg, nvgRGBA(255, 200, 255, 220))
+        nvgText(nvg, hx, silenceY + hexSize * 0.25, tostring(hero.silencedTurns) .. "回合")
+    end
+
+    -- 7.6.8.6 棋步就绪持续指示器（英雄头顶金色闪光提示，直到棋步跳跃执行后消失）
+    if G.battle._kingmakerReady and G.battle.hero and G.battle.hero.hp > 0 then
+        local hero = G.battle.hero
+        local hx, hy
+        if hero.animTimer and hero.animTimer > 0 and hero.animFromCol then
+            local at = 1.0 - hero.animTimer / hero.animMaxTimer
+            at = 1.0 - (1.0 - at) * (1.0 - at)
+            local fx2, fy2 = HexGrid.HexToPixel(hero.animFromCol, hero.animFromRow, hexSize, ox, oy)
+            local tx2, ty2 = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+            hx = fx2 + (tx2 - fx2) * at
+            hy = fy2 + (ty2 - fy2) * at
+        else
+            hx, hy = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+        end
+        local gt = G.time or 0
+        local kmY = hy - hexSize * 1.35
+        local pulse = math.sin(gt * 3.0) * 0.12 + 0.88
+        local floatOff = math.sin(gt * 1.8) * 3.0  -- 上下浮动
+
+        -- "♟棋步就绪" 文字（无外框，带描边增强可读性）
+        nvgFontFace(nvg, "sans")
+        nvgFontSize(nvg, hexSize * 0.55)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        -- 深色描边（增强对比度）
+        nvgFillColor(nvg, nvgRGBA(40, 20, 0, math.floor(200 * pulse)))
+        for dx = -1.5, 1.5, 1.5 do
+            for dy = -1.5, 1.5, 1.5 do
+                if dx ~= 0 or dy ~= 0 then
+                    nvgText(nvg, hx + dx, kmY + floatOff + dy, "♟棋步就绪")
+                end
+            end
+        end
+        -- 金色文字
+        nvgFontFace(nvg, "sans")
+        nvgFontSize(nvg, hexSize * 0.55)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(nvg, nvgRGBA(255, 230, 100, math.floor(255 * pulse)))
+        nvgText(nvg, hx, kmY + floatOff, "♟棋步就绪")
+
+        -- 闪闪发光粒子（10颗围绕文字旋转的金色星星，更大更亮）
+        for i = 0, 9 do
+            local angle = i * math.pi / 5 + gt * 1.5
+            local dist = hexSize * (0.85 + math.sin(gt * 2.5 + i * 1.3) * 0.15)
+            local px = hx + math.cos(angle) * dist
+            local py = kmY + floatOff + math.sin(angle) * hexSize * 0.35
+            local sparkSize = (3.5 + math.sin(gt * 4.0 + i * 0.8) * 1.8) * pulse
+            local sparkAlpha = math.floor((200 + math.sin(gt * 3.5 + i * 1.1) * 55) * pulse)
+
+            -- 十字星形粒子
+            nvgBeginPath(nvg)
+            nvgMoveTo(nvg, px - sparkSize, py)
+            nvgLineTo(nvg, px, py - sparkSize * 1.5)
+            nvgLineTo(nvg, px + sparkSize, py)
+            nvgLineTo(nvg, px, py + sparkSize * 1.5)
+            nvgClosePath(nvg)
+            nvgFillColor(nvg, nvgRGBA(255, 240, 120, sparkAlpha))
+            nvgFill(nvg)
+        end
+
+        -- 额外小圆点闪烁（随机分布感，更大范围）
+        for i = 0, 7 do
+            local seed = i * 2.37
+            local sx = hx + math.sin(gt * 1.5 + seed) * hexSize * 0.95
+            local sy = kmY + floatOff + math.cos(gt * 1.9 + seed) * hexSize * 0.35
+            local dotAlpha = math.floor(math.max(0, math.sin(gt * 5.0 + seed * 3.0)) * 240)
+            if dotAlpha > 20 then
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx, sy, 3.0)
+                nvgFillColor(nvg, nvgRGBA(255, 255, 200, dotAlpha))
+                nvgFill(nvg)
+            end
+        end
+    end
+
     -- 7.6.9 猎手印记指示器（被标记的敌人显示橙色靶心，跟随移动动画插值）
     if G.battle.board then
         local enemies = HexGrid.GetTeamPieces(G.battle.board, "enemy")
@@ -3861,9 +4242,20 @@ function BoardWidget:Render(nvg)
     -- 9-13. 全屏叠加层（连击/Boss公告、回合提示、技能横幅等）
     BoardWidget_Overlays.Render(_ctx)
 
+    -- 14. 轮盘弹窗覆盖层（最顶层）
+    if WheelPopup.IsOpen() then
+        WheelPopup.RenderNVG(nvg, l.w, l.h)
+    end
+
 end
 
 function BoardWidget:HandleClick(event)
+    -- 轮盘弹窗打开时拦截所有点击
+    if WheelPopup.IsOpen() then
+        WheelPopup.HandleClick()
+        return
+    end
+
     if not G.gridParams then return end
     local l = self:GetAbsoluteLayout()
     -- 使用与渲染相同的 gridParams，保证点击判定与视觉位置一致

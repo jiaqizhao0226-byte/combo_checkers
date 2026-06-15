@@ -1,3 +1,4 @@
+---@diagnostic disable: assign-type-mismatch, return-type-mismatch
 -- ============================================================================
 -- TurnFlow - 游戏回合流程（技能选择、玩家操作、敌人回合、胜负判定）
 -- ============================================================================
@@ -12,12 +13,18 @@ local G = require "GameState"
 local GameUI = require "GameUI"
 local MenuSystem = require "MenuSystem"
 local AM = require "AudioManager"
+local WheelPopup = require "WheelPopup"
 
 local TurnFlow = {}
 
 --- 构建 FindValidJumps 的 opts: 所有章节障碍物（岩石、珊瑚、祭坛等）均可作为飞跃先锋支点
 local function buildJumpOpts()
-    return { ch3Rocks = true }
+    local opts = { ch3Rocks = true }
+    -- 稻草人是友方目标，可被当做跳板（跳跃支撑点）
+    if G.battle and G.battle.scarecrowActive and G.battle.scarecrow and G.battle.scarecrow.hp > 0 then
+        opts.scarecrow = G.battle.scarecrow
+    end
+    return opts
 end
 
 -- TurnFlow.UploadProgress 定义在文件底部
@@ -44,6 +51,8 @@ local function SettleBattleRewards()
         end
         if level > (G.playerData.highestLevel or 1) then
             G.playerData.highestLevel = level
+            -- 记录到达新最高关卡时的累计把数（用于排行榜公平排名）
+            G.playerData.runsAtHighest = G.playerData.totalRuns or 0
         end
     end
 
@@ -162,27 +171,12 @@ function TurnFlow.ReturnToMenu()
     G.menuTab = "adventure"
     G.selectedLevel = G.highestLevel
 
-    -- 检测初次通关第三章 → 自动切换到无尽模式页面
-    local justUnlockedEndless = false
-    if (G.playerData.highestLevel or 1) > 3 * Battle.LEVELS_PER_CHAPTER
-       and not G.playerData.endlessUnlockSeen then
-        G.playerData.endlessUnlockSeen = true
-        PlayerData.Save(G.playerData)
-        G.selectedChapter = 0  -- 切换到无尽模式页面
-        justUnlockedEndless = true
-    else
-        -- 主线仅3章，无尽模式在 selectedChapter=0
-        local maxChapter = math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER)
-        G.selectedChapter = math.min(maxChapter, 3)
-    end
+    -- 主线章节定位
+    local maxChapter = math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER)
+    G.selectedChapter = math.min(maxChapter, 4)
 
     MenuSystem.CreateMenuUI()
     AM.PlayBGM("menu")
-
-    -- 初次解锁无尽模式弹窗
-    if justUnlockedEndless then
-        TurnFlow.ShowEndlessUnlockPopup()
-    end
 end
 
 -- ============================================================================
@@ -456,6 +450,50 @@ function TurnFlow.StartPlayerTurn()
     -- 猎手印记: 每回合开始标记血量最高的敌人
     Battle.ApplyHunterMarks(G.battle)
 
+    -- 厄运轮盘：承伤增加倒计时
+    if G.battle.doomDamageTakenTurns and G.battle.doomDamageTakenTurns > 0 then
+        G.battle.doomDamageTakenTurns = G.battle.doomDamageTakenTurns - 1
+        if G.battle.doomDamageTakenTurns <= 0 then
+            Battle.AddLog(G.battle, "💀 脆弱诅咒解除！承伤恢复正常")
+        end
+    end
+    -- 厄运轮盘：输出降低倒计时
+    if G.battle.doomOutputDownTurns and G.battle.doomOutputDownTurns > 0 then
+        G.battle.doomOutputDownTurns = G.battle.doomOutputDownTurns - 1
+        if G.battle.doomOutputDownTurns <= 0 then
+            Battle.AddLog(G.battle, "💀 力量枯竭解除！输出恢复正常")
+        end
+    end
+    -- 幸运轮盘：战意高涨倒计时
+    if G.battle.luckyAtkUpTurns and G.battle.luckyAtkUpTurns > 0 then
+        G.battle.luckyAtkUpTurns = G.battle.luckyAtkUpTurns - 1
+        if G.battle.luckyAtkUpTurns <= 0 then
+            Battle.AddLog(G.battle, "⚔️ 战意高涨消退！攻击力恢复正常")
+        end
+    end
+    -- 厄运轮盘：暗毒侵蚀倒计时（每回合扣5%最大HP）
+    if G.battle.doomPoisonTurns and G.battle.doomPoisonTurns > 0 then
+        local hero = G.battle.hero
+        local poisonDmg = math.max(1, math.floor(hero.maxHp * 0.05))
+        hero.hp = math.max(1, hero.hp - poisonDmg)  -- 中毒不致死，最低保留1HP
+        Battle.AddFloatingText(G.battle, hero.col, hero.row, "🧪毒-" .. poisonDmg, {120, 200, 50, 255}, "hit", 2.0)
+        G.battle.doomPoisonTurns = G.battle.doomPoisonTurns - 1
+        if G.battle.doomPoisonTurns <= 0 then
+            Battle.AddLog(G.battle, "🧪 暗毒解除！不再中毒")
+        end
+    end
+    -- 幸运轮盘：生命之泉倒计时（每回合回复8%最大HP）
+    if G.battle.luckyRegenTurns and G.battle.luckyRegenTurns > 0 then
+        local hero = G.battle.hero
+        local regenAmt = math.max(1, math.floor(hero.maxHp * 0.08))
+        hero.hp = math.min(hero.maxHp, hero.hp + regenAmt)
+        Battle.AddFloatingText(G.battle, hero.col, hero.row, "💚回复+" .. regenAmt, {50, 220, 120, 255}, "heal", 2.0)
+        G.battle.luckyRegenTurns = G.battle.luckyRegenTurns - 1
+        if G.battle.luckyRegenTurns <= 0 then
+            Battle.AddLog(G.battle, "💚 生命之泉效果结束")
+        end
+    end
+
     -- 魅惑免疫期递减（每回合开始时）
     if G.battle.heroCharmImmunity and G.battle.heroCharmImmunity > 0 then
         G.battle.heroCharmImmunity = G.battle.heroCharmImmunity - 1
@@ -504,6 +542,59 @@ function TurnFlow.RefreshHighlightsForSelect()
     else
         local maxJump = G.battle.setEffects and SetEffects.GetMaxJumpOverCount(G.battle.setEffects) or 1
         G.validJumps = HexGrid.FindValidJumps(G.battle.board, hero.col, hero.row, maxJump, buildJumpOpts())
+    end
+
+    -- === 棋步: 就绪时扩展跳跃范围至全图所有有敌人的格子 ===
+    if G.battle._kingmakerReady and Skills.Level(G.battle.skills, "kingmaker") >= 1 then
+        local enemies = HexGrid.GetTeamPieces(G.battle.board, "enemy")
+        for _, enemy in ipairs(enemies) do
+            if enemy.hp > 0 then
+                -- 检查该敌人是否已经在 validJumps 中
+                local alreadyIn = false
+                for _, j in ipairs(G.validJumps) do
+                    if j.jumpedCol == enemy.col and j.jumpedRow == enemy.row then
+                        alreadyIn = true
+                        break
+                    end
+                end
+                if not alreadyIn then
+                    -- 找到敌人背后的空落点（沿英雄→敌人方向的对称位置）
+                    local neighbors = HexGrid.GetNeighbors(enemy.col, enemy.row)
+                    local landingTile = nil
+                    local heroDist = HexGrid.CubeDistance(hero.col, hero.row, enemy.col, enemy.row)
+                    for _, nb in ipairs(neighbors) do
+                        -- 落点必须为空且在棋盘内
+                        if not HexGrid.IsBlocked(G.battle.board, nb.col, nb.row) then
+                            -- 选择离英雄更远的空格作为落点（跳过敌人后的位置）
+                            local d = HexGrid.CubeDistance(hero.col, hero.row, nb.col, nb.row)
+                            if d > heroDist then
+                                landingTile = nb
+                                break
+                            end
+                        end
+                    end
+                    -- 如果没找到"更远"的，就找任意空格
+                    if not landingTile then
+                        for _, nb in ipairs(neighbors) do
+                            if not HexGrid.IsBlocked(G.battle.board, nb.col, nb.row) then
+                                landingTile = nb
+                                break
+                            end
+                        end
+                    end
+                    if landingTile then
+                        G.validJumps[#G.validJumps + 1] = {
+                            col = landingTile.col, row = landingTile.row,
+                            enemy = enemy,
+                            jumpedCol = enemy.col, jumpedRow = enemy.row,
+                            isRockJump = false,
+                            dist = heroDist,
+                            isKingmaker = true,  -- 标记为棋步跳
+                        }
+                    end
+                end
+            end
+        end
     end
 
     -- 过滤掉稻草人所在格子（稻草人不在 board.pieces 中，IsBlocked 检测不到）
@@ -753,7 +844,13 @@ function TurnFlow.HandleSelectClick(col, row)
     for _, m in ipairs(G.validMoves) do
         if m.col == col and m.row == row then
             Battle.ExecuteMove(G.battle, col, row, false)
-            TurnFlow.EndPlayerTurn()
+            -- 移动后检查轮盘道具（ExecuteMove内部的CheckItemPickup可能设置了pendingWheel）
+            if G.battle and G.battle.pendingWheel then
+                log:Write(LOG_INFO, "[Wheel] ShowWheelPopup after ExecuteMove")
+                TurnFlow.ShowWheelPopup()
+            else
+                TurnFlow.EndPlayerTurn()
+            end
             return
         end
     end
@@ -895,20 +992,29 @@ function TurnFlow.ExecuteOneJump()
             end
         end
     elseif jumpInfo.isRockJump then
-        -- 岩石已被清除（第三章跳岩石会清除障碍物）
-        local obs = HexGrid.GetObstacleAt(G.battle.board, jumpInfo.jumpedCol, jumpInfo.jumpedRow)
-        -- 也检查贝壳（贝壳不在 board.obstacles，需单独查）
-        local shellHere = false
-        if G.battle.board.shells then
-            for _, s in ipairs(G.battle.board.shells) do
-                if s.col == jumpInfo.jumpedCol and s.row == jumpInfo.jumpedRow then
-                    shellHere = true
-                    break
+        if jumpInfo.isScarecrowJump then
+            -- 稻草人跳跃: 检查稻草人是否仍在原位且存活
+            local sc = G.battle.scarecrow
+            if not (G.battle.scarecrowActive and sc and sc.hp > 0
+                    and sc.col == jumpInfo.jumpedCol and sc.row == jumpInfo.jumpedRow) then
+                jumpValid = false
+            end
+        else
+            -- 岩石已被清除（第三章跳岩石会清除障碍物）
+            local obs = HexGrid.GetObstacleAt(G.battle.board, jumpInfo.jumpedCol, jumpInfo.jumpedRow)
+            -- 也检查贝壳（贝壳不在 board.obstacles，需单独查）
+            local shellHere = false
+            if G.battle.board.shells then
+                for _, s in ipairs(G.battle.board.shells) do
+                    if s.col == jumpInfo.jumpedCol and s.row == jumpInfo.jumpedRow then
+                        shellHere = true
+                        break
+                    end
                 end
             end
-        end
-        if not obs and not shellHere then
-            jumpValid = false
+            if not obs and not shellHere then
+                jumpValid = false
+            end
         end
     end
     -- 落点被其他棋子/障碍物占据（漩涡鳗可能把敌人洗到落点上）
@@ -1043,9 +1149,52 @@ function TurnFlow.ProceedWithRewards(rewardsPreTriggered, comboTriggered)
         pcall(GameUI.UpdateHUD)
         G.battle.comboSpotlightPending = nil
         G.battle.scarecrowTutorialPending = nil
+        if G.battle.pendingWheel then
+            log:Write(LOG_INFO, "[Wheel] pendingWheel='" .. tostring(G.battle.pendingWheel) .. "' deferred (comboTriggered=" .. tostring(comboTriggered) .. " result=" .. tostring(result) .. ")")
+        end
     else
-        TurnFlow.EndPlayerTurn()
+        -- 轮盘道具检查：如果拾取了轮盘，弹出轮盘弹窗
+        if G.battle.pendingWheel then
+            log:Write(LOG_INFO, "[Wheel] ShowWheelPopup from ProceedWithRewards (no combo/result)")
+            TurnFlow.ShowWheelPopup()
+        else
+            TurnFlow.EndPlayerTurn()
+        end
     end
+end
+
+-- ============================================================================
+-- 轮盘弹窗流程
+-- ============================================================================
+
+function TurnFlow.ShowWheelPopup()
+    local wType = G.battle.pendingWheel
+    G.battle.pendingWheel = nil
+    G.battle.phase = "WHEEL_WAIT"
+
+    WheelPopup.Open(wType, function()
+        -- 轮盘关闭回调
+        if not G.battle then return end
+
+        -- 检查额外技能选择
+        if G.battle.pendingExtraSkillPick then
+            G.battle.pendingExtraSkillPick = nil
+            G.battle.phase = "PLAYER_SELECT"
+            TurnFlow.ShowSkillSelect()
+            return
+        end
+
+        -- 检查额外回合
+        if G.battle.pendingExtraTurn then
+            G.battle.pendingExtraTurn = nil
+            Battle.AddLog(G.battle, "⏩ 额外回合开始！")
+            TurnFlow.StartPlayerTurn()
+            return
+        end
+
+        -- 正常结束玩家回合
+        TurnFlow.EndPlayerTurn()
+    end)
 end
 
 -- 阶段2：mastery bonus → spotlight 检测 → ProceedWithRewards
@@ -1409,9 +1558,12 @@ TurnFlow.UploadProgress = function(pd)
         local level       = pd.highestLevel or 1
         local runs        = pd.totalRuns or 0
         local endlessWave = pd.highestEndlessWave or 0
-        -- 复合分数：进度高优先，同进度把数少优先（降序排列时自然正确）
-        -- adventure_rank = level * 100000 + (99999 - clamp(runs, 0, 99999))
-        local clampedRuns = math.max(0, math.min(runs, 99999))
+        -- 使用 runsAtHighest（到达最高关卡时的把数）计算排名分数
+        -- 这样玩家继续游玩不会导致排名下降
+        local runsAtHighest = pd.runsAtHighest or runs  -- 兼容旧存档：无该字段时 fallback 到 totalRuns
+        -- 复合分数：进度高优先，同进度到达把数少优先（降序排列时自然正确）
+        -- adventure_rank = level * 100000 + (99999 - clamp(runsAtHighest, 0, 99999))
+        local clampedRuns = math.max(0, math.min(runsAtHighest, 99999))
         local adventureRank = level * 100000 + (99999 - clampedRuns)
         -- highest_level 作为冒险排行分数，endless_wave 作为无尽排行分数
         clientCloud:BatchSet()
@@ -1434,6 +1586,8 @@ function TurnFlow.ShowChapterClear(chapter)
     end
     if nextLevel > (G.playerData.highestLevel or 1) then
         G.playerData.highestLevel = nextLevel
+        -- 记录到达新最高关卡时的累计把数（用于排行榜公平排名）
+        G.playerData.runsAtHighest = G.playerData.totalRuns or 0
     end
     PlayerData.Save(G.playerData)
     TurnFlow.UploadProgress(G.playerData)
@@ -1602,13 +1756,13 @@ function TurnFlow.ShowChapterClear(chapter)
                     { x = 0, y = 0, blur = 1, spread = 0, color = {theme.color1[1], theme.color1[2], theme.color1[3], 30}, inset = true },
                 },
                 children = {
-                    -- 标题行（emoji + 文字同行）
+                    -- 标题行（emoji + 文字同行，不换行）
                     UI.Label {
                         text = theme.icon .. " 恭喜通关！",
-                        fontSize = 32,
+                        fontSize = 30,
                         fontColor = {255, 225, 65, 255}, fontWeight = "bold", marginTop = 8,
                         textShadow = { offsetX = 0, offsetY = 2, blur = 10, color = {200, 160, 0, 100} },
-                        numberOfLines = 1,
+                        numberOfLines = 1, flexShrink = 0,
                     },
                     -- 章节名
                     UI.Label {
@@ -1718,6 +1872,9 @@ end
 function TurnFlow.Update(dt)
     if G.gamePhase ~= "GAME" then return end
 
+    -- 轮盘旋转动画更新
+    WheelPopup.Update(dt)
+
     -- 英雄死亡动画延迟弹窗
     if G._defeatPopupDelay then
         G._defeatPopupDelay = G._defeatPopupDelay - dt
@@ -1799,6 +1956,13 @@ function TurnFlow.Update(dt)
                 G.comboRewardTimer = nil
                 G.comboRewardElapsed = nil
 
+                -- === 轮盘道具：combo奖励播完后弹出轮盘（优先于延迟WIN和EndPlayerTurn） ===
+                if G.battle.pendingWheel then
+                    log:Write(LOG_INFO, "[Wheel] ShowWheelPopup from proceedAfterTutorials (after COMBO_REWARD_WAIT)")
+                    TurnFlow.ShowWheelPopup()
+                    return
+                end
+
                 -- === 延迟结算：连击奖励动画播完后，如果之前标记了延迟WIN，回到PLAYER_SELECT ===
                 if G.battle._deferredWin then
                     G.battle._deferredWin = nil
@@ -1818,6 +1982,8 @@ function TurnFlow.Update(dt)
                 if result then
                     TurnFlow.ClearPlan()
                     TurnFlow.ShowResult(result)
+                elseif G.battle.pendingWheel then
+                    TurnFlow.ShowWheelPopup()
                 else
                     TurnFlow.EndPlayerTurn()
                 end

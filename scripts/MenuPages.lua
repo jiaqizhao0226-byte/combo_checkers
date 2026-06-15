@@ -1,3 +1,4 @@
+---@diagnostic disable: assign-type-mismatch, param-type-mismatch, return-type-mismatch
 -- ============================================================================
 -- MenuPages.lua - 主菜单各标签页 UI 构建器
 -- 天赋、商店(抽奖)、装备(全屏6槽+套装) 页面
@@ -1763,8 +1764,10 @@ function MenuPages.UpdateShopCarousel(dt)
         local fadeDur = 0.35
         c.fadeAlpha = math.max(0, 1.0 - c.fadeTimer / fadeDur)
         if c.fadeTimer >= fadeDur then
-            -- 切换到下一个
-            c.index = (c.index % numSets) + 1
+            -- 切换索引（支持手动方向）
+            local dir = c._switchDir or 1
+            c._switchDir = nil
+            c.index = ((c.index - 1 + dir) % numSets) + 1
             c.fadeDir = 2  -- 开始淡入
             c.fadeTimer = 0
             -- 刷新UI
@@ -1781,6 +1784,19 @@ function MenuPages.UpdateShopCarousel(dt)
             c.timer = 0
         end
     end
+end
+
+--- 手动切换轮播到指定方向 (dir: 1=下一个, -1=上一个)
+function MenuPages.SwitchCarousel(dir)
+    local c = MenuPages._shopCarousel
+    local numSets = #Equipment.SETS
+    if numSets <= 1 or c.fadeDir ~= 0 then return end -- 正在切换中不响应
+
+    -- 计算目标索引
+    c._switchDir = dir
+    c.fadeDir = 1  -- 开始淡出
+    c.fadeTimer = 0
+    c.timer = 0
 end
 
 --- 构建套装海报卡片 (v4.2: 竖版全幅海报)
@@ -1912,13 +1928,42 @@ function MenuPages.BuildShopPage(data, callbacks)
         },
     }
 
-    -- ======== 1. 全幅套装海报 ========
+    -- ======== 1. 全幅套装海报 + 翻页箭头 ========
+    local arrowBtn = function(label, dir)
+        return UI.Button {
+            text = label,
+            width = 36, height = 36,
+            fontSize = 18, fontWeight = "bold",
+            borderRadius = 18,
+            backgroundColor = {30, 25, 50, 180},
+            pressedBackgroundColor = {255, 215, 0, 220},
+            fontColor = {255, 230, 120, 255},
+            borderWidth = 1.5, borderColor = {255, 215, 0, 100},
+            onClick = function(self)
+                AM.PlaySFX("ui_click", 0.7)
+                MenuPages.SwitchCarousel(dir)
+            end,
+        }
+    end
+
     children[#children + 1] = UI.Panel {
-        width = "100%",
-        paddingLeft = 16, paddingRight = 16,
+        width = "100%", flexDirection = "row",
+        alignItems = "center",
+        paddingLeft = 4, paddingRight = 4,
         paddingTop = 4, paddingBottom = 0,
         children = {
-            BuildSetPoster(currentSet),
+            -- 左箭头
+            numSets > 1 and arrowBtn("<", -1) or nil,
+            -- 海报
+            UI.Panel {
+                flexGrow = 1, flexShrink = 1,
+                paddingLeft = 4, paddingRight = 4,
+                children = {
+                    BuildSetPoster(currentSet),
+                },
+            },
+            -- 右箭头
+            numSets > 1 and arrowBtn(">", 1) or nil,
         },
     }
 

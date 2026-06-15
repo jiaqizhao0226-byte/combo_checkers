@@ -1,3 +1,4 @@
+---@diagnostic disable: param-type-mismatch
 -- ============================================================================
 -- MenuHeroWidget - 主菜单英雄动画区域 NanoVG 渲染控件
 -- ============================================================================
@@ -1013,32 +1014,6 @@ function MenuHeroWidget:Render(nvg)
         nvgFillColor(nvg, nvgRGBA(120, 120, 140, 200))
     end
     nvgText(nvg, cx, titleY, displayTitle)
-
-    -- === 1.5 "研发中"标识（第四章专属，醒目大字）===
-    if ch == 4 then
-        local badgeText = "🚧 研发中"
-        local badgeFontSize = math.max(18, titleFontSize * 0.6)
-        local badgeY = titleY + titleFontSize + 6
-        -- 背景胶囊（更大更醒目）
-        nvgFontSize(nvg, badgeFontSize)
-        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
-        local tw = nvgTextBounds(nvg, 0, 0, badgeText)
-        local bw = tw + 24
-        local bh = badgeFontSize + 12
-        nvgBeginPath(nvg)
-        nvgRoundedRect(nvg, cx - bw / 2, badgeY, bw, bh, bh / 2)
-        nvgFillColor(nvg, nvgRGBA(180, 110, 10, 210))
-        nvgFill(nvg)
-        -- 边框（更粗更亮）
-        nvgBeginPath(nvg)
-        nvgRoundedRect(nvg, cx - bw / 2, badgeY, bw, bh, bh / 2)
-        nvgStrokeColor(nvg, nvgRGBA(255, 200, 50, 200))
-        nvgStrokeWidth(nvg, 2.0)
-        nvgStroke(nvg)
-        -- 文字（更亮更清晰）
-        nvgFillColor(nvg, nvgRGBA(255, 255, 230, 255))
-        nvgText(nvg, cx, badgeY + 6, badgeText)
-    end
 
     -- === 2. 章节卡片 ===
     DrawChapterCard(nvg, ch, cardX, cardY, cardW, cardH,

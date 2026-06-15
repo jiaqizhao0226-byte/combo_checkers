@@ -167,9 +167,11 @@ function Start()
     -- 加载持久化存档
     G.playerData = PlayerData.Load()
     G.highestLevel = G.playerData.highestLevel or 1
-    -- 若 Load 内部执行了迁移，立即持久化
-    if G.playerData._chapterMigrated then
+    -- 若 Load 内部执行了迁移或恢复操作，立即持久化
+    if G.playerData._chapterMigrated or G.playerData._recoveredFromBackup or G.playerData._recoveredFromCorruption then
         PlayerData.Save(G.playerData)
+        G.playerData._recoveredFromBackup = nil
+        G.playerData._recoveredFromCorruption = nil
     end
 
     -- 启动时上报一次进度（确保 adventure_rank 字段存在，兼容老玩家）
@@ -214,6 +216,12 @@ function HandleUpdate(eventType, eventData)
         if G.menuTab == "guild" then
             MenuSystem.UpdateGuild(dt)
         end
+        -- 无尽模式标签呼吸闪烁动画
+        if G.menuEndlessHint and G.menuEndlessHint:IsVisible() then
+            local breath = 0.5 + 0.5 * math.sin(G.time * 2.2)  -- 0~1 缓慢呼吸
+            local alpha = 0.45 + 0.55 * breath  -- 0.45 ~ 1.0
+            G.menuEndlessHint:SetStyle({ opacity = alpha })
+        end
         return
     end
 
@@ -224,7 +232,7 @@ end
 ---@param eventData KeyDownEventData
 function HandleKeyDown(eventType, eventData)
     local key = eventData["Key"]:GetInt()
-    -- if key == KEY_T then TestPanel.Show() return end  -- 发布时关闭
+    -- TestPanel 入口已关闭（发布模式）
     if G.gamePhase == "MENU" then return end
     TurnFlow.HandleKeyDown(key)
 end

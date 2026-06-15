@@ -29,9 +29,14 @@ IconAtlas.PATHS = {
     skill_hunter_mark      = "image/skill_hunter_mark_20260601033312.png",
     skill_combo_shield     = "image/skill_combo_shield_20260601033314.png",
     skill_step_strike      = "image/skill_step_strike_20260601033527.png",
+    skill_frost_mark       = "image/skill_frost_mark_20260609063805.png",
+    skill_kingmaker        = "image/skill_kingmaker_20260609063755.png",
+    skill_gravity_pull     = "image/skill_gravity_pull_20260609063803.png",
     -- 组合技能
     skill_combo_storm      = "image/skill_combo_thunder_quake_20260601033526.png",
     skill_combo_thorn      = "image/skill_combo_blood_thorns_20260601033523.png",
+    skill_combo_fire       = "image/skill_combo_fire_20260609063807.png",
+    skill_combo_pirate     = "image/skill_combo_pirate_20260609063750.png",
 
     -- === HUD 图标 (4) ===
     hud_hp                 = "icons/hud/hud_hp_20260427110233.png",
@@ -46,11 +51,13 @@ IconAtlas.PATHS = {
     tab_talent             = "icons/tabs/tab_talent_20260427110453.png",
     tab_guild              = "icons/tabs/tab_guild_20260427110241.png",
 
-    -- === 道具图标 (3) ===
+    -- === 道具图标 (5) ===
     item_health_potion     = "icons/items/item_health_potion_20260427110358.png",
     item_health_potion_big = "icons/items/item_health_potion_big_20260521032413.png",
     item_gold_bag          = "icons/items/item_gold_bag_20260427110618.png",
     item_shield            = "icons/items/item_shield_20260427110945.png",
+    item_lucky_wheel       = "image/item_lucky_wheel_20260604090826.png",
+    item_doom_wheel        = "image/item_doom_wheel_20260604090828.png",
 
     -- === 装备槽位图标 (6) ===
     equip_weapon           = "icons/equip/equip_weapon_20260427110614.png",

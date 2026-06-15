@@ -41,9 +41,9 @@ Equipment.RARITIES = {
 }
 
 Equipment.RARITY_MULT = {
-    blue   = 1.0,
-    purple = 1.7,
-    gold   = 2.5,
+    blue   = 0.85,
+    purple = 1.5,
+    gold   = 2.2,
 }
 
 Equipment.RARITY_DECOMPOSE = {
@@ -85,9 +85,9 @@ Equipment.SETS = {
         id = "combo_mastery", name = "金色套装-连击心得", icon = "🔥",
         color = {255, 140, 40, 255},
         -- 金4/6: 连跳链结算后50%概率combo+1
-        -- 金6/6: 75%概率combo+1
+        -- 金6/6: 100%概率combo+1
         desc4 = "50%概率combo+1",
-        desc6 = "75%概率combo+1",
+        desc6 = "100%概率combo+1",
         effectType = "combo_boost",
     },
 

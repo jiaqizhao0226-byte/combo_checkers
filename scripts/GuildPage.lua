@@ -15,7 +15,7 @@ local GuildPage = {}
 -- ============================================================================
 
 --- 关卡号 → "第N章 第M关" 文本
-local MAX_CHAPTER = 3  -- 当前游戏最大章节数（第4章为无尽模式），防止旧测试数据显示超出范围的章节
+local MAX_CHAPTER = 4  -- 当前游戏最大章节数，防止旧测试数据显示超出范围的章节
 
 local function LevelToText(level)
     if type(level) ~= "number" then level = tonumber(level) or 1 end
@@ -271,7 +271,7 @@ function GuildPage.Build(playerData, onRefresh)
 end
 
 --- 构建排行榜列表内容（异步拉取后调用）
---- @param rankData table[{rank,nickname,level,runs,isMe}]
+--- @param rankData table
 function GuildPage.BuildRankList(rankData)
     local rows = {}
     rows[#rows + 1] = BuildHeader()
@@ -422,7 +422,7 @@ function GuildPage.BuildEndlessMyCard(playerData)
 end
 
 --- 构建无尽排行榜列表内容（异步拉取后调用）
---- @param rankData table[{rank, nickname, wave, isMe}]
+--- @param rankData table
 function GuildPage.BuildEndlessRankList(rankData)
     local rows = {}
     rows[#rows + 1] = BuildEndlessHeader()

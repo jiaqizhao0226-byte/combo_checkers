@@ -244,6 +244,60 @@ Skills.SKILLS = {
             return string.format("对生命值低于%d%%的敌人造成额外%d%%伤害", threshold, bonus)
         end,
     },
+
+    -- 17. 冰霜印记 - 叠层冻结
+    frost_mark = {
+        name = "冰霜印记",
+        icon = "skill_frost_mark",
+        color = {100, 200, 255},
+        maxLevel = 5,
+        rarity = {1, 1, 2, 3, 4},
+        desc = function(lv)
+            local stacks = math.max(2, 5 - lv)  -- Lv1=4层, Lv2=3层, Lv3=3层, Lv4=2层, Lv5=2层
+            if lv <= 2 then stacks = 4 - (lv - 1) end  -- Lv1=4, Lv2=3
+            if lv >= 3 then stacks = 3 - math.floor((lv - 3) / 2) end  -- Lv3=3, Lv4=2, Lv5=2
+            local freezeDur = lv >= 3 and 2 or 1
+            local extra = ""
+            if lv >= 3 then extra = extra .. "；冻结持续2回合" end
+            if lv >= 5 then extra = extra .. "；冻结时受伤+30%" end
+            return string.format("攻击叠加冰霜印记，%d层时冻结敌人(跳过行动)%s", stacks, extra)
+        end,
+    },
+
+    -- 18. 棋步 - 每N跳全图任意跳跃
+    kingmaker = {
+        name = "棋步",
+        icon = "skill_kingmaker",
+        color = {220, 180, 60},
+        maxLevel = 5,
+        rarity = {1, 2, 2, 3, 4},
+        desc = function(lv)
+            local interval
+            if lv <= 3 then interval = 8 - lv  -- Lv1=7, Lv2=6, Lv3=5
+            else interval = 5 - math.floor((lv - 3) / 2) end  -- Lv4=4, Lv5=4
+            local extra = ""
+            if lv >= 3 then extra = extra .. "；棋步跳伤害+20%" end
+            if lv >= 5 then extra = extra .. "；棋步跳无视防御" end
+            return string.format("每%d次跳跃后，下一跳可到达任意位置%s", interval, extra)
+        end,
+    },
+
+    -- 19. 引力 - 落地拉近周围敌人
+    gravity_pull = {
+        name = "引力",
+        icon = "skill_gravity_pull",
+        color = {140, 80, 220},
+        maxLevel = 5,
+        rarity = {1, 1, 2, 3, 4},
+        desc = function(lv)
+            local range = lv >= 3 and 3 or 2
+            local extra = ""
+            if lv >= 3 then extra = extra .. "；范围扩大至3格" end
+            if lv >= 4 then extra = extra .. "；被拉动敌人受5伤" end
+            if lv >= 5 then extra = extra .. "；拉到身边的敌人眩晕1回合" end
+            return string.format("跳跃落地后，%d格内敌人被拉近1格%s", range, extra)
+        end,
+    },
 }
 
 -- ============================================================================

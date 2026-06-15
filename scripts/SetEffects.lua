@@ -85,10 +85,8 @@ function SetEffects.OnComboChainComplete(seState, currentCombo)
     local bonus = 0
 
     if tier >= 6 then
-        -- 6/6: 75% combo+1
-        if math.random(1, 100) <= 75 then
-            bonus = 1
-        end
+        -- 6/6: 100% combo+1
+        bonus = 1
     else
         -- 4/6: 50% combo+1
         if math.random(1, 100) <= 50 then

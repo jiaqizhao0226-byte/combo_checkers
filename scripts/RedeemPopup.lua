@@ -1,3 +1,4 @@
+---@diagnostic disable: param-type-mismatch, assign-type-mismatch
 -- ============================================================================
 -- RedeemPopup.lua - 兑换码系统
 -- 点击右上角金币栏触发，支持键盘输入兑换码，发放金币奖励

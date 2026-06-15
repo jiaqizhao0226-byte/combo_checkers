@@ -8,8 +8,7 @@ local PlayerData = {}
 
 -- ============================================================================
 -- 存档版本号
--- 每次需要强制重置所有玩家进度时，将此值 +1
--- 当存档中的 saveVersion 与此值不一致时，忽略旧存档、生成全新默认数据
+-- 版本号不匹配时仅更新版本号字段，保留所有玩家资产（不会重置进度）
 -- ============================================================================
 PlayerData.SAVE_VERSION = 2
 
@@ -65,7 +64,7 @@ PlayerData.TALENTS = {
     },
 }
 
-PlayerData.TALENT_COSTS = { 30, 60, 120, 250, 450, 800, 1400, 2200, 3500, 5000 }
+PlayerData.TALENT_COSTS = { 20, 40, 80, 150, 280, 500, 850, 1400, 2200, 3500 }
 
 function PlayerData.GetTalentDef(id)
     for _, t in ipairs(PlayerData.TALENTS) do
@@ -92,6 +91,7 @@ function PlayerData.NewDefault()
         pityCounter = 0,
         highestLevel = 1,
         totalRuns = 0,
+        runsAtHighest = 0,  -- 到达 highestLevel 时的 totalRuns（用于排行榜排名）
         highestEndlessWave = 0,
         comboTutorialSeen = false,
         scarecrowTutorialSeen = false,
@@ -99,6 +99,7 @@ function PlayerData.NewDefault()
         chainJumpTutorialSeen = false,
         tutorialSpawnSeen = false,
         endlessUnlockSeen = false,
+        wheelIntroSeen = false,
         seenComboTiers = {},
         seenEnemyTypes = {},
         usedCodes = {},
@@ -198,6 +199,26 @@ local function tryLoadFrom(filename)
     if ok and type(data) == "table" then
         return data
     end
+    -- 解码失败：尝试修复被截断的 JSON（文件写到一半崩溃的情况）
+    -- 方法：找到最后一个完整的 key-value 对，截断后补上结尾大括号
+    log:Write(LOG_WARNING, "[PlayerData] JSON解码失败(" .. filename .. ")，尝试截断修复...")
+    local lastBrace = str:match(".*()}")  -- 找到最后一个 }
+    if lastBrace then
+        local truncated = str:sub(1, lastBrace --[[@as integer]])
+        local ok2, data2 = pcall(cjson.decode, truncated)
+        if ok2 and type(data2) == "table" then
+            log:Write(LOG_INFO, "[PlayerData] 截断修复成功(" .. filename .. ")")
+            return data2
+        end
+    end
+    -- 最后尝试：在末尾补 } 关闭
+    local patched = str:gsub("[,%s]+$", "") .. "}"
+    local ok3, data3 = pcall(cjson.decode, patched)
+    if ok3 and type(data3) == "table" then
+        log:Write(LOG_INFO, "[PlayerData] 补尾修复成功(" .. filename .. ")")
+        return data3
+    end
+    log:Write(LOG_ERROR, "[PlayerData] " .. filename .. " 无法修复，跳过")
     return nil
 end
 
@@ -216,28 +237,83 @@ function PlayerData.Load()
             if data then
                 log:Write(LOG_INFO, "[PlayerData] 从备份 save.bak.json 恢复成功")
             else
-                log:Write(LOG_ERROR, "[PlayerData] 备份也不可用，将创建新存档")
-                return PlayerData.NewDefault()
+                -- 备份也不可用 → 尝试从临时文件恢复（关键修复：之前此处直接返回 NewDefault 导致存档丢失）
+                log:Write(LOG_WARNING, "[PlayerData] 备份也不可用，尝试从临时文件恢复...")
+                data = tryLoadFrom("save.tmp.json")
+                if data then
+                    log:Write(LOG_INFO, "[PlayerData] 从临时文件 save.tmp.json 恢复成功")
+                else
+                    -- 三个文件全部损坏：这是已有玩家（主存档文件存在），绝不能创建新存档
+                    -- 返回带标记的默认数据，但保留警告以便追踪
+                    log:Write(LOG_ERROR, "[PlayerData] 所有存档文件均损坏！创建应急存档（标记为已损坏恢复）")
+                    local emergency = PlayerData.NewDefault()
+                    emergency._recoveredFromCorruption = true
+                    return emergency
+                end
             end
         elseif fileSystem:FileExists("save.bak.json") then
             -- 主存档不存在但备份存在（极端情况：写入主存档时崩溃导致文件为空被删）
             log:Write(LOG_WARNING, "[PlayerData] 主存档丢失，从备份恢复...")
             data = tryLoadFrom("save.bak.json")
             if not data then
+                -- 备份也损坏 → 尝试临时文件
+                data = tryLoadFrom("save.tmp.json")
+                if not data then
+                    log:Write(LOG_ERROR, "[PlayerData] 备份和临时文件均损坏！创建应急存档")
+                    local emergency = PlayerData.NewDefault()
+                    emergency._recoveredFromCorruption = true
+                    return emergency
+                end
+                log:Write(LOG_INFO, "[PlayerData] 从临时文件 save.tmp.json 恢复成功")
+            end
+        elseif fileSystem:FileExists("save.tmp.json") then
+            -- 主存档和备份都不存在，但临时文件存在（写入主存档前崩溃）
+            log:Write(LOG_WARNING, "[PlayerData] 仅临时文件存在，从临时文件恢复...")
+            data = tryLoadFrom("save.tmp.json")
+            if not data then
+                -- 全新玩家（临时文件也损坏，且无其他存档文件存在）
                 return PlayerData.NewDefault()
             end
         else
-            -- 全新玩家，无任何存档
+            -- 全新玩家，无任何存档文件存在
             return PlayerData.NewDefault()
         end
     end
 
     -- 3. 尝试从临时文件恢复（如果临时文件比主存档更新，说明上次写入中途崩溃）
+    -- 使用时间戳为主、totalRuns为辅判断哪份数据更新
     local tmpData = tryLoadFrom("save.tmp.json")
-    if tmpData and type(tmpData.totalRuns) == "number" and type(data.totalRuns) == "number" then
-        if tmpData.totalRuns > data.totalRuns or (tmpData.gold or 0) > (data.gold or 0) then
-            log:Write(LOG_INFO, "[PlayerData] 检测到临时文件数据更新，使用临时文件恢复")
-            data = tmpData
+    if tmpData then
+        local tmpTs = tmpData._savedAt or 0
+        local mainTs = data._savedAt or 0
+        local tmpRuns = type(tmpData.totalRuns) == "number" and tmpData.totalRuns or 0
+        local mainRuns = type(data.totalRuns) == "number" and data.totalRuns or 0
+        -- 选择更新数据的标准：时间戳更大，或时间戳相同时 totalRuns 更大
+        -- 不再使用 gold 作为判断依据（消费金币后 gold 减少不代表数据更旧）
+        local preferTmp = false
+        if tmpTs > mainTs then
+            preferTmp = true
+        elseif tmpTs == mainTs and tmpRuns > mainRuns then
+            preferTmp = true
+        elseif tmpTs == 0 and mainTs == 0 and tmpRuns > mainRuns then
+            -- 兼容旧存档（无时间戳），仅用 totalRuns 判断
+            preferTmp = true
+        end
+        if preferTmp then
+            -- 额外安全检查：不用明显数据缺失的 tmp 覆盖有资产的 main
+            local tmpHasAssets = (tmpData.gold or 0) > 0
+                or (type(tmpData.inventory) == "table" and #tmpData.inventory > 0)
+                or (type(tmpData.equipment) == "table" and next(tmpData.equipment) ~= nil)
+            local mainHasAssets = (data.gold or 0) > 0
+                or (type(data.inventory) == "table" and #data.inventory > 0)
+                or (type(data.equipment) == "table" and next(data.equipment) ~= nil)
+            if mainHasAssets and not tmpHasAssets then
+                log:Write(LOG_WARNING, "[PlayerData] 临时文件更新但资产为空，保留主存档数据（防止覆盖丢失）")
+            else
+                log:Write(LOG_INFO, "[PlayerData] 检测到临时文件数据更新(ts=" .. tmpTs .. " vs " .. mainTs ..
+                    ", runs=" .. tmpRuns .. " vs " .. mainRuns .. ")，使用临时文件恢复")
+                data = tmpData
+            end
         end
     end
     -- 防止 cjson 将整数字段解码为 Lua 浮点数（Lua 5.4 中 %d 不接受浮点数）
@@ -245,6 +321,12 @@ function PlayerData.Load()
     data.highestLevel        = math.floor(data.highestLevel or 1)
     data.totalRuns           = math.floor(data.totalRuns or 0)
     data.highestEndlessWave  = math.floor(data.highestEndlessWave or 0)
+    -- 旧存档兼容：没有 runsAtHighest 字段时，用 totalRuns 作为初始值
+    if not data.runsAtHighest then
+        data.runsAtHighest = data.totalRuns
+    else
+        data.runsAtHighest = math.floor(data.runsAtHighest)
+    end
     data.pityCounter         = math.floor(data.pityCounter or 0)
     if type(data.talents) == "table" then
         for k, v in pairs(data.talents) do
@@ -273,10 +355,14 @@ function PlayerData.Load()
             data.talents[t.id] = 0
         end
     end
-    if type(data.inventory) ~= "table" then data.inventory = {} end
+    if type(data.inventory) ~= "table" then
+        log:Write(LOG_ERROR, "[PlayerData] 存档 inventory 字段损坏(类型=" .. type(data.inventory) .. ")，初始化为空背包")
+        data.inventory = {}
+    end
     if type(data.seenEnemyTypes) ~= "table" then data.seenEnemyTypes = {} end
     -- 迁移装备格式
     if type(data.equipment) ~= "table" then
+        log:Write(LOG_ERROR, "[PlayerData] 存档 equipment 字段损坏(类型=" .. type(data.equipment) .. ")，初始化为空装备")
         data.equipment = defaults.equipment
     else
         data.equipment = migrateEquipment(data.equipment)
@@ -295,11 +381,141 @@ function PlayerData.Load()
         data._chapterMigrated = true
         log:Write(LOG_INFO, "[PlayerData] 章节迁移: highestLevel → " .. data.highestLevel)
     end
+
+    -- ========================================================================
+    -- 一致性校验：如果有进度但资产全空，尝试从备份恢复资产
+    -- 这是防止 JSON 截断修复后丢失金币/装备的最后防线
+    -- ========================================================================
+    local loadedHasProgress = (data.highestLevel or 1) > 3 or (data.totalRuns or 0) > 5
+    local loadedHasAssets = (data.gold or 0) > 0
+        or (type(data.inventory) == "table" and #data.inventory > 0)
+    local loadedHasEquip = false
+    if type(data.equipment) == "table" then
+        for _, slot in ipairs({"weapon","necklace","helmet","top_armor","bottom_armor","shoes"}) do
+            if data.equipment[slot] then loadedHasEquip = true; break end
+        end
+    end
+    local loadedHasTalents = false
+    if type(data.talents) == "table" then
+        for _, v in pairs(data.talents) do
+            if (v or 0) > 0 then loadedHasTalents = true; break end
+        end
+    end
+    if loadedHasProgress and not loadedHasAssets and not loadedHasEquip and not loadedHasTalents then
+        -- 异常状态：有显著进度但完全没有任何资产，尝试从备份恢复
+        log:Write(LOG_ERROR, "[PlayerData] 一致性异常！有进度(level=" .. tostring(data.highestLevel) ..
+            " runs=" .. tostring(data.totalRuns) .. ")但资产全空(gold=" .. tostring(data.gold) ..
+            " inv=0 equip=0 talents=0)，尝试从备份恢复...")
+        local bakData = tryLoadFrom("save.bak.json")
+        if bakData then
+            local bakHasAssets = (bakData.gold or 0) > 0
+                or (type(bakData.inventory) == "table" and #bakData.inventory > 0)
+            local bakHasEquip = false
+            if type(bakData.equipment) == "table" then
+                for _, slot in ipairs({"weapon","necklace","helmet","top_armor","bottom_armor","shoes"}) do
+                    if bakData.equipment[slot] then bakHasEquip = true; break end
+                end
+            end
+            if bakHasAssets or bakHasEquip then
+                -- 从备份恢复资产字段（保留当前的进度字段，取备份的资产字段）
+                log:Write(LOG_INFO, "[PlayerData] 从备份恢复资产: gold=" .. tostring(bakData.gold) ..
+                    " inv=" .. tostring(type(bakData.inventory) == "table" and #bakData.inventory or 0))
+                data.gold = bakData.gold or data.gold
+                if type(bakData.inventory) == "table" and #bakData.inventory > 0 then
+                    data.inventory = bakData.inventory
+                end
+                if type(bakData.equipment) == "table" then
+                    for _, slot in ipairs({"weapon","necklace","helmet","top_armor","bottom_armor","shoes"}) do
+                        if bakData.equipment[slot] and not data.equipment[slot] then
+                            data.equipment[slot] = bakData.equipment[slot]
+                        end
+                    end
+                end
+                if type(bakData.talents) == "table" then
+                    for k, v in pairs(bakData.talents) do
+                        if (v or 0) > (data.talents[k] or 0) then
+                            data.talents[k] = v
+                        end
+                    end
+                end
+                data._recoveredFromBackup = true
+            else
+                log:Write(LOG_WARNING, "[PlayerData] 备份也无有效资产，无法恢复")
+            end
+        else
+            log:Write(LOG_WARNING, "[PlayerData] 无可用备份文件，无法恢复资产")
+        end
+    end
+
     return data
 end
 
 --- 保存到本地文件（安全写入：先写临时文件，成功后再替换主文件）
 function PlayerData.Save(data)
+    -- 0. 安全检查：防止将空/初始数据覆盖有进度的存档
+    if not data or type(data) ~= "table" then
+        log:Write(LOG_ERROR, "[PlayerData] Save 被调用但数据为空，拒绝保存")
+        return false
+    end
+    -- 如果当前数据看起来是全新的（无任何进度），但磁盘上已有有效存档，则拒绝覆盖
+    -- 增强保护：检查进度存在但资产全空的异常情况
+    local hasProgress = (data.totalRuns or 0) > 0 or (data.highestLevel or 1) > 1
+    local hasAssets = (data.gold or 0) > 0
+        or (type(data.inventory) == "table" and #data.inventory > 0)
+        or (type(data.equipment) == "table" and next(data.equipment) ~= nil)
+    local hasTalents = false
+    if type(data.talents) == "table" then
+        for _, v in pairs(data.talents) do
+            if (v or 0) > 0 then hasTalents = true; break end
+        end
+    end
+    local isNewData = not hasProgress and not hasAssets
+    -- 新手正常状态：刚完成第一局(runs=1, level=1)，尚未获得金币/装备，属于正常情况
+    local isEarlyGame = (data.totalRuns or 0) <= 1 and (data.highestLevel or 1) <= 1
+    local isSuspiciousData = hasProgress and not hasAssets and not hasTalents and not isEarlyGame
+    if (isNewData or isSuspiciousData) and fileSystem:FileExists("save.json") then
+        local existingData = tryLoadFrom("save.json")
+        if existingData then
+            -- 如果磁盘和内存的关键数据完全一致，说明是正常的重复保存，直接放行
+            local sameProgress = (existingData.totalRuns or 0) == (data.totalRuns or 0)
+                and (existingData.highestLevel or 1) == (data.highestLevel or 1)
+                and (existingData.gold or 0) == (data.gold or 0)
+            if sameProgress then
+                -- 数据一致，不是丢失，正常保存
+            else
+                -- 如果内存进度 >= 磁盘进度，说明是正常的游戏推进（玩家正在打关卡）
+                local memLevel = data.highestLevel or 1
+                local diskLevel = existingData.highestLevel or 1
+                local memRuns = data.totalRuns or 0
+                local diskRuns = existingData.totalRuns or 0
+                local isForwardProgress = memLevel >= diskLevel and memRuns >= diskRuns
+                if isForwardProgress then
+                    -- 内存进度不低于磁盘，属于正常游戏推进，放行保存
+                else
+                    local existHasAssets = (existingData.gold or 0) > 0
+                        or (type(existingData.inventory) == "table" and #existingData.inventory > 0)
+                        or (type(existingData.equipment) == "table" and next(existingData.equipment) ~= nil)
+                    local existHasProgress = (existingData.totalRuns or 0) > 0 or (existingData.highestLevel or 1) > 1
+                    if existHasProgress or existHasAssets then
+                        log:Write(LOG_ERROR, "[PlayerData] 安全保护：拒绝用空/异常数据覆盖有进度的存档！" ..
+                            " (磁盘: runs=" .. tostring(existingData.totalRuns) ..
+                            " level=" .. tostring(existingData.highestLevel) ..
+                            " gold=" .. tostring(existingData.gold) ..
+                            " inv=" .. tostring(type(existingData.inventory) == "table" and #existingData.inventory or 0) ..
+                            ") (内存: runs=" .. tostring(data.totalRuns) ..
+                            " level=" .. tostring(data.highestLevel) ..
+                            " gold=" .. tostring(data.gold) ..
+                            " inv=" .. tostring(type(data.inventory) == "table" and #data.inventory or 0) .. ")")
+                        return false
+                    end
+                end
+            end
+        end
+    end
+
+    -- 写入时间戳（用于 Load 时判断 tmp vs main 哪份更新）
+    data._savedAt = os.time()
+
     -- 1. 先序列化，确保数据有效
     local ok, jsonStr = pcall(cjson.encode, data)
     if not ok or #jsonStr < 2 then

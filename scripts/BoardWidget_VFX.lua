@@ -1,3 +1,4 @@
+---@diagnostic disable: assign-type-mismatch
 -- ============================================================================
 -- BoardWidget_VFX - 视觉特效渲染（从 BoardWidget.lua 拆分）
 -- ctx 字段: nvg, hexSize, ox, oy, t
@@ -23,7 +24,7 @@ local ENEMY_COLORS = {
     lava_giant      = {255, 80, 0},
     shadow_ambusher = {120, 60, 180},
     smoke_master    = {150, 150, 180},
-    shadow_knight   = {180, 30, 50},
+
     abyss_kraken    = {100, 20, 160},
     lava_lord       = {255, 100, 0},
     coral_snapper   = {255, 120, 160},
@@ -729,7 +730,7 @@ function BoardWidget_VFX.Render(ctx)
                 nvgFontSize(nvg, hexSize * 0.3)
                 nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
                 local bounds = {}
-                nvgTextBounds(nvg, scx, textY, labelText, bounds)
+                nvgTextBounds(nvg, scx, textY, labelText, nil, bounds)
                 local tw = (bounds[3] or scx + 40) - (bounds[1] or scx - 40)
                 local padX, padY = 8, 4
                 nvgBeginPath(nvg)
@@ -3843,59 +3844,108 @@ function BoardWidget_VFX.Render(ctx)
             end
 
         elseif fx.type == "abyss_claw" then
-            -- ═══ 深渊海妖·触手重击：暗紫触手从中心猛击扫射，黑水飞溅 ═══
+            -- ═══ 深渊海妖·触手重击：粗大触手从Boss方向猛力砸向英雄 ═══
             local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
-            local fade  = math.max(0, 1.0 - progress)
+            local x1, y1 = cx, cy
+            if fx.fromCol and fx.fromRow then
+                x1, y1 = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
+            end
+            -- 动画阶段：0~0.35 触手伸出, 0.35~0.55 砸击停顿, 0.55~1.0 回缩淡出
+            local fade = math.max(0, 1.0 - math.max(0, progress - 0.55) / 0.45)
             local alpha = math.floor(fade * 255)
             if alpha > 5 then
-                -- 中心黑暗闪光（前40%）
-                if progress < 0.4 then
-                    local flashP = progress / 0.4
-                    local flashA = math.floor((1.0 - flashP) * 200)
-                    local flashR = hexSize * (0.6 + flashP * 1.0)
-                    nvgBeginPath(nvg)
-                    nvgCircle(nvg, cx, cy, flashR)
-                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, flashR,
-                        nvgRGBA(200, 80, 255, flashA), nvgRGBA(80, 0, 120, 0)))
-                    nvgFill(nvg)
-                end
-                -- 3条触手弧线向外扫射（放射状）
-                for i = 1, 3 do
-                    local baseAngle = (i / 3) * math.pi * 2 + progress * 3.0
-                    local tentacleLen = hexSize * 1.8 * math.min(1.0, progress / 0.35)
-                    local endX = cx + math.cos(baseAngle) * tentacleLen
-                    local endY = cy + math.sin(baseAngle) * tentacleLen
-                    -- 弯曲触手：用两段近似
-                    local midX = cx + math.cos(baseAngle + 0.4) * tentacleLen * 0.55
-                    local midY = cy + math.sin(baseAngle + 0.4) * tentacleLen * 0.55
-                    nvgBeginPath(nvg)
-                    nvgMoveTo(nvg, cx, cy)
-                    nvgQuadTo(nvg, midX, midY, endX, endY)
-                    nvgStrokePaint(nvg, nvgLinearGradient(nvg, cx, cy, endX, endY,
-                        nvgRGBA(160, 40, 220, alpha), nvgRGBA(60, 0, 100, 0)))
-                    nvgStrokeWidth(nvg, 5.0 * fade)
-                    nvgLineCap(nvg, NVG_ROUND)
-                    nvgStroke(nvg)
-                end
-                -- 8颗黑紫碎水粒子向外飞散
-                for i = 1, 8 do
-                    local angle = (i / 8) * math.pi * 2 + progress * 1.2
-                    local dist  = hexSize * progress * 1.5
-                    local px2 = cx + math.cos(angle) * dist
-                    local py2 = cy + math.sin(angle) * dist
-                    local pSize = 4.0 * fade
-                    nvgBeginPath(nvg)
-                    nvgCircle(nvg, px2, py2, pSize)
-                    nvgFillColor(nvg, nvgRGBA(140, 30, 200, math.floor(alpha * 0.8)))
-                    nvgFill(nvg)
-                end
-                -- 外层暗紫冲击环
-                local ringR = hexSize * 2.2 * progress
+                local dx, dy = cx - x1, cy - y1
+                local dist = math.sqrt(dx * dx + dy * dy)
+                -- 伸出动画（easeOutBack 超射效果）
+                local extendT = math.min(1.0, progress / 0.35)
+                local easeOut = 1.0 + 1.2 * math.sin(extendT * math.pi) * (1.0 - extendT)
+                local reachLen = dist * math.min(1.0, extendT * easeOut)
+
+                -- 法线方向
+                local nx, ny = 0, 0
+                if dist > 1 then nx, ny = -dy / dist, dx / dist end
+
+                -- 触手波形参数
+                local segments = 14
+                local waveAmp = hexSize * 1.0 * (1.0 - extendT * 0.5)
+                local waveFreq = math.pi * 3.0
+
+                -- 外层辉光（超粗暗紫）
                 nvgBeginPath(nvg)
-                nvgCircle(nvg, cx, cy, ringR)
-                nvgStrokeColor(nvg, nvgRGBA(120, 40, 180, math.floor(alpha * 0.7)))
-                nvgStrokeWidth(nvg, 3.5 * fade)
+                nvgMoveTo(nvg, x1, y1)
+                for s = 1, segments do
+                    local st = s / segments
+                    local reachSt = st * reachLen / (dist > 0 and dist or 1)
+                    local mx = x1 + dx * reachSt
+                    local my = y1 + dy * reachSt
+                    local wave = math.sin(st * waveFreq + progress * 10) * waveAmp * (1.0 - st * 0.4)
+                    nvgLineTo(nvg, mx + nx * wave, my + ny * wave)
+                end
+                nvgStrokeColor(nvg, nvgRGBA(80, 20, 140, math.floor(alpha * 0.3)))
+                nvgStrokeWidth(nvg, 22 * fade)
+                nvgLineCap(nvg, NVG_ROUND)
                 nvgStroke(nvg)
+
+                -- 中层触手主体（粗紫色）
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, x1, y1)
+                for s = 1, segments do
+                    local st = s / segments
+                    local reachSt = st * reachLen / (dist > 0 and dist or 1)
+                    local mx = x1 + dx * reachSt
+                    local my = y1 + dy * reachSt
+                    local wave = math.sin(st * waveFreq + progress * 10) * waveAmp * (1.0 - st * 0.4)
+                    nvgLineTo(nvg, mx + nx * wave, my + ny * wave)
+                end
+                nvgStrokePaint(nvg, nvgLinearGradient(nvg, x1, y1, cx, cy,
+                    nvgRGBA(180, 60, 240, alpha), nvgRGBA(100, 20, 160, alpha)))
+                nvgStrokeWidth(nvg, 11 * fade)
+                nvgLineCap(nvg, NVG_ROUND)
+                nvgStroke(nvg)
+
+                -- 内层高光芯（亮紫 + 粉色）
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, x1, y1)
+                for s = 1, segments do
+                    local st = s / segments
+                    local reachSt = st * reachLen / (dist > 0 and dist or 1)
+                    local mx = x1 + dx * reachSt
+                    local my = y1 + dy * reachSt
+                    local wave = math.sin(st * waveFreq + progress * 10) * waveAmp * 0.6 * (1.0 - st * 0.4)
+                    nvgLineTo(nvg, mx + nx * wave, my + ny * wave)
+                end
+                nvgStrokeColor(nvg, nvgRGBA(220, 140, 255, math.floor(alpha * 0.9)))
+                nvgStrokeWidth(nvg, 4 * fade)
+                nvgLineCap(nvg, NVG_ROUND)
+                nvgStroke(nvg)
+
+                -- 砸击命中爆发（progress 0.3~0.6 期间）
+                if progress > 0.3 and progress < 0.6 then
+                    local hitP = (progress - 0.3) / 0.3
+                    local hitA = math.floor((1.0 - hitP) * 240)
+                    local hitR = hexSize * (0.5 + hitP * 1.5)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, hitR)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hitR,
+                        nvgRGBA(200, 80, 255, hitA), nvgRGBA(100, 20, 180, 0)))
+                    nvgFill(nvg)
+                end
+
+                -- 吸盘装饰点（沿触手分布）
+                for s = 2, segments - 1, 2 do
+                    local st = s / segments
+                    local reachSt = st * reachLen / (dist > 0 and dist or 1)
+                    if reachSt <= 1.0 then
+                        local mx = x1 + dx * reachSt
+                        local my = y1 + dy * reachSt
+                        local wave = math.sin(st * waveFreq + progress * 10) * waveAmp * (1.0 - st * 0.4)
+                        local dotSize = (3.5 - st * 1.5) * fade
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, mx + nx * wave, my + ny * wave, dotSize)
+                        nvgFillColor(nvg, nvgRGBA(220, 100, 255, math.floor(alpha * 0.7)))
+                        nvgFill(nvg)
+                    end
+                end
             end
 
         elseif fx.type == "abyss_venom" then
@@ -4136,6 +4186,183 @@ function BoardWidget_VFX.Render(ctx)
                         or  nvgRGBA(60, 220, 160, math.floor(alpha * 0.85)))
                     nvgFill(nvg)
                 end
+            end
+
+        elseif fx.type == "coral_tide_surge" then
+            -- ═══ 珊瑚守卫·潮汐冲击：水波从Boss向外扩散的冲击波环 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 255)
+            if alpha > 5 then
+                -- 多层扩散水波环
+                for ring = 1, 3 do
+                    local ringDelay = (ring - 1) * 0.15
+                    local ringP = math.max(0, math.min(1, (progress - ringDelay) / 0.7))
+                    if ringP > 0 then
+                        local ringR = hexSize * (0.4 + ringP * 1.8) * ring * 0.5
+                        local ringA = math.floor((1.0 - ringP) * 180)
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, cx, cy, ringR)
+                        nvgStrokeColor(nvg, nvgRGBA(80, 200, 240, ringA))
+                        nvgStrokeWidth(nvg, (4.0 - ring) * (1.0 - ringP * 0.5))
+                        nvgStroke(nvg)
+                    end
+                end
+                -- 中心水花爆发
+                if progress < 0.4 then
+                    local burstP = progress / 0.4
+                    local burstR = hexSize * (0.3 + burstP * 0.6)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, burstR)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, burstR,
+                        nvgRGBA(120, 230, 255, math.floor((1 - burstP) * 200)),
+                        nvgRGBA(40, 160, 220, 0)))
+                    nvgFill(nvg)
+                end
+                -- 水滴飞溅粒子
+                for i = 1, 8 do
+                    local angle = (i / 8) * math.pi * 2 + progress * 1.5
+                    local dist = hexSize * (0.2 + progress * 1.2)
+                    local px = cx + math.cos(angle) * dist
+                    local py = cy + math.sin(angle) * dist - progress * hexSize * 0.3
+                    local pSize = 3.0 * fade
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, px, py, pSize)
+                    nvgFillColor(nvg, nvgRGBA(100, 220, 255, math.floor(alpha * 0.8)))
+                    nvgFill(nvg)
+                end
+            end
+
+        elseif fx.type == "coral_throw_charge" then
+            -- ═══ 珊瑚守卫·珊瑚投掷蓄力：橙红色珊瑚能量聚集在Boss身上 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress * 0.5) -- 蓄力保持较亮
+            local alpha = math.floor(fade * 255)
+            if alpha > 5 then
+                -- 底部光晕（橙红脉动）
+                local pulse = 0.7 + 0.3 * math.sin(progress * math.pi * 4)
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, hexSize * 0.85 * pulse)
+                nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.85 * pulse,
+                    nvgRGBA(255, 140, 60, math.floor(alpha * 0.4 * pulse)),
+                    nvgRGBA(255, 80, 30, 0)))
+                nvgFill(nvg)
+                -- 珊瑚碎片向中心收拢（6颗）
+                for i = 1, 6 do
+                    local angle = (i / 6) * math.pi * 2 + progress * 0.8
+                    local dist = hexSize * (1.2 - progress * 0.8) -- 从远到近收拢
+                    local px = cx + math.cos(angle) * dist
+                    local py = cy + math.sin(angle) * dist
+                    -- 菱形珊瑚碎片
+                    local sz = hexSize * 0.12
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, px, py - sz * 2)
+                    nvgLineTo(nvg, px + sz, py)
+                    nvgLineTo(nvg, px, py + sz * 2)
+                    nvgLineTo(nvg, px - sz, py)
+                    nvgClosePath(nvg)
+                    nvgFillColor(nvg, nvgRGBA(255, 130, 80, math.floor(alpha * 0.9)))
+                    nvgFill(nvg)
+                end
+                -- 顶部上升能量柱
+                local colH = hexSize * 1.5 * math.min(1.0, progress / 0.5)
+                if colH > 2 then
+                    nvgBeginPath(nvg)
+                    nvgRect(nvg, cx - hexSize * 0.08, cy - colH, hexSize * 0.16, colH)
+                    nvgFillPaint(nvg, nvgLinearGradient(nvg, cx, cy, cx, cy - colH,
+                        nvgRGBA(255, 160, 80, math.floor(alpha * 0.6)),
+                        nvgRGBA(255, 100, 50, 0)))
+                    nvgFill(nvg)
+                end
+            end
+
+        elseif fx.type == "coral_seal_ring" then
+            -- ═══ 珊瑚守卫·珊瑚封印：紫色魔法阵 + 珊瑚从地面升起包围英雄 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 255)
+            if alpha > 5 then
+                -- 外圈旋转魔法阵（紫粉色）
+                local rotAngle = progress * math.pi * 2
+                local ringR = hexSize * 1.2
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, ringR)
+                nvgStrokeColor(nvg, nvgRGBA(200, 100, 255, math.floor(alpha * 0.7)))
+                nvgStrokeWidth(nvg, 2.5)
+                nvgStroke(nvg)
+                -- 内圈旋转（反向）
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, ringR * 0.7)
+                nvgStrokeColor(nvg, nvgRGBA(255, 150, 200, math.floor(alpha * 0.5)))
+                nvgStrokeWidth(nvg, 1.5)
+                nvgStroke(nvg)
+                -- 6个魔法标记点在外圈旋转
+                for i = 1, 6 do
+                    local a = rotAngle + (i / 6) * math.pi * 2
+                    local mx = cx + math.cos(a) * ringR
+                    local my = cy + math.sin(a) * ringR
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, mx, my, 4.0)
+                    nvgFillColor(nvg, nvgRGBA(255, 180, 255, alpha))
+                    nvgFill(nvg)
+                end
+                -- 中心沉默标记（X形锁定）
+                if progress > 0.3 then
+                    local lockP = math.min(1, (progress - 0.3) / 0.4)
+                    local lockSz = hexSize * 0.4 * lockP
+                    local lockA = math.floor(alpha * lockP)
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx - lockSz, cy - lockSz)
+                    nvgLineTo(nvg, cx + lockSz, cy + lockSz)
+                    nvgMoveTo(nvg, cx + lockSz, cy - lockSz)
+                    nvgLineTo(nvg, cx - lockSz, cy + lockSz)
+                    nvgStrokeColor(nvg, nvgRGBA(255, 80, 150, lockA))
+                    nvgStrokeWidth(nvg, 3.0)
+                    nvgStroke(nvg)
+                end
+                -- 底部渐变光晕
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, hexSize * 0.9)
+                nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.9,
+                    nvgRGBA(180, 80, 220, math.floor(alpha * 0.25)),
+                    nvgRGBA(120, 40, 180, 0)))
+                nvgFill(nvg)
+            end
+
+        elseif fx.type == "coral_heal" then
+            -- ═══ 珊瑚守卫·自然恢复：青绿色治愈光环向上飘散 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 255)
+            if alpha > 5 then
+                -- 底部光晕
+                local pulseP = 0.6 + 0.4 * math.sin(progress * math.pi * 3)
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, hexSize * 0.7 * pulseP)
+                nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hexSize * 0.7 * pulseP,
+                    nvgRGBA(80, 230, 140, math.floor(alpha * 0.35)),
+                    nvgRGBA(40, 180, 100, 0)))
+                nvgFill(nvg)
+                -- 上升治愈粒子（绿色小圆点向上飘）
+                for i = 1, 6 do
+                    local angle = (i / 6) * math.pi * 2
+                    local baseX = cx + math.cos(angle) * hexSize * 0.3
+                    local riseY = cy - progress * hexSize * 1.2 - (i * hexSize * 0.15)
+                    local pAlpha = math.floor(alpha * (1.0 - (i / 6) * 0.5))
+                    if riseY > cy - hexSize * 1.8 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, baseX, riseY, 2.5)
+                        nvgFillColor(nvg, nvgRGBA(100, 240, 160, pAlpha))
+                        nvgFill(nvg)
+                    end
+                end
+                -- 外圈生命光环
+                local healR = hexSize * (0.5 + progress * 0.3)
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, healR)
+                nvgStrokeColor(nvg, nvgRGBA(80, 220, 130, math.floor(alpha * 0.4)))
+                nvgStrokeWidth(nvg, 2.0 * fade)
+                nvgStroke(nvg)
             end
 
         -- ═══════════════════════════════════════════════════════════════
@@ -4664,6 +4891,315 @@ function BoardWidget_VFX.Render(ctx)
                     nvgCircle(nvg, cx, cy, hexSize * 0.4 * (1 - ring * 0.5))
                     nvgStrokeColor(nvg, nvgRGBA(255, 100, 50, math.floor(ring * 180)))
                     nvgStrokeWidth(nvg, 2.0)
+                    nvgStroke(nvg)
+                end
+            end
+
+        elseif fx.type == "tentacle_strike" then
+            -- ═══ 触手鞭击：深紫色触手从Boss甩向英雄 ═══
+            if fx.fromCol and fx.toCol then
+                local x1, y1 = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
+                local x2, y2 = HexGrid.HexToPixel(fx.toCol, fx.toRow, hexSize, ox, oy)
+                local fade = math.max(0, 1.0 - progress * 1.1)
+                local alpha = math.floor(fade * 255)
+
+                if alpha > 5 then
+                    local dx, dy = x2 - x1, y2 - y1
+                    local dist = math.sqrt(dx * dx + dy * dy)
+                    -- 鞭击进度：快速甩出（easeOutQuad）
+                    local whipT = math.min(1.0, progress * 2.2)
+                    local easeWhip = 1.0 - (1.0 - whipT) * (1.0 - whipT)
+
+                    -- 触手路径（波形弯曲，模拟甩动）
+                    local nx, ny = 0, 0
+                    if dist > 1 then nx, ny = -dy / dist, dx / dist end
+                    local segments = 12
+                    local waveAmp = hexSize * 0.8 * (1.0 - easeWhip * 0.6) -- 甩出后波幅减小
+
+                    -- 外层辉光（宽 + 暗紫）
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1, y1)
+                    for s = 1, segments do
+                        local st = s / segments * easeWhip
+                        local mx = x1 + dx * st
+                        local my = y1 + dy * st
+                        local wave = math.sin(st * math.pi * 2.5 + progress * 8) * waveAmp * (1.0 - st * 0.5)
+                        nvgLineTo(nvg, mx + nx * wave, my + ny * wave)
+                    end
+                    nvgStrokeColor(nvg, nvgRGBA(120, 40, 180, math.floor(alpha * 0.25)))
+                    nvgStrokeWidth(nvg, 16 * fade)
+                    nvgLineCap(nvg, NVG_ROUND)
+                    nvgStroke(nvg)
+
+                    -- 中层触手体（紫色粗线）
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1, y1)
+                    for s = 1, segments do
+                        local st = s / segments * easeWhip
+                        local mx = x1 + dx * st
+                        local my = y1 + dy * st
+                        local wave = math.sin(st * math.pi * 2.5 + progress * 8) * waveAmp * (1.0 - st * 0.5)
+                        nvgLineTo(nvg, mx + nx * wave, my + ny * wave)
+                    end
+                    nvgStrokeColor(nvg, nvgRGBA(160, 60, 200, alpha))
+                    nvgStrokeWidth(nvg, 7 * fade)
+                    nvgLineCap(nvg, NVG_ROUND)
+                    nvgStroke(nvg)
+
+                    -- 内层高亮芯（亮粉紫）
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, x1, y1)
+                    for s = 1, segments do
+                        local st = s / segments * easeWhip
+                        local mx = x1 + dx * st
+                        local my = y1 + dy * st
+                        local wave = math.sin(st * math.pi * 2.5 + progress * 8) * waveAmp * (1.0 - st * 0.5)
+                        nvgLineTo(nvg, mx + nx * wave, my + ny * wave)
+                    end
+                    nvgStrokeColor(nvg, nvgRGBA(220, 140, 255, math.floor(alpha * 0.7)))
+                    nvgStrokeWidth(nvg, 2.5 * fade)
+                    nvgLineCap(nvg, NVG_ROUND)
+                    nvgStroke(nvg)
+
+                    -- 鞭击前端（到达目标后的冲击效果）
+                    if easeWhip > 0.7 then
+                        local impactP = (easeWhip - 0.7) / 0.3
+                        local impactR = hexSize * (0.3 + impactP * 0.5)
+                        local impactA = math.floor((1.0 - impactP * 0.5) * alpha * 0.8)
+                        -- 紫色冲击光环
+                        local impactPaint = nvgRadialGradient(nvg, x2, y2, 0, impactR,
+                            nvgRGBA(200, 80, 255, impactA),
+                            nvgRGBA(140, 40, 180, 0))
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, x2, y2, impactR)
+                        nvgFillPaint(nvg, impactPaint)
+                        nvgFill(nvg)
+                        -- 冲击环
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, x2, y2, impactR * 1.3)
+                        nvgStrokeColor(nvg, nvgRGBA(180, 60, 220, math.floor(impactA * 0.6)))
+                        nvgStrokeWidth(nvg, 2.5 * (1.0 - impactP))
+                        nvgStroke(nvg)
+                    end
+
+                    -- 起点处Boss触手根部辉光
+                    local rootR = hexSize * 0.4 * (1.0 - progress * 0.5)
+                    local rootPaint = nvgRadialGradient(nvg, x1, y1, 0, rootR,
+                        nvgRGBA(100, 20, 160, math.floor(alpha * 0.5)),
+                        nvgRGBA(80, 20, 140, 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, x1, y1, rootR)
+                    nvgFillPaint(nvg, rootPaint)
+                    nvgFill(nvg)
+
+                    -- 紫色飞散粒子（沿触手路径）
+                    if progress > 0.15 then
+                        for i = 1, 6 do
+                            local pT = (progress * 1.5 + i * 0.12) % 1.0
+                            local pDist = easeWhip * pT
+                            local px = x1 + dx * pDist
+                            local py = y1 + dy * pDist
+                            local pWave = math.sin(pDist * math.pi * 2.5 + progress * 8) * waveAmp * 0.5
+                            px = px + nx * pWave
+                            py = py + ny * pWave
+                            local pSize = (3.0 + math.sin(i * 2.1) * 1.5) * fade
+                            local pAlpha = math.floor(alpha * (1.0 - pT * 0.7) * 0.6)
+                            if pAlpha > 5 then
+                                nvgBeginPath(nvg)
+                                nvgCircle(nvg, px, py, pSize)
+                                nvgFillColor(nvg, nvgRGBA(180, 80, 255, pAlpha))
+                                nvgFill(nvg)
+                            end
+                        end
+                    end
+                end
+            end
+
+        elseif fx.type == "kingmaker_burst" then
+            -- ═══ 棋步爆发：金色冲击波 + 棋子图腾 + 光柱 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local maxR = hexSize * 2.0
+
+            -- 3 阶段: 爆发(0~0.3), 扩散(0.3~0.7), 消散(0.7~1)
+            local fade = 1.0
+            if progress < 0.15 then
+                fade = progress / 0.15
+            elseif progress > 0.6 then
+                fade = 1.0 - (progress - 0.6) / 0.4
+            end
+            local alpha = math.floor(fade * 255)
+
+            -- 中心金色光柱（向上喷射）
+            local beamH = hexSize * 2.5 * math.min(1.0, progress * 3.0) * fade
+            local beamW = hexSize * 0.3 * fade
+            local beamPaint = nvgLinearGradient(nvg, cx, cy, cx, cy - beamH,
+                nvgRGBA(255, 220, 80, alpha),
+                nvgRGBA(255, 180, 40, 0))
+            nvgBeginPath(nvg)
+            nvgRect(nvg, cx - beamW / 2, cy - beamH, beamW, beamH)
+            nvgFillPaint(nvg, beamPaint)
+            nvgFill(nvg)
+
+            -- 外扩冲击波环（金色，2层）
+            for ring = 1, 2 do
+                local ringProgress = math.max(0, progress - ring * 0.1) * 1.5
+                if ringProgress > 0 and ringProgress < 1.0 then
+                    local ringR = maxR * ringProgress
+                    local ringAlpha = math.floor(alpha * (1.0 - ringProgress) * 0.8)
+                    if ringAlpha > 5 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, cx, cy, ringR)
+                        nvgStrokeColor(nvg, nvgRGBA(255, 200, 50, ringAlpha))
+                        nvgStrokeWidth(nvg, (3.5 - ring * 0.8) * fade)
+                        nvgStroke(nvg)
+                    end
+                end
+            end
+
+            -- 中心爆炸光球
+            local coreR = hexSize * 0.5 * fade * (1.0 + math.sin(progress * 20) * 0.15)
+            local corePaint = nvgRadialGradient(nvg, cx, cy, 0, coreR,
+                nvgRGBA(255, 240, 120, math.floor(alpha * 0.9)),
+                nvgRGBA(255, 180, 40, 0))
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, cy, coreR)
+            nvgFillPaint(nvg, corePaint)
+            nvgFill(nvg)
+
+            -- 向外飞散的金色碎片粒子（8颗）
+            for i = 0, 7 do
+                local pAngle = i * math.pi / 4 + progress * 1.5
+                local pDist = hexSize * 0.3 + maxR * progress * 0.8 * (0.7 + math.sin(i * 1.7) * 0.3)
+                local px = cx + math.cos(pAngle) * pDist * fade
+                local py = cy + math.sin(pAngle) * pDist * 0.6 * fade
+                local pSize = (4.0 - progress * 3.0) * fade
+                local pAlpha = math.floor(alpha * (1.0 - progress * 0.7))
+                if pSize > 0.5 and pAlpha > 10 then
+                    nvgBeginPath(nvg)
+                    -- 菱形粒子
+                    nvgMoveTo(nvg, px, py - pSize * 1.5)
+                    nvgLineTo(nvg, px + pSize, py)
+                    nvgLineTo(nvg, px, py + pSize * 1.5)
+                    nvgLineTo(nvg, px - pSize, py)
+                    nvgClosePath(nvg)
+                    nvgFillColor(nvg, nvgRGBA(255, 230, 80, pAlpha))
+                    nvgFill(nvg)
+                end
+            end
+
+            -- 旋转的棋子图腾符号（♟）
+            nvgSave(nvg)
+            nvgTranslate(nvg, cx, cy - hexSize * 0.3 * fade)
+            nvgRotate(nvg, progress * math.pi * 2)
+            local totemScale = fade * (0.8 + math.sin(progress * 10) * 0.1)
+            nvgFontFace(nvg, "sans")
+            nvgFontSize(nvg, hexSize * 0.7 * totemScale)
+            nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgFillColor(nvg, nvgRGBA(255, 220, 60, math.floor(alpha * 0.85)))
+            nvgText(nvg, 0, 0, "♟")
+            nvgRestore(nvg)
+
+        elseif fx.type == "gravity_pull" then
+            -- ═══ 引力场：从英雄位置爆发紫黑色引力漩涡，向内收缩的力场 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local range = fx.range or 2
+            local maxR = hexSize * range * 1.2
+
+            -- 阶段1(0~0.3): 引力场扩张   阶段2(0.3~0.7): 向内收缩   阶段3(0.7~1): 消散
+            local fade = 1.0
+            if progress < 0.3 then
+                fade = progress / 0.3
+            elseif progress > 0.7 then
+                fade = 1.0 - (progress - 0.7) / 0.3
+            end
+            local alpha = math.floor(fade * 255)
+
+            -- 向内收缩的同心圆环（引力波）
+            for ring = 1, 4 do
+                local ringPhase = (progress * 3.0 + ring * 0.25) % 1.0
+                local ringR = maxR * (1.0 - ringPhase)  -- 从外向内收缩
+                local ringAlpha = math.floor(alpha * (1.0 - ringPhase) * 0.6)
+                if ringAlpha > 5 and ringR > 5 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, ringR)
+                    nvgStrokeColor(nvg, nvgRGBA(120, 50, 200, ringAlpha))
+                    nvgStrokeWidth(nvg, 2.5 * (1.0 - ringPhase))
+                    nvgStroke(nvg)
+                end
+            end
+
+            -- 中心漩涡（深紫色旋转渐变）
+            local vortexR = hexSize * 0.6 * fade
+            local rotAngle = progress * math.pi * 6  -- 快速旋转
+            nvgSave(nvg)
+            nvgTranslate(nvg, cx, cy)
+            nvgRotate(nvg, rotAngle)
+
+            -- 漩涡臂（4条螺旋线）
+            for arm = 0, 3 do
+                local armAngle = arm * math.pi / 2
+                nvgBeginPath(nvg)
+                local prevX, prevY = 0, 0
+                nvgMoveTo(nvg, 0, 0)
+                for seg = 1, 8 do
+                    local segT = seg / 8
+                    local spiralR = vortexR * segT * (1.0 + math.sin(progress * 8 + seg) * 0.2)
+                    local spiralA = armAngle + segT * math.pi * 1.5
+                    local sx = math.cos(spiralA) * spiralR
+                    local sy = math.sin(spiralA) * spiralR
+                    nvgLineTo(nvg, sx, sy)
+                    prevX, prevY = sx, sy
+                end
+                local armAlpha = math.floor(alpha * 0.8)
+                nvgStrokeColor(nvg, nvgRGBA(160, 80, 255, armAlpha))
+                nvgStrokeWidth(nvg, 2.0 * fade)
+                nvgStroke(nvg)
+            end
+            nvgRestore(nvg)
+
+            -- 中心引力核心光球
+            local coreR = hexSize * 0.25 * fade * (0.9 + math.sin(progress * 12) * 0.1)
+            local corePaint = nvgRadialGradient(nvg, cx, cy, 0, coreR,
+                nvgRGBA(80, 20, 180, math.floor(alpha * 0.9)),
+                nvgRGBA(40, 10, 100, 0))
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, cy, coreR)
+            nvgFillPaint(nvg, corePaint)
+            nvgFill(nvg)
+
+            -- 飞向中心的粒子（模拟物体被吸入）
+            for i = 0, 11 do
+                local pAngle = i * math.pi / 6 + progress * 2.0
+                local pPhase = (progress * 2.5 + i * 0.08) % 1.0
+                local pDist = maxR * (1.0 - pPhase)  -- 从外向中心飞
+                local px = cx + math.cos(pAngle) * pDist
+                local py = cy + math.sin(pAngle) * pDist
+                local pSize = (2.0 + pPhase * 2.0) * fade
+                local pAlpha = math.floor(alpha * pPhase * 0.7)
+                if pAlpha > 10 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, px, py, pSize)
+                    nvgFillColor(nvg, nvgRGBA(140, 60, 220, pAlpha))
+                    nvgFill(nvg)
+                end
+            end
+
+            -- 扭曲线条（表现空间扭曲感）
+            for i = 0, 5 do
+                local wAngle = i * math.pi / 3 + progress * 1.5
+                local wR1 = hexSize * 0.4 * fade
+                local wR2 = maxR * 0.7 * fade
+                local wx1 = cx + math.cos(wAngle) * wR1
+                local wy1 = cy + math.sin(wAngle) * wR1
+                local wx2 = cx + math.cos(wAngle + 0.3) * wR2
+                local wy2 = cy + math.sin(wAngle + 0.3) * wR2
+                local wAlpha = math.floor(alpha * 0.35)
+                if wAlpha > 5 then
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, wx1, wy1)
+                    nvgLineTo(nvg, wx2, wy2)
+                    nvgStrokeColor(nvg, nvgRGBA(100, 40, 180, wAlpha))
+                    nvgStrokeWidth(nvg, 1.5 * fade)
                     nvgStroke(nvg)
                 end
             end
