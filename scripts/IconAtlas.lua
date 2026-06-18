@@ -29,14 +29,18 @@ IconAtlas.PATHS = {
     skill_hunter_mark      = "image/skill_hunter_mark_20260601033312.png",
     skill_combo_shield     = "image/skill_combo_shield_20260601033314.png",
     skill_step_strike      = "image/skill_step_strike_20260601033527.png",
-    skill_frost_mark       = "image/skill_frost_mark_20260609063805.png",
-    skill_kingmaker        = "image/skill_kingmaker_20260609063755.png",
-    skill_gravity_pull     = "image/skill_gravity_pull_20260609063803.png",
+    skill_frost_mark       = "image/skill_frost_mark_20260617123756.png",
+    skill_kingmaker        = "image/skill_kingmaker_20260617123811.png",
+    skill_gravity_pull     = "image/skill_gravity_pull_20260617123924.png",
+    skill_dart_storm       = "image/skill_dart_storm_20260617123810.png",
+    skill_multi_cast       = "image/skill_multi_cast_20260617123804.png",
+    skill_damage_amp       = "image/skill_damage_amp_20260617124030.png",
+    skill_silence_path     = "image/skill_silence_path_20260617123803.png",
     -- 组合技能
     skill_combo_storm      = "image/skill_combo_thunder_quake_20260601033526.png",
     skill_combo_thorn      = "image/skill_combo_blood_thorns_20260601033523.png",
     skill_combo_fire       = "image/skill_combo_fire_20260609063807.png",
-    skill_combo_pirate     = "image/skill_combo_pirate_20260609063750.png",
+    skill_combo_pirate     = "image/skill_combo_pirate_20260617123816.png",
 
     -- === HUD 图标 (4) ===
     hud_hp                 = "icons/hud/hud_hp_20260427110233.png",

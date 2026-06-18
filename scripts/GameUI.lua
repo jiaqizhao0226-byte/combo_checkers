@@ -524,10 +524,12 @@ end
 
 -- 章节背景主题色表（饱和度提高，确保棋盘外区域也能体现章节色）
 local BG_THEMES = {
+    [0] = { top={32,20,58,255},   bot={42,28,72,255}  },  -- 无尽深渊：紫色（与BoardWidget BOARD_THEMES[0]同步）
     [1] = { top={15,25,60,255},   bot={22,42,85,255}  },  -- 深海蓝（保持不变）
     [2] = { top={40,16,8,255},    bot={58,22,10,255}  },  -- 熔岩暗红棕（调暗降饱和）
     [3] = { top={15,45,35,255},   bot={22,68,52,255}  },  -- 珊瑚深绿（保持不变）
     [4] = { top={40,30,12,255},   bot={55,40,18,255}  },  -- 流沙荒漠（与BoardWidget CHAPTER_THEMES[4]同步）
+    [5] = { top={12,18,38,255},   bot={22,30,58,255}  },  -- 永冻绝境（冰蓝，与BOARD_THEMES[5]同步）
 }
 
 --- 动态更新根面板背景渐变（换章节时调用）
@@ -538,7 +540,7 @@ function GameUI.UpdateBackground()
     if G.battle and G.battle.level then
         ch = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
     end
-    if isEndless then ch = 4 end
+    if isEndless then ch = 0 end
     local t = BG_THEMES[ch] or BG_THEMES[1]
     G.uiRoot:SetBackgroundGradient({
         type = "linear", direction = "to-bottom",
@@ -554,7 +556,7 @@ function GameUI.CreateUI()
     if G.battle and G.battle.level then
         ch = math.ceil(G.battle.level / Battle.LEVELS_PER_CHAPTER)
     end
-    if isEndless then ch = 4 end
+    if isEndless then ch = 0 end
 
     -- 直接用棋盘主题的 bgTop/bgBot，与 BoardWidget 背景无缝衔接
     local t = BG_THEMES[ch] or BG_THEMES[1]
@@ -888,23 +890,23 @@ function GameUI.CreateUI()
                 position = "absolute",
                 bottom = 70, left = 10,
                 zIndex = 20,
-                flexDirection = "row", alignItems = "center", gap = 4,
+                flexDirection = "row", alignItems = "center", gap = 6,
                 backgroundColor = {35, 55, 75, 200},
                 borderRadius = 0,
                 borderWidth = 1,
                 borderColor = {60, 100, 150, 120},
-                paddingLeft = 8, paddingRight = 10, paddingTop = 6, paddingBottom = 6,
+                paddingLeft = 12, paddingRight = 14, paddingTop = 9, paddingBottom = 9,
                 onClick = function(self)
                     GameUI.ShowTutorialGuide()
                 end,
                 children = {
                     UI.Label {
                         text = "📖",
-                        fontSize = 16,
+                        fontSize = 22,
                     },
                     UI.Label {
                         text = "教程",
-                        fontSize = 12,
+                        fontSize = 18,
                         fontColor = {150, 200, 230, 230},
                     },
                 },
@@ -914,23 +916,23 @@ function GameUI.CreateUI()
                 position = "absolute",
                 bottom = 70, right = 10,
                 zIndex = 20,
-                flexDirection = "row", alignItems = "center", gap = 4,
+                flexDirection = "row", alignItems = "center", gap = 6,
                 backgroundColor = {55, 35, 75, 200},
                 borderRadius = 0,
                 borderWidth = 1,
                 borderColor = {100, 60, 150, 120},
-                paddingLeft = 8, paddingRight = 10, paddingTop = 6, paddingBottom = 6,
+                paddingLeft = 12, paddingRight = 14, paddingTop = 9, paddingBottom = 9,
                 onClick = function(self)
                     GameUI.ShowSkillsPopup()
                 end,
                 children = {
                     UI.Label {
                         text = "⚔",
-                        fontSize = 16,
+                        fontSize = 22,
                     },
                     UI.Label {
                         text = "技能",
-                        fontSize = 12,
+                        fontSize = 18,
                         fontColor = {200, 170, 240, 230},
                     },
                 },
@@ -1915,21 +1917,21 @@ local TUTORIAL_PAGES = {
         icon = "👑",
         entries = {
             { separator = true, text = "── 深渊海沟 Boss ──" },
-            { emoji = "🐙", text = "深渊海妖 — HP450 ATK20 | 护盾60" },
+            { emoji = "🐙", text = "深渊海妖 — HP350 ATK14 | 护盾60" },
             { emoji = "🦑", text = "触手障碍 — 在棋盘放置触手阻挡移动" },
             { emoji = "🌊", text = "漩涡牵引 — 将你拉向Boss并造成伤害" },
             { emoji = "🕳️", text = "深渊收缩 — 棋盘边缘崩塌，可活动范围缩小" },
             { separator = true, text = "── 熔岩祭坛 Boss ──" },
-            { emoji = "🌋", text = "熔岩领主 — HP350 ATK21 | 护盾70" },
+            { emoji = "🌋", text = "熔岩领主 — HP480 ATK28 | 护盾90" },
             { emoji = "🔥", text = "熔岩喷射 — 射程2远程攻击" },
             { emoji = "🌋", text = "熔岩喷发 — 在英雄周围放置岩浆地形" },
             { separator = true, text = "── 珊瑚迷宫 Boss ──" },
-            { emoji = "🪸", text = "珊瑚守卫 — HP480 ATK22 | 护盾80" },
+            { emoji = "🪸", text = "珊瑚守卫 — HP650 ATK30 | 护盾110" },
             { emoji = "🌊", text = "潮汐冲击 — 将你推离并造成伤害" },
             { emoji = "🪸", text = "珊瑚墙 — 放置珊瑚障碍封堵退路" },
             { emoji = "🧙", text = "召唤小兵 — 召唤珊瑚夹增援" },
             { separator = true, text = "── 流沙荒漠 Boss ──" },
-            { emoji = "🐛", text = "沙丘巨虫 — HP820 ATK26 | 护盾70 | 7节蛇身" },
+            { emoji = "🐛", text = "沙丘巨虫 — HP1180 ATK38 | 护盾130 | 7节蛇身 | 跳过虫体会被反伤" },
             { emoji = "💥", text = "尾鞭甩飞 — 尾部扫击，将英雄击飞" },
             { emoji = "🌪️", text = "沙暴狂怒 — 范围沙暴伤害" },
             { emoji = "🕳️", text = "钻地突袭 — 潜入地下后从预警处破土而出" },
@@ -1944,24 +1946,29 @@ local TUTORIAL_PAGES = {
         title = "技能一览",
         accent = {100, 200, 180},
         icon = "✨",
+        hint = "👆 点击技能查看各等级详细效果",
         entries = {
-            { emoji = "💥", text = "震地落 — 跳跃落地对相邻敌人造成范围伤害" },
-            { emoji = "⚡", text = "连锁闪电 — 攻击时电弧跳跃到附近敌人" },
-            { emoji = "🩸", text = "吸血跳 — 跳杀回复部分HP" },
-            { emoji = "🌿", text = "荆棘护甲 — 被攻击时反弹部分伤害" },
-            { emoji = "🪤", text = "地刺陷阱 — 跳过的格子留下陷阱伤害经过的敌人" },
-            { emoji = "😡", text = "血怒 — HP越低攻击力越高" },
-            { emoji = "🦶", text = "重力践踏 — 落地范围击飞周围敌人" },
-            { emoji = "💣", text = "分裂弹 — 击杀产生弹射伤害" },
-            { emoji = "🎯", text = "猎手印记 — 标记后攻击该敌人伤害加成" },
-            { emoji = "🛡️", text = "连击护盾 — 连击越高护盾越强" },
-            { emoji = "🔮", text = "玻璃大炮 — 伤害大幅提升，但生命降低" },
-            { emoji = "🌅", text = "黎明使者 — 每章首次战斗额外技能选择" },
-            { emoji = "⚔️", text = "踏步斩 — 移动时对路过的相邻敌人造成伤害" },
-            { emoji = "📦", text = "收集者 — 拾取道具概率获得额外奖励" },
-            { emoji = "❄️", text = "冰霜印记 — 攻击叠层，满层冻结敌人" },
-            { emoji = "♟️", text = "棋步 — 每N跳后可跳至全图任意位置" },
-            { emoji = "🟣", text = "引力 — 落地后拉近周围敌人" },
+            { emoji = "💥", text = "震地落 — 跳跃落地对相邻敌人造成范围伤害", skillId = "quake_land" },
+            { emoji = "⚡", text = "连锁闪电 — 攻击时电弧跳跃到附近敌人", skillId = "chain_lightning" },
+            { emoji = "🩸", text = "吸血跳 — 跳杀回复部分HP", skillId = "vampiric_jump" },
+            { emoji = "🌿", text = "荆棘护甲 — 被攻击时反弹部分伤害", skillId = "thorns" },
+            { emoji = "🪤", text = "地刺陷阱 — 跳过的格子留下陷阱伤害经过的敌人", skillId = "spike_trap" },
+            { emoji = "😡", text = "血怒 — HP越低攻击力越高", skillId = "blood_rage" },
+            { emoji = "🦶", text = "重力践踏 — 落地范围击飞周围敌人", skillId = "gravity_stomp" },
+            { emoji = "💣", text = "分裂弹 — 击杀产生弹射伤害", skillId = "split_shot" },
+            { emoji = "🎯", text = "猎手印记 — 标记后攻击该敌人伤害加成", skillId = "hunter_mark" },
+            { emoji = "🛡️", text = "连击护盾 — 连击越高护盾越强", skillId = "combo_shield" },
+            { emoji = "🔮", text = "玻璃大炮 — 伤害大幅提升，但生命降低", skillId = "glass_cannon" },
+            { emoji = "🌅", text = "黎明使者 — 每章首次战斗额外技能选择", skillId = "dawn_herald" },
+            { emoji = "⚔️", text = "踏步斩 — 移动时斩杀血量不足的相邻敌人（Boss除外）", skillId = "step_strike" },
+            { emoji = "📦", text = "收集者 — 对残血敌人造成额外伤害", skillId = "collector" },
+            { emoji = "❄️", text = "冰霜印记 — 攻击叠层，满层冻结敌人", skillId = "frost_mark" },
+            { emoji = "♟️", text = "棋步 — 每N跳后可跳至全图任意位置", skillId = "kingmaker" },
+            { emoji = "🟣", text = "引力 — 落地后拉近周围敌人", skillId = "gravity_pull" },
+            { emoji = "🗡️", text = "飞镖风暴 — 2连跳发射多枚飞镖，可穿透/灼烧", skillId = "dart_storm" },
+            { emoji = "🌀", text = "连锁释放 — 落地后概率额外重演落地效果(震地/地刺)", skillId = "multi_cast" },
+            { emoji = "💪", text = "战意增幅 — 提升所有技能的伤害输出", skillId = "damage_amp" },
+            { emoji = "🤐", text = "寂灭之路 — 连跳经过的敌人被沉默，无法用特殊技能", skillId = "silence_path" },
         },
     },
     -- ========== Page 10: 装备与套装 ==========
@@ -1975,7 +1982,7 @@ local TUTORIAL_PAGES = {
             { emoji = "🟣", text = "紫色 — 属性×1.5 + 随机词条" },
             { emoji = "🟡", text = "金色 — 属性×2.2 + 套装效果" },
             { separator = true, text = "── 套装效果（金色） ──" },
-            { emoji = "🦅", text = "飞跃先锋 4/6 — 免费额外一跳" },
+            { emoji = "🦅", text = "飞跃先锋 4/6 — 可跳过2连续敌人" },
             { emoji = "🦅", text = "飞跃先锋 6/6 — 可跳过3连续敌人" },
             { emoji = "🔥", text = "连击心得 4/6 — 连跳后50%概率combo+1" },
             { emoji = "🔥", text = "连击心得 6/6 — 连跳后100%概率combo+1" },
@@ -1984,6 +1991,132 @@ local TUTORIAL_PAGES = {
         },
     },
 }
+
+--- 技能详情弹窗：展示某技能 Lv1~满级 的逐级效果（含具体数值，从 Skills.SKILLS[id].desc(lv) 动态生成）
+---@param skillId string
+function GameUI._ShowSkillDetail(skillId)
+    local def = Skills.SKILLS[skillId]
+    if not def then return end
+    if G.skillDetailPopup then G.skillDetailPopup:Remove(); G.skillDetailPopup = nil end
+
+    local maxLv = def.maxLevel or 1
+
+    -- 逐级效果行
+    local levelRows = {}
+    for lv = 1, maxLv do
+        local rarityIdx = (def.rarity and def.rarity[lv]) or 1
+        local meta = Skills.RARITY_META[rarityIdx] or Skills.RARITY_META[1]
+        local descText = ""
+        if type(def.desc) == "function" then
+            descText = def.desc(lv)
+        elseif type(def.desc) == "string" then
+            descText = def.desc
+        end
+        levelRows[#levelRows + 1] = UI.Panel {
+            width = "100%",
+            flexDirection = "row", alignItems = "center", gap = 8,
+            paddingTop = 7, paddingBottom = 7, paddingLeft = 8, paddingRight = 8,
+            backgroundColor = { meta.color[1], meta.color[2], meta.color[3], 22 },
+            borderRadius = 0,
+            borderWidth = 1,
+            borderColor = { meta.color[1], meta.color[2], meta.color[3], 80 },
+            children = {
+                -- 等级 + 稀有度标签
+                UI.Panel {
+                    width = 46, flexShrink = 0, alignItems = "center", gap = 1,
+                    children = {
+                        UI.Label { text = "Lv" .. lv, fontSize = 15, fontWeight = "bold", fontColor = meta.color },
+                        UI.Label { text = meta.label, fontSize = 9,
+                            fontColor = { meta.color[1], meta.color[2], meta.color[3], 190 } },
+                    },
+                },
+                -- 该等级效果文案
+                UI.Label {
+                    text = descText,
+                    fontSize = 12, fontColor = { 215, 220, 240, 235 },
+                    flexGrow = 1, flexShrink = 1, numberOfLines = 5,
+                },
+            },
+        }
+    end
+
+    G.skillDetailPopup = UI.Panel {
+        position = "absolute", top = 0, left = 0, right = 0, bottom = 0,
+        justifyContent = "center", alignItems = "center",
+        backgroundColor = { 0, 0, 0, 150 },
+        backdropBlur = 3,
+        zIndex = 950,  -- 高于教程弹窗(800)
+        onClick = function()
+            if G.skillDetailPopup then G.skillDetailPopup:Remove(); G.skillDetailPopup = nil end
+        end,
+        children = {
+            UI.Panel {
+                width = "88%", maxWidth = 380, maxHeight = "82%",
+                backgroundGradient = {
+                    type = "linear", direction = "to-bottom",
+                    from = { 34, 30, 60, 252 }, to = { 22, 18, 44, 252 },
+                },
+                borderRadius = 0,
+                borderWidth = 2,
+                borderColor = { def.color[1], def.color[2], def.color[3], 180 },
+                onClick = function() end,  -- 阻止穿透
+                children = {
+                    UI.ScrollView {
+                        width = "100%", flexGrow = 1, flexShrink = 1,
+                        children = {
+                            UI.Panel {
+                                width = "100%", gap = 8,
+                                paddingTop = 14, paddingBottom = 14, paddingLeft = 14, paddingRight = 14,
+                                children = {
+                                    -- 头部：图标 + 名称
+                                    UI.Panel {
+                                        width = "100%", flexDirection = "row", alignItems = "center", gap = 10,
+                                        children = {
+                                            UI.Panel {
+                                                backgroundImage = IconAtlas.GetPath(def.icon),
+                                                width = 50, height = 50, backgroundFit = "contain", flexShrink = 0,
+                                            },
+                                            UI.Label {
+                                                text = def.name, fontSize = 21, fontWeight = "bold",
+                                                fontColor = def.color, flexGrow = 1, flexShrink = 1,
+                                            },
+                                        },
+                                    },
+                                    UI.Label {
+                                        text = "各等级效果（满级 Lv" .. maxLv .. "）",
+                                        fontSize = 12, fontColor = { 150, 150, 185, 200 },
+                                    },
+                                    UI.Panel { width = "100%", height = 1,
+                                        backgroundColor = { def.color[1], def.color[2], def.color[3], 90 } },
+                                    -- 逐级效果
+                                    UI.Panel { width = "100%", gap = 5, children = levelRows },
+                                    -- 关闭按钮
+                                    UI.Button {
+                                        text = "关闭", width = "100%", height = 36,
+                                        fontSize = 15, fontWeight = "bold",
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-bottom",
+                                            from = { 70, 55, 130, 255 }, to = { 45, 35, 90, 255 },
+                                        },
+                                        fontColor = { 220, 215, 245, 255 },
+                                        pressedBackgroundColor = { 55, 40, 100, 255 },
+                                        onClick = function()
+                                            if G.skillDetailPopup then G.skillDetailPopup:Remove(); G.skillDetailPopup = nil end
+                                        end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local root = UI.GetRoot()
+    if root then root:AddChild(G.skillDetailPopup) end
+    AM.PlaySFX("ui_popup_open")
+end
 
 --- 生成单个条目卡片（实底卡片风格，复刻章节教学样式）
 ---@param entry table
@@ -2025,6 +2158,10 @@ local function MakeTutorialEntry(entry, idx, accent)
         borderRadius = 0,
         borderWidth = 1,
         borderColor = {accent[1], accent[2], accent[3], 40},
+        pressedBackgroundColor = entry.skillId and {accent[1], accent[2], accent[3], 55} or nil,
+        onClick = entry.skillId and function()
+            GameUI._ShowSkillDetail(entry.skillId)
+        end or nil,
         children = {
             -- 左侧大emoji
             UI.Panel {
@@ -2048,6 +2185,13 @@ local function MakeTutorialEntry(entry, idx, accent)
                 fontColor = {220, 230, 245, 240},
                 flexGrow = 1, flexShrink = 1,
                 numberOfLines = 2,
+            },
+            -- 可点击提示箭头（仅技能条目显示）
+            UI.Label {
+                text = entry.skillId and "›" or "",
+                fontSize = 24, fontWeight = "bold",
+                fontColor = {accent[1], accent[2], accent[3], 200},
+                flexShrink = 0,
             },
         },
     }
@@ -2388,9 +2532,11 @@ function GameUI.ShowSkillsPopup()
         }
     else
         for _, item in ipairs(skillItems) do
-            local rarityColor = item.def.rarity == "legendary" and {255, 200, 50, 255}
-                or item.def.rarity == "rare" and {180, 120, 255, 255}
-                or {100, 180, 255, 255}
+            -- 按"当前等级"的稀有度着色（rarity 是数组 {Lv1..LvN}）；缺失则兜底为普通
+            local rArr = item.def.rarity
+            local rIdx = (type(rArr) == "table" and (rArr[item.lv] or rArr[#rArr])) or 1
+            local rMeta = Skills.RARITY_META[rIdx] or Skills.RARITY_META[1]
+            local rarityColor = rMeta.color
             skillGridChildren[#skillGridChildren + 1] = UI.Panel {
                 width = 56, height = 68,
                 alignItems = "center", justifyContent = "center",
@@ -2419,14 +2565,9 @@ function GameUI.ShowSkillsPopup()
         end
     end
 
-    -- 构建组合技合成列表（只展示已实装的组合技）
-    local implementedCombos = {
-        combo_thunder_quake = true,
-        combo_hunter_instinct = true,
-    }
+    -- 构建组合技合成列表（展示全部组合技，无论是否已解锁）
     local comboChildren = {}
     for _, combo in ipairs(Skills.COMBOS) do
-        if not implementedCombos[combo.id] then goto continue_combo end
         local isActive = false
         for _, ac in ipairs(activeCombos) do
             if ac.id == combo.id then isActive = true; break end
@@ -2460,9 +2601,9 @@ function GameUI.ShowSkillsPopup()
 
         comboChildren[#comboChildren + 1] = UI.Panel {
             width = "100%",
-            paddingTop = 4, paddingBottom = 4,
-            paddingLeft = 6, paddingRight = 6,
-            gap = 2,
+            paddingTop = 8, paddingBottom = 8,
+            paddingLeft = 10, paddingRight = 10,
+            gap = 4,
             backgroundColor = isActive and {40, 60, 50, 180} or {35, 30, 60, 120},
             borderRadius = 0,
             borderWidth = isActive and 1 or 0,
@@ -2471,39 +2612,38 @@ function GameUI.ShowSkillsPopup()
                 -- 标题行
                 UI.Panel {
                     width = "100%",
-                    flexDirection = "row", alignItems = "center", gap = 4,
+                    flexDirection = "row", alignItems = "center", gap = 6,
                     children = {
                         UI.Panel {
                             backgroundImage = IconAtlas.GetPath(combo.icon),
-                            width = 18, height = 18, backgroundFit = "contain",
+                            width = 26, height = 26, backgroundFit = "contain", flexShrink = 0,
                         },
                         UI.Label {
                             text = combo.name,
-                            fontSize = 13, fontWeight = "bold",
+                            fontSize = 18, fontWeight = "bold",
                             fontColor = combo.color and {combo.color[1], combo.color[2], combo.color[3], 255} or {220, 215, 250, 255},
-                            flexGrow = 1,
+                            flexGrow = 1, flexShrink = 1,
                         },
                         UI.Label {
                             text = statusText,
-                            fontSize = 11, fontColor = statusColor,
+                            fontSize = 13, fontColor = statusColor, flexShrink = 0,
                         },
                     },
                 },
                 -- 效果描述
                 UI.Label {
                     text = combo.desc,
-                    fontSize = 11, fontColor = {180, 175, 210, 200},
-                    numberOfLines = 2, width = "100%",
+                    fontSize = 14, fontColor = {200, 195, 225, 220},
+                    numberOfLines = 3, width = "100%",
                 },
                 -- 合成条件
                 UI.Label {
                     text = "需要: " .. table.concat(reqNames, " + ") .. " (等级和≥5)",
-                    fontSize = 10, fontColor = {140, 135, 175, 160},
+                    fontSize = 12, fontColor = {150, 145, 185, 180},
                     numberOfLines = 2, width = "100%",
                 },
             },
         }
-        ::continue_combo::
     end
 
     G.skillsPopup = UI.Panel {
@@ -2575,9 +2715,9 @@ function GameUI.ShowSkillsPopup()
                         width = "100%", gap = 3,
                         children = {
                             UI.Label {
-                                text = "组合技合成 (" .. #activeCombos .. "/2 已激活)",
-                                fontSize = 12, fontWeight = "bold",
-                                fontColor = {220, 200, 130, 180},
+                                text = "组合技合成 (" .. #activeCombos .. "/" .. #Skills.COMBOS .. " 已激活)",
+                                fontSize = 16, fontWeight = "bold",
+                                fontColor = {235, 215, 140, 255},
                             },
                             UI.Panel { width = "100%", height = 1, backgroundColor = {80, 65, 140, 60} },
                         },

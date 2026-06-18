@@ -34,8 +34,10 @@ local function SettleBattleRewards()
     if not G.battle or G.battle._rewardsSettled then return end
     G.battle._rewardsSettled = true
 
-    -- 金币（无论胜负都结算当局累计金币）
-    PlayerData.AddGold(G.playerData, G.battle.gold or 0)
+    -- 金币（无论胜负都结算当局累计金币）；全局 +20% 产出加成
+    -- 注：作用于"本局累计总额"而非每笔小额，避免第一章低基数金币(1~2)被 floor 截断
+    local GOLD_GAIN_MULT = 1.2
+    PlayerData.AddGold(G.playerData, math.floor((G.battle.gold or 0) * GOLD_GAIN_MULT))
     G.battle.gold = 0
 
     -- 进度

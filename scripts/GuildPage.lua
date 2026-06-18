@@ -15,7 +15,7 @@ local GuildPage = {}
 -- ============================================================================
 
 --- 关卡号 → "第N章 第M关" 文本
-local MAX_CHAPTER = 4  -- 当前游戏最大章节数，防止旧测试数据显示超出范围的章节
+local MAX_CHAPTER = 5  -- 当前游戏最大章节数，防止旧测试数据显示超出范围的章节
 
 local function LevelToText(level)
     if type(level) ~= "number" then level = tonumber(level) or 1 end

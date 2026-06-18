@@ -858,6 +858,178 @@ function TestPanel.Show()
                                     },
                                 },
                             },
+                            -- 第二行：飞镖风暴 + 连锁释放
+                            UI.Panel {
+                                width = "100%",
+                                flexDirection = "row", gap = 8,
+                                children = {
+                                    -- 飞镖风暴
+                                    UI.Button {
+                                        text = "🎯 飞镖风暴",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {130, 80, 20, 255}, to = {100, 60, 10, 255},
+                                        },
+                                        fontColor = {255, 200, 100, 255},
+                                        borderWidth = 1,
+                                        borderColor = {200, 140, 50, 150},
+                                        pressedBackgroundColor = {100, 60, 15, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["dart_storm"] = 1
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["dart_storm"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["dart_storm"] = newLv
+                                                self:SetText("🎯 飞镖Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
+                                        end,
+                                    },
+                                    -- 连锁释放
+                                    UI.Button {
+                                        text = "🔮 连锁释放",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {90, 40, 140, 255}, to = {60, 30, 100, 255},
+                                        },
+                                        fontColor = {220, 160, 255, 255},
+                                        borderWidth = 1,
+                                        borderColor = {150, 80, 220, 150},
+                                        pressedBackgroundColor = {70, 30, 100, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["multi_cast"] = 1
+                                                -- 给一个落地技能方便测试连锁
+                                                G.battle.skills["quake_land"] = 3
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["multi_cast"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["multi_cast"] = newLv
+                                                self:SetText("🔮 连锁Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
+                                        end,
+                                    },
+                                },
+                            },
+                            -- 第三行：战意增幅 + 寂灭之路
+                            UI.Panel {
+                                width = "100%",
+                                flexDirection = "row", gap = 8,
+                                children = {
+                                    -- 战意增幅
+                                    UI.Button {
+                                        text = "💪 战意增幅",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {130, 30, 30, 255}, to = {100, 20, 20, 255},
+                                        },
+                                        fontColor = {255, 130, 130, 255},
+                                        borderWidth = 1,
+                                        borderColor = {200, 60, 60, 150},
+                                        pressedBackgroundColor = {100, 20, 20, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["damage_amp"] = 1
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["damage_amp"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["damage_amp"] = newLv
+                                                self:SetText("💪 增幅Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
+                                        end,
+                                    },
+                                    -- 寂灭之路
+                                    UI.Button {
+                                        text = "🤐 寂灭之路",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {60, 30, 100, 255}, to = {40, 20, 70, 255},
+                                        },
+                                        fontColor = {180, 130, 240, 255},
+                                        borderWidth = 1,
+                                        borderColor = {120, 70, 180, 150},
+                                        pressedBackgroundColor = {45, 20, 70, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            local needNewBattle = not G.battle or not G.battle.hero
+                                            if needNewBattle then
+                                                TestPanel.Close()
+                                                local TurnFlow = require "TurnFlow"
+                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                                G.battle = Battle.New(bonus)
+                                                G.battle.skills["silence_path"] = 1
+                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
+                                                TurnFlow.SnapCameraToHero()
+                                                TurnFlow.ClearPlan()
+                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                                TurnFlow.StartPlayerTurn()
+                                            else
+                                                local cur = G.battle.skills["silence_path"] or 0
+                                                local newLv = math.min(cur + 1, 5)
+                                                G.battle.skills["silence_path"] = newLv
+                                                self:SetText("🤐 寂灭Lv" .. newLv)
+                                                if newLv >= 5 then
+                                                    self:SetDisabled(true)
+                                                end
+                                            end
+                                        end,
+                                    },
+                                },
+                            },
                         },
                     },
 

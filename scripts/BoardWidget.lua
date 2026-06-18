@@ -112,6 +112,20 @@ local BOARD_THEMES = {
         silClr      = {30, 22, 10, 180},
         silType     = "rocks",
     },
+    [5] = { -- 永冻绝境：冰白蓝主题
+        hexFill     = {38, 55, 78, 255},
+        hexStroke   = {70, 110, 150, 180},
+        hexGlow     = {100, 180, 240},
+        bgTop       = {12, 18, 38, 255},
+        bgBot       = {22, 30, 58, 255},
+        fogColor    = {20, 40, 70, 40},
+        particle    = "snowflake",
+        particleClr = {{200, 230, 255}, {160, 210, 245}, {240, 248, 255}},
+        shaftClr    = {80, 160, 220},
+        frameClr    = {120, 200, 240},
+        silClr      = {10, 15, 30, 180},
+        silType     = "rocks",
+    },
     [0] = { -- 无尽深渊：紫色主题
         hexFill     = {58, 40, 90, 255},
         hexStroke   = {90, 68, 135, 180},
@@ -900,25 +914,7 @@ function BoardWidget:Render(nvg)
         local cx, cy = HexGrid.HexToPixel(spike.col, spike.row, hexSize, ox, oy)
         if not IsCellOnScreen(cx, cy, hexSize, l.x, l.y, l.w, l.h) then goto cull_spike end
         do
-        -- 六边形底板：暗红渐变 + 微光边框（危险感但不突兀）
-        local spikeR = hexSize * 0.88
-        nvgBeginPath(nvg)
-        for i = 0, 5 do
-            local angle = math.rad(60 * i - 90)
-            local vx = cx + spikeR * math.cos(angle)
-            local vy = cy + spikeR * math.sin(angle)
-            if i == 0 then nvgMoveTo(nvg, vx, vy) else nvgLineTo(nvg, vx, vy) end
-        end
-        nvgClosePath(nvg)
-        -- 径向渐变：中心深红 → 边缘暗褐（不再纯黑）
-        local bgPaint = nvgRadialGradient(nvg, cx, cy, hexSize * 0.1, hexSize * 0.85,
-            nvgRGBA(80, 20, 15, 220), nvgRGBA(35, 15, 20, 200))
-        nvgFillPaint(nvg, bgPaint)
-        nvgFill(nvg)
-        -- 边框：暗红发光感（不再纯白）
-        nvgStrokeColor(nvg, nvgRGBA(200, 80, 60, 180))
-        nvgStrokeWidth(nvg, 2.5)
-        nvgStroke(nvg)
+        -- 无底色/无边框：仅绘制尖刺图标本身（避免与"可跳格子"的红色高亮混淆）
         -- 3根向上三角尖刺（带发光感的红色）
         local spikeH = hexSize * 0.46
         local spikeW = hexSize * 0.16
@@ -3679,6 +3675,42 @@ function BoardWidget:Render(nvg)
                     nvgFillColor(nvg, nvgRGBA(100, 200, 255, math.floor(220 * pulse)))
                     nvgText(nvg, ex, frzY, "🧊冻" .. e._frozenTurns .. "回合")
                 end
+            end
+        end
+    end
+
+    -- 7.6.8.4 敌人沉默标记（寂灭之路：被沉默的敌人头顶持续显示，独立于冰霜印记技能）
+    if G.battle.board then
+        local silencedEnemies = HexGrid.GetTeamPieces(G.battle.board, "enemy")
+        for _, e in ipairs(silencedEnemies) do
+            if e.hp > 0 and (e._silencedTurns or 0) > 0 then
+                local ex, ey = HexGrid.HexToPixel(e.col, e.row, hexSize, ox, oy)
+                local silY = ey - hexSize * 0.74  -- 高于冻结标记，避免重叠
+                local t = G.time or 0
+                local pulse = math.sin(t * 4.5) * 0.25 + 0.75
+                -- 紫色光环底座（柔和发光，让标记更醒目）
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, ex, silY, hexSize * 0.5 * pulse)
+                nvgFillPaint(nvg, nvgRadialGradient(nvg, ex, silY, 0, hexSize * 0.5 * pulse,
+                    nvgRGBA(175, 75, 235, math.floor(75 * pulse)),
+                    nvgRGBA(120, 40, 190, 0)))
+                nvgFill(nvg)
+                -- 紫色背景框（醒目）
+                nvgBeginPath(nvg)
+                nvgRoundedRect(nvg, ex - hexSize * 0.52, silY - hexSize * 0.19,
+                    hexSize * 1.04, hexSize * 0.38, 4)
+                nvgFillColor(nvg, nvgRGBA(85, 35, 145, math.floor(205 * pulse)))
+                nvgFill(nvg)
+                -- 紫色描边
+                nvgStrokeColor(nvg, nvgRGBA(195, 125, 255, math.floor(235 * pulse)))
+                nvgStrokeWidth(nvg, 1.6)
+                nvgStroke(nvg)
+                -- 文字（亮紫白色）
+                nvgFontFace(nvg, "sans")
+                nvgFontSize(nvg, hexSize * 0.28)
+                nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                nvgFillColor(nvg, nvgRGBA(235, 195, 255, math.floor(255 * pulse)))
+                nvgText(nvg, ex, silY, "🤐沉默" .. e._silencedTurns .. "回合")
             end
         end
     end

@@ -370,7 +370,7 @@ function MenuSystem.RebuildMenuPage(tabId)
             })
         end
         if G.menuArrowRight then
-            G.menuArrowRight:SetVisible(G.selectedChapter < 4)
+            G.menuArrowRight:SetVisible(G.selectedChapter < 5)
             G.menuArrowRight:SetStyle({
                 backgroundGradient = { type = "linear", direction = "to-bottom", from = at.from, to = at.to },
                 pressedBackgroundColor = at.pressed,
@@ -801,13 +801,19 @@ function MenuSystem.RebuildMenuPage(tabId)
                 -- 保持原始类型（数字），GetUserNickname 需要数字 ID，传字符串会静默失败
                 userIds[#userIds + 1] = entry.userId
             end
+            print("[排行榜] GetUserNickname 类型=" .. type(GetUserNickname)
+                .. " 待查询userId数量=" .. #userIds
+                .. " 首个userId=" .. tostring(userIds[1]))
             -- GetUserNickname 只在联网且 lobby 可用时存在
             if type(GetUserNickname) == "function" then
                 GetUserNickname({
                     userIds = userIds,
                     onSuccess = function(nicknames)
+                        print("[排行榜] 昵称查询成功, 返回条数=" .. tostring(nicknames and #nicknames or 0))
                         local nicknameMap = {}
                         for _, info in ipairs(nicknames) do
+                            print("[排行榜]   userId=" .. tostring(info.userId)
+                                .. " nickname='" .. tostring(info.nickname) .. "'")
                             -- 只存非空昵称，空字符串跳过，让 fallback 生效
                             if info.nickname and info.nickname ~= "" then
                                 nicknameMap[tostring(info.userId)] = info.nickname
@@ -815,12 +821,14 @@ function MenuSystem.RebuildMenuPage(tabId)
                         end
                         fillContainer(container, buildRowsFn(buildFn(rankList, nicknameMap)))
                     end,
-                    onError = function()
+                    onError = function(errorCode)
+                        print("[排行榜] 昵称查询失败, errorCode=" .. tostring(errorCode))
                         fillContainer(container, buildRowsFn(buildFn(rankList, nil)))
                     end,
                 })
             else
                 -- 离线/测试：直接用 userId 后四位作为昵称
+                print("[排行榜] GetUserNickname 不存在(可能为离线/测试环境)，使用 fallback 昵称")
                 fillContainer(container, buildRowsFn(buildFn(rankList, nil)))
             end
         end
@@ -1977,7 +1985,7 @@ function MenuSystem.CreateMenuUI()
                                                     fontColor = {180, 220, 255, 220},
                                                 },
                                                 UI.Label {
-                                                    text = tostring(math.min(4, math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER))),
+                                                    text = tostring(math.min(5, math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER))),
                                                     fontSize = isMobile and 18 or 22,
                                                     fontWeight = "bold",
                                                     fontColor = {255, 255, 255, 255},
@@ -2137,7 +2145,7 @@ function MenuSystem.CreateMenuUI()
                     zIndex = 10,
                     onClick = function(self)
                         AM.PlaySFX("ui_click")
-                        if G.selectedChapter < 4 then
+                        if G.selectedChapter < 5 then
                             G.selectedChapter = G.selectedChapter + 1
                             MenuSystem.RebuildMenuPage(G.menuTab)
                         end
@@ -2185,7 +2193,7 @@ function MenuSystem.CreateMenuUI()
                 G.menuHeroArea = UI.Panel {
                     width = "100%", flexGrow = 1, flexShrink = 1,
                     onSwipeLeft = function(event, widget)
-                        if G.selectedChapter < 4 then
+                        if G.selectedChapter < 5 then
                             G.selectedChapter = G.selectedChapter + 1
                             MenuSystem.RebuildMenuPage(G.menuTab)
                         end

@@ -47,6 +47,13 @@ BattleData.ENEMY_GOLD = {
     sand_strider    = 3,
     sand_rattler    = 2,
     venom_lizard    = 2,
+    -- 第五章（永冻绝境）
+    frost_grunt      = 2,
+    aurora_jelly     = 1,
+    frost_barracuda  = 2,
+    ice_crystal      = 2,
+    blizzard_hawk    = 2,
+    frost_bear       = 3,
     -- Boss
     boss     = 10,
 }
@@ -403,11 +410,11 @@ BattleData.BOSS_TEMPLATES = {
         whirlpoolCooldown = 0,  -- 漩涡冷却（拉拽英雄靠近）
         enraged = false,
     },
-    -- 第四章Boss: 沙丘巨虫
+    -- 第四章Boss: 沙丘巨虫（最终Boss，强度全面高于第三章珊瑚守卫）
     sand_worm = {
         team = "enemy", enemyType = "boss",
-        hp = 820, maxHp = 820,
-        atk = 26,
+        hp = 1180, maxHp = 1180,   -- 820→1180（最终Boss，明显高于珊瑚守卫650）
+        atk = 38,                  -- 26→38（高于珊瑚守卫30，各技能伤害随之提升）
         attackRange = 1,
         attackLabel = "吞噬",
         name = "沙丘巨虫",
@@ -415,12 +422,93 @@ BattleData.BOSS_TEMPLATES = {
         bossType = "sand_worm",
         phase = 1,
         shieldHp = 0,
-        shieldMax = 70,
+        shieldMax = 130,           -- 70→130（高于珊瑚守卫110）
         segments = 7,           -- 总节数（含头）
         burrowCooldown = 0,     -- 钻地冷却
         tailWhipCooldown = 0,   -- 尾部甩飞冷却
         -- sandstormCooldown 已移除（巨岩投掷技能已删除）
         sandFuryCooldown = 4,   -- 呼唤风沙冷却（首次延迟4回合）
+        enraged = false,
+    },
+
+    -- ====== 第五章: 永冻绝境 ======
+    frost_grunt = {
+        team = "enemy", enemyType = "frost_grunt",
+        hp = 48, maxHp = 48,
+        atk = 24,
+        attackRange = 1,
+        attackLabel = "冰锥",
+        name = "冰锥兵",
+        iceImmune = true,      -- 免疫冰面滑行推动
+        deathSpawnIce = true,  -- 死亡时生成冰面格
+    },
+    aurora_jelly = {
+        team = "enemy", enemyType = "aurora_jelly",
+        hp = 22, maxHp = 22,
+        atk = 0,
+        attackRange = 1,
+        attackLabel = "魅惑",
+        name = "极光水母",
+        charmRange = 2,        -- 魅惑光环范围
+        iceSpeedBoost = true,  -- 冰面上移速×2
+    },
+    frost_barracuda = {
+        team = "enemy", enemyType = "frost_barracuda",
+        hp = 30, maxHp = 30,
+        atk = 28,
+        attackRange = 1,
+        attackLabel = "冲刺",
+        name = "寒冰梭鱼",
+        chargeRange = 4,       -- 冲刺攻击距离
+        iceChargeUnlimited = true, -- 冰面上冲刺无距离限制
+    },
+    ice_crystal = {
+        team = "enemy", enemyType = "ice_crystal",
+        hp = 60, maxHp = 60,
+        atk = 0,
+        attackRange = 3,
+        attackLabel = "冻结射线",
+        name = "冰晶体",
+        isStationary = true,   -- 不移动
+        freezeRayCooldown = 0, -- 冻结射线冷却（每2回合射一次）
+        freezeDuration = 1,    -- 冻结英雄回合数
+    },
+    blizzard_hawk = {
+        team = "enemy", enemyType = "blizzard_hawk",
+        hp = 26, maxHp = 26,
+        atk = 20,
+        attackRange = 3,
+        attackLabel = "暴风吐息",
+        name = "暴风雪鹰",
+        fleeRange = 1,         -- 英雄靠近1格时逃跑
+        iceTrailAttack = true, -- 攻击路径铺冰面
+    },
+    frost_bear = {
+        team = "enemy", enemyType = "frost_bear",
+        hp = 90, maxHp = 90,
+        atk = 30,
+        attackRange = 1,
+        attackLabel = "冰面推击",
+        name = "寒霜巨熊",
+        pushDistance = 3,      -- 推飞英雄距离
+        iceImmune = true,      -- 免疫冰面滑行推动
+    },
+    -- 第五章Boss: 永冻之王
+    frost_king = {
+        team = "enemy", enemyType = "boss",
+        hp = 1600, maxHp = 1600,
+        atk = 42,
+        attackRange = 2,
+        attackLabel = "寒冰投枪",
+        name = "永冻之王",
+        isBoss = true,
+        bossType = "frost_king",
+        phase = 1,
+        shieldHp = 0,
+        shieldMax = 170,
+        iceFieldCooldown = 0,    -- 冰封领域冷却
+        iceArmorCooldown = 0,    -- 冰甲凝聚冷却
+        iceSpearCooldown = 0,    -- 寒冰投枪冷却
         enraged = false,
     },
 }
@@ -430,6 +518,7 @@ BattleData.CHAPTER_BOSS = {
     [2] = "lava_lord",
     [3] = "coral_guardian",
     [4] = "sand_worm",
+    [5] = "frost_king",
 }
 
 BattleData.BOSS_AURA = {

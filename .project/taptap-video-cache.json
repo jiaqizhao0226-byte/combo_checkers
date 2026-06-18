@@ -18,6 +18,12 @@
       "etag": "\"6a156e0d-26b6f9\"",
       "last_modified": "Tue, 26 May 2026 09:55:25 GMT",
       "content_length": 2537209
+    },
+    {
+      "source": "./assets/video/cgt-20260615152127-fv7c7_video.mp4",
+      "source_type": "local",
+      "video_id": 5714754,
+      "sha256": "e0ea84b8824f4119b06a5ea95fb5ba7d663ffc06ec56cbf9334a1f91da8e9c87"
     }
   ]
 }

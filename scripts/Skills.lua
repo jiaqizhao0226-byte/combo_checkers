@@ -38,7 +38,7 @@ Skills.SKILLS = {
         maxLevel = 5,
         rarity = {1, 1, 2, 3, 4},  -- Lv3范围扩大=稀有, Lv4全场AOE=史诗, Lv5碎甲=传说
         desc = function(lv)
-            local dmg = 6 + lv * 2          -- Lv1=8, Lv2=10, Lv3=12, Lv4=14, Lv5=16
+            local dmg = 10 + lv * 5         -- Lv1=15, Lv2=20, Lv3=25, Lv4=30, Lv5=35
             local range = lv >= 3 and 2 or 1
             local extra = ""
             if lv >= 4 then extra = extra .. "；连跳>=3全场AOE" end
@@ -109,7 +109,7 @@ Skills.SKILLS = {
         rarity = {1, 1, 2, 2, 3},  -- 控制技能，最高史诗
         desc = function(lv)
             local dmg = 5 + lv * 5           -- Lv1=10, Lv2=15, ..., Lv5=30
-            local dur = 3 + math.floor(lv / 2) -- Lv1=3, Lv2=4, Lv3=4, Lv4=5, Lv5=5
+            local dur = 4 + lv               -- Lv1=5, Lv2=6, Lv3=7, Lv4=8, Lv5=9
             local extra = ""
             if lv >= 3 then extra = extra .. "；减速1回合" end
             if lv >= 5 then extra = extra .. "；踩刺敌人受全伤害+20%" end
@@ -141,10 +141,10 @@ Skills.SKILLS = {
         maxLevel = 5,
         rarity = {1, 1, 2, 3, 4},  -- Lv4连跳上限=史诗, Lv5极限倍率=传说
         desc = function(lv)
-            local bonus = 50 + lv * 30       -- Lv1=80%, ..., Lv5=200%
+            local bonus = 50 + lv * 22       -- Lv1=72%, ..., Lv5=160%
             local extra = ""
-            if lv >= 4 then extra = extra .. "；连跳加成上限提升至+200%（最高x3）" end
-            if lv >= 5 then extra = extra .. "；重击加成提升至+200%（即基伤x3）" end
+            if lv >= 4 then extra = extra .. "；连跳加成上限提升（最高x3）" end
+            if lv >= 5 then extra = extra .. "；满级重击加成达+160%" end
             return string.format("连续跳杀>=3次时，伤害提升%d%%%s", bonus, extra)
         end,
     },
@@ -155,6 +155,7 @@ Skills.SKILLS = {
         icon = "skill_split_shot",
         color = {80, 200, 220},
         maxLevel = 5,
+        rarity = {1, 1, 2, 2, 3},  -- Lv3穿透=稀有, Lv5再分裂=史诗
         desc = function(lv)
             local count = 1 + math.floor(lv / 2) -- Lv1=1, Lv2=2, Lv3=2, Lv4=3, Lv5=3
             local dmg = 5 + lv * 5               -- Lv1=10, Lv2=15, ..., Lv5=30
@@ -171,8 +172,9 @@ Skills.SKILLS = {
         icon = "skill_hunter_mark",
         color = {255, 120, 60},
         maxLevel = 5,
+        rarity = {1, 1, 2, 3, 4},  -- Lv3回复=稀有, Lv4双标记=史诗, Lv5击杀回复=传说
         desc = function(lv)
-            local bonus = 20 + lv * 7        -- Lv1=+27%, Lv2=+34%, ..., Lv5=+55%
+            local bonus = 20 + lv * 5        -- Lv1=+25%, Lv2=+30%, ..., Lv5=+45%
             local marks = lv >= 4 and 2 or 1
             local extra = ""
             if lv >= 3 then extra = extra .. "；印记敌人被击回复5HP" end
@@ -187,6 +189,7 @@ Skills.SKILLS = {
         icon = "skill_combo_shield",
         color = {60, 160, 220},
         maxLevel = 5,
+        rarity = {1, 1, 2, 2, 3},  -- Lv3反弹=稀有, Lv5护盾翻倍=史诗
         desc = function(lv)
             local perStack = 2 + lv * 2       -- Lv1=4, Lv2=6, Lv3=8, Lv4=10, Lv5=12
             local shieldCap = 10 + lv * 10    -- Lv1=20, Lv2=30, Lv3=40, Lv4=50, Lv5=60
@@ -202,6 +205,7 @@ Skills.SKILLS = {
         icon = "skill_glass_cannon",
         color = {255, 100, 50},
         maxLevel = 5,
+        rarity = {1, 1, 2, 3, 3},  -- 高风险高回报，线性强化
         desc = function(lv)
             local hpReduce = 10 + lv * 5     -- Lv1=-15%, Lv2=-20%, ..., Lv5=-35%
             local atkBoost = 15 + lv * 5     -- Lv1=+20%, Lv2=+25%, ..., Lv5=+40%
@@ -215,6 +219,7 @@ Skills.SKILLS = {
         icon = "skill_dawn_herald",
         color = {255, 200, 80},
         maxLevel = 1,
+        rarity = {3},  -- 免死保命，史诗级
         desc = function(lv)
             return "首次受到致命伤害时不会死亡，恢复至30%HP（每次冒险仅一次）"
         end,
@@ -226,9 +231,14 @@ Skills.SKILLS = {
         icon = "skill_step_strike",
         color = {220, 80, 120},
         maxLevel = 5,
+        rarity = {1, 1, 2, 3, 4},  -- Lv5无条件斩杀=传说
         desc = function(lv)
-            local dmg = 5 + lv * 5             -- Lv1=10, Lv2=15, Lv3=20, Lv4=25, Lv5=30
-            return string.format("每次移动时对1个相邻敌人造成%d点近战伤害", dmg)
+            local dmg = 5 + lv * 5             -- 保底伤害
+            local execPct = math.min(100, 30 + lv * 14)  -- Lv1=44%,Lv2=58%,Lv3=72%,Lv4=86%,Lv5=100%
+            if lv >= 5 then
+                return "每次移动时直接斩杀1个相邻敌人(Boss除外，Boss受30伤害)"
+            end
+            return string.format("每次移动时斩杀血量<=%d%%的相邻敌人；未达线则造成%d近战伤害(Boss除外)", execPct, dmg)
         end,
     },
 
@@ -238,6 +248,7 @@ Skills.SKILLS = {
         icon = "skill_collector",
         color = {180, 120, 200},
         maxLevel = 5,
+        rarity = {1, 1, 2, 2, 3},  -- 残血额外伤害，收割定位
         desc = function(lv)
             local threshold = 30 + lv * 5    -- Lv1=<35%, Lv2=<40%, ..., Lv5=<55%
             local bonus = lv == 5 and 50 or (20 + lv * 10)  -- Lv1=+30%, Lv2=+40%, Lv3=+50%, Lv4=+60%, Lv5=+50%(上限)
@@ -278,11 +289,11 @@ Skills.SKILLS = {
             local extra = ""
             if lv >= 3 then extra = extra .. "；棋步跳伤害+20%" end
             if lv >= 5 then extra = extra .. "；棋步跳无视防御" end
-            return string.format("每%d次跳跃后，下一跳可到达任意位置%s", interval, extra)
+            return string.format("每%d轮行动后，下一跳可跳杀全图任意敌人%s", interval, extra)
         end,
     },
 
-    -- 19. 引力 - 落地拉近周围敌人
+    -- 19. 引力 - 落地拉1个敌人到身边
     gravity_pull = {
         name = "引力",
         icon = "skill_gravity_pull",
@@ -291,11 +302,76 @@ Skills.SKILLS = {
         rarity = {1, 1, 2, 3, 4},
         desc = function(lv)
             local range = lv >= 3 and 3 or 2
+            local stunTurns = lv >= 5 and 3 or (lv >= 4 and 2 or 1)
+            local extra = string.format("；眩晕%d回合", stunTurns)
+            if lv >= 3 then extra = extra .. "；感应范围3格" end
+            if lv >= 4 then extra = extra .. "；拉动附带10伤害" end
+            return string.format("落地后将%d格内最近的1个敌人拉到身边%s", range, extra)
+        end,
+    },
+
+    -- 20. 飞镖风暴 - 连跳飞镖数量增加
+    dart_storm = {
+        name = "飞镖风暴",
+        icon = "skill_dart_storm",
+        color = {255, 160, 50},
+        maxLevel = 5,
+        rarity = {1, 1, 2, 3, 4},
+        desc = function(lv)
+            local count = 1 + lv                -- Lv1=2, Lv2=3, ..., Lv5=6
+            local dmg = 30 + lv * 5             -- Lv1=35, Lv2=40, ..., Lv5=55
             local extra = ""
-            if lv >= 3 then extra = extra .. "；范围扩大至3格" end
-            if lv >= 4 then extra = extra .. "；被拉动敌人受5伤" end
-            if lv >= 5 then extra = extra .. "；拉到身边的敌人眩晕1回合" end
-            return string.format("跳跃落地后，%d格内敌人被拉近1格%s", range, extra)
+            if lv >= 3 then extra = extra .. "；飞镖穿透(可命中同一敌人多次)" end
+            if lv >= 5 then extra = extra .. "；飞镖附带灼烧(每回合6伤害,2回合)" end
+            return string.format("2连跳飞镖变为%d枚，首枚%d伤害，后续飞镖递减%s", count, dmg, extra)
+        end,
+    },
+
+    -- 21. 连锁释放 - 技能多次触发
+    multi_cast = {
+        name = "连锁释放",
+        icon = "skill_multi_cast",
+        color = {180, 100, 255},
+        maxLevel = 5,
+        rarity = {1, 2, 2, 3, 4},
+        desc = function(lv)
+            local chance = 15 + lv * 8          -- Lv1=23%, Lv2=31%, ..., Lv5=55%
+            local extra = ""
+            if lv >= 5 then extra = "；可触发三重释放(12%)" end
+            return string.format("落地后%d%%概率额外重演一次落地效果(震地落AOE+地刺)%s", chance, extra)
+        end,
+    },
+
+    -- 22. 战意增幅 - 全技能伤害加成
+    damage_amp = {
+        name = "战意增幅",
+        icon = "skill_damage_amp",
+        color = {255, 80, 80},
+        maxLevel = 5,
+        rarity = {1, 1, 2, 3, 4},
+        desc = function(lv)
+            local pct = 5 + lv * 3              -- Lv1=8%, Lv2=11%, ..., Lv5=20%
+            local extra = ""
+            if lv >= 3 then extra = extra .. "；连跳>=4时额外+8%" end
+            if lv >= 5 then extra = extra .. "；击杀时叠加(最多+12%,战斗结束重置)" end
+            return string.format("所有技能伤害提升%d%%%s", pct, extra)
+        end,
+    },
+
+    -- 23. 寂灭之路 - 连跳路径沉默怪物
+    silence_path = {
+        name = "寂灭之路",
+        icon = "skill_silence_path",
+        color = {100, 60, 160},
+        maxLevel = 5,
+        rarity = {1, 2, 2, 3, 4},
+        desc = function(lv)
+            local turns = 1 + math.floor(lv / 2) -- Lv1=1, Lv2=2, Lv3=2, Lv4=3, Lv5=3
+            local range = lv >= 4 and 2 or 1     -- Lv4+: 路径周围2格
+            local extra = ""
+            if lv >= 3 then extra = extra .. "；被沉默敌人受伤+15%" end
+            if lv >= 5 then extra = extra .. "；沉默结束时造成20固定伤害" end
+            return string.format("连跳经过的敌人被沉默%d回合(无法使用技能)，影响范围%d格%s", turns, range, extra)
         end,
     },
 }

@@ -11,7 +11,7 @@ local MenuSystem = require "MenuSystem"
 local MenuPages = require "MenuPages"
 local AM = require "AudioManager"
 local Battle = require "Battle"
--- local TestPanel = require "TestPanel"  -- 发布时关闭
+local TestPanel = require "TestPanel"  -- 测试中
 
 -- ============================================================================
 -- 注册模块间回调（解耦 UI 按钮 → 流程函数）
@@ -178,7 +178,7 @@ function Start()
     TurnFlow.UploadProgress(G.playerData)
 
     G.selectedLevel = G.highestLevel
-    G.selectedChapter = math.min(4, math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER))
+    G.selectedChapter = math.min(5, math.ceil(G.highestLevel / Battle.LEVELS_PER_CHAPTER))
 
     SubscribeToEvent("Update", "HandleUpdate")
     SubscribeToEvent("KeyDown", "HandleKeyDown")
@@ -232,7 +232,7 @@ end
 ---@param eventData KeyDownEventData
 function HandleKeyDown(eventType, eventData)
     local key = eventData["Key"]:GetInt()
-    -- TestPanel 入口已关闭（发布模式）
+    if key == KEY_T then TestPanel.Show() return end  -- 测试中
     if G.gamePhase == "MENU" then return end
     TurnFlow.HandleKeyDown(key)
 end
