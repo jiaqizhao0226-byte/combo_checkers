@@ -349,6 +349,7 @@ function MenuSystem.RebuildMenuPage(tabId)
             [2] = { from = {140, 60, 40, 220},  to = {80, 30, 20, 240},  pressed = {190, 90, 60, 240},  border = {255, 130, 80, 100},  glow = {220, 90, 40, 50} },
             [3] = { from = {50, 130, 100, 220}, to = {25, 70, 55, 240},  pressed = {80, 180, 140, 240}, border = {120, 220, 180, 100}, glow = {80, 200, 150, 50} },
             [4] = { from = {140, 110, 40, 220}, to = {80, 60, 20, 240},  pressed = {190, 150, 60, 240}, border = {220, 180, 80, 100},  glow = {200, 160, 50, 50} },
+            [5] = { from = {80, 110, 140, 220}, to = {40, 60, 80, 240},  pressed = {120, 160, 200, 240}, border = {140, 190, 230, 100}, glow = {100, 160, 210, 50} },
         }
         local at = arrowThemes[G.selectedChapter] or arrowThemes[1]
 

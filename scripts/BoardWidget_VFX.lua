@@ -311,6 +311,220 @@ function BoardWidget_VFX.Render(ctx)
                 end
             end
 
+        elseif fx.type == "frost_barracuda_charge" then
+            -- 寒冰梭鱼：沿冰面高速直线突刺的蓝白轨迹
+            local x1, y1 = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
+            local x2, y2 = HexGrid.HexToPixel(fx.toCol, fx.toRow, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local alpha = math.floor(fade * 230)
+            if alpha > 0 then
+                local dx, dy = x2 - x1, y2 - y1
+                local len = math.sqrt(dx * dx + dy * dy)
+                if len < 1 then len = 1 end
+                local nx, ny = dx / len, dy / len
+                local px, py = -ny, nx
+                local headT = math.min(1.0, progress * 1.35)
+                local hx = x1 + dx * headT
+                local hy = y1 + dy * headT
+                local tailT = math.max(0, headT - 0.45)
+                local tx = x1 + dx * tailT
+                local ty = y1 + dy * tailT
+
+                -- 主冰蓝拖尾
+                for layer = 1, 3 do
+                    local w = ({12, 7, 3})[layer]
+                    local a = math.floor(alpha * ({0.22, 0.48, 0.95})[layer])
+                    local r = ({90, 150, 235})[layer]
+                    local g = ({190, 230, 255})[layer]
+                    local b = 255
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, tx, ty)
+                    nvgLineTo(nvg, hx, hy)
+                    nvgStrokeColor(nvg, nvgRGBA(r, g, b, a))
+                    nvgStrokeWidth(nvg, w * fade)
+                    nvgLineCap(nvg, NVG_ROUND)
+                    nvgStroke(nvg)
+                end
+
+                -- 两侧速度线
+                for i = 1, 4 do
+                    local side = (i % 2 == 0) and 1 or -1
+                    local offset = side * hexSize * (0.11 + i * 0.035)
+                    local back = hexSize * (0.25 + i * 0.12)
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, hx - nx * back + px * offset, hy - ny * back + py * offset)
+                    nvgLineTo(nvg, hx - nx * back * 0.25 + px * offset * 0.45, hy - ny * back * 0.25 + py * offset * 0.45)
+                    nvgStrokeColor(nvg, nvgRGBA(210, 250, 255, math.floor(alpha * 0.55)))
+                    nvgStrokeWidth(nvg, 1.4 * fade)
+                    nvgStroke(nvg)
+                end
+
+                -- 冲刺头部闪光
+                local glowR = hexSize * (0.22 + 0.16 * math.sin(progress * math.pi))
+                local glowPaint = nvgRadialGradient(nvg, hx, hy, 0, glowR,
+                    nvgRGBA(245, 255, 255, math.floor(alpha * 0.95)),
+                    nvgRGBA(80, 190, 255, 0))
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, hx, hy, glowR)
+                nvgFillPaint(nvg, glowPaint)
+                nvgFill(nvg)
+            end
+
+        elseif fx.type == "ice_block_projectile" then
+            -- 冰块炮弹：真正画出冰块沿路径高速飞出，而不是只有冰面轨迹
+            local x1, y1 = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
+            local x2, y2 = HexGrid.HexToPixel(fx.toCol, fx.toRow, hexSize, ox, oy)
+            local flyT = 1.0 - (1.0 - progress) * (1.0 - progress)
+            local cx = x1 + (x2 - x1) * flyT
+            local cy = y1 + (y2 - y1) * flyT
+            local dx, dy = x2 - x1, y2 - y1
+            local len = math.sqrt(dx * dx + dy * dy)
+            if len < 1 then len = 1 end
+            local nx, ny = dx / len, dy / len
+            local px, py = -ny, nx
+            local fade = math.max(0, 1.0 - math.max(0, progress - 0.82) / 0.18)
+            local alpha = math.floor(255 * fade)
+            local spin = progress * math.pi * 5.5
+            local wobble = math.sin(progress * math.pi * 3.0) * hexSize * 0.035
+            cx = cx + px * wobble
+            cy = cy + py * wobble
+
+            -- 冰蓝拖尾，表现发射速度
+            local tailLen = math.min(len * 0.5, hexSize * (1.2 + (fx.power or 1) * 0.15))
+            for layer = 1, 3 do
+                local w = ({13, 7, 3})[layer]
+                local a = math.floor(alpha * ({0.18, 0.38, 0.82})[layer])
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, cx - nx * tailLen, cy - ny * tailLen)
+                nvgLineTo(nvg, cx, cy)
+                nvgStrokeColor(nvg, nvgRGBA(120 + layer * 35, 215 + layer * 10, 255, a))
+                nvgStrokeWidth(nvg, w * fade)
+                nvgLineCap(nvg, NVG_ROUND)
+                nvgStroke(nvg)
+            end
+
+            -- 路径两侧碎冰粒子
+            for i = 1, 8 do
+                local p = math.max(0, flyT - i * 0.055)
+                local sx = x1 + dx * p + px * math.sin(i * 2.1 + progress * 8) * hexSize * 0.12
+                local sy = y1 + dy * p + py * math.sin(i * 1.7 + progress * 7) * hexSize * 0.12
+                local sAlpha = math.floor(alpha * (0.75 - i * 0.055))
+                if sAlpha > 0 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, sx, sy, hexSize * (0.025 + (i % 3) * 0.01))
+                    nvgFillColor(nvg, nvgRGBA(210, 250, 255, sAlpha))
+                    nvgFill(nvg)
+                end
+            end
+
+            -- 发光底盘
+            local glowR = hexSize * 0.55 * fade
+            local glow = nvgRadialGradient(nvg, cx, cy, 0, glowR,
+                nvgRGBA(210, 250, 255, math.floor(alpha * 0.55)),
+                nvgRGBA(80, 180, 255, 0))
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, cy, glowR)
+            nvgFillPaint(nvg, glow)
+            nvgFill(nvg)
+
+            -- 不规则六边冰块本体，和棋盘冰块造型保持一致
+            local rs = hexSize * 0.42 * (0.96 + 0.08 * math.sin(progress * math.pi))
+            local rawPts = {
+                { -0.10, -0.82 }, { 0.70, -0.42 }, { 0.78, 0.26 },
+                { 0.14, 0.78 }, { -0.70, 0.44 }, { -0.76, -0.24 },
+            }
+            local pts = {}
+            local cs, sn = math.cos(spin), math.sin(spin)
+            for i, p in ipairs(rawPts) do
+                local rx = p[1] * rs
+                local ry = p[2] * rs
+                pts[i] = { cx + rx * cs - ry * sn, cy + rx * sn + ry * cs }
+            end
+            nvgBeginPath(nvg)
+            for i, p in ipairs(pts) do
+                if i == 1 then nvgMoveTo(nvg, p[1], p[2]) else nvgLineTo(nvg, p[1], p[2]) end
+            end
+            nvgClosePath(nvg)
+            nvgFillPaint(nvg, nvgLinearGradient(nvg, cx, cy - rs, cx, cy + rs,
+                nvgRGBA(245, 255, 255, math.floor(alpha * 0.95)),
+                nvgRGBA(65, 180, 245, math.floor(alpha * 0.88))))
+            nvgFill(nvg)
+            nvgBeginPath(nvg)
+            for i, p in ipairs(pts) do
+                if i == 1 then nvgMoveTo(nvg, p[1], p[2]) else nvgLineTo(nvg, p[1], p[2]) end
+            end
+            nvgClosePath(nvg)
+            nvgStrokeColor(nvg, nvgRGBA(235, 255, 255, alpha))
+            nvgStrokeWidth(nvg, 2.1 * fade)
+            nvgStroke(nvg)
+
+            -- 命中终点预爆光，动画末端更有砸中感
+            if progress > 0.65 then
+                local hitP = (progress - 0.65) / 0.35
+                local hx, hy = x2, y2
+                local r = hexSize * (0.25 + hitP * 0.7)
+                local a = math.floor((1.0 - hitP) * 170)
+                local hitGlow = nvgRadialGradient(nvg, hx, hy, 0, r,
+                    nvgRGBA(235, 255, 255, a), nvgRGBA(80, 190, 255, 0))
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, hx, hy, r)
+                nvgFillPaint(nvg, hitGlow)
+                nvgFill(nvg)
+            end
+
+        elseif fx.type == "ice_crash" then
+            -- 冰面撞墙：蓝白冰裂纹 + 冰晶碎片，power 由滑行距离决定强度
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local fade = math.max(0, 1.0 - progress)
+            local power = math.min(7, math.max(1, fx.power or 1))
+            local maxR = hexSize * (1.45 + power * 0.18)
+            local alpha = math.floor(fade * 230)
+            if alpha > 0 then
+                if progress < 0.28 then
+                    local flashP = progress / 0.28
+                    local flashR = hexSize * (0.55 + flashP * 0.95)
+                    local flashPaint = nvgRadialGradient(nvg, cx, cy, 0, flashR,
+                        nvgRGBA(235, 255, 255, math.floor((1.0 - flashP) * 210)),
+                        nvgRGBA(90, 190, 255, 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, flashR)
+                    nvgFillPaint(nvg, flashPaint)
+                    nvgFill(nvg)
+                end
+
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, cx, cy, maxR * progress)
+                nvgStrokeColor(nvg, nvgRGBA(180, 235, 255, math.floor(alpha * 0.85)))
+                nvgStrokeWidth(nvg, math.max(1.0, 4.5 * fade))
+                nvgStroke(nvg)
+
+                local shardCount = 7 + math.floor(power)
+                for i = 1, shardCount do
+                    local angle = (i / shardCount) * math.pi * 2 + 0.35 * math.sin(i * 1.7)
+                    local len = maxR * (0.35 + 0.55 * progress) * (0.75 + (i % 3) * 0.12)
+                    local sx = cx + math.cos(angle) * hexSize * 0.18
+                    local sy = cy + math.sin(angle) * hexSize * 0.18
+                    local ex = cx + math.cos(angle) * len
+                    local ey = cy + math.sin(angle) * len
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, sx, sy)
+                    nvgLineTo(nvg, ex, ey)
+                    nvgStrokeColor(nvg, nvgRGBA(215, 250, 255, math.floor(alpha * 0.9)))
+                    nvgStrokeWidth(nvg, math.max(1.0, (2.3 - progress) * fade))
+                    nvgStroke(nvg)
+
+                    local shardX = cx + math.cos(angle) * len * 0.82
+                    local shardY = cy + math.sin(angle) * len * 0.82 - progress * hexSize * 0.18
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, shardX, shardY - 4 * fade)
+                    nvgLineTo(nvg, shardX + 5 * fade, shardY + 3 * fade)
+                    nvgLineTo(nvg, shardX - 4 * fade, shardY + 4 * fade)
+                    nvgClosePath(nvg)
+                    nvgFillColor(nvg, nvgRGBA(170, 230, 255, math.floor(alpha * 0.75)))
+                    nvgFill(nvg)
+                end
+            end
+
         elseif fx.type == "quake_land" then
             -- 震地落: 范围六角格高亮 + 中心冲击 + 命中格伤害数字
             local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
@@ -3733,6 +3947,144 @@ function BoardWidget_VFX.Render(ctx)
                 nvgStroke(nvg)
             end
 
+        elseif fx.type == "step_strike_slash" then
+            -- ═══ 踏步斩·斩杀：大弧形刀光 + 速度线 + 斩击十字闪 ═══
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local ox2, oy2 = cx, cy
+            if fx.fromCol and fx.fromRow then
+                ox2, oy2 = HexGrid.HexToPixel(fx.fromCol, fx.fromRow, hexSize, ox, oy)
+            end
+            local dx = cx - ox2
+            local dy = cy - oy2
+            local len = math.sqrt(dx * dx + dy * dy)
+            if len < 1 then len = 1 end
+            local nx2, ny2 = dx / len, dy / len
+            local px2, py2 = -ny2, nx2  -- 法线
+
+            local isExec = fx.isExecute
+            -- 主色：斩杀用金红，普通用白粉
+            local mr, mg, mb = 255, 200, 50
+            local hr, hg, hb = 255, 255, 200
+            if not isExec then mr, mg, mb = 255, 100, 180; hr, hg, hb = 255, 220, 240 end
+
+            -- 阶段：0~0.3 快速展开，0.3~1.0 消散
+            local appear = math.min(1.0, progress / 0.25)
+            local fadeOut = math.max(0.0, (progress - 0.25) / 0.75)
+            local alpha = math.floor((1.0 - fadeOut) * 255)
+
+            if alpha > 5 then
+                -- 大弧形斩击（从侧面划过目标，贝塞尔曲线）
+                local slashLen = hexSize * 2.0 * appear
+                local curveOff = hexSize * 0.8
+                local startX = cx - px2 * slashLen * 0.5 - nx2 * hexSize * 0.2
+                local startY = cy - py2 * slashLen * 0.5 - ny2 * hexSize * 0.2
+                local endX = cx + px2 * slashLen * 0.5 + nx2 * hexSize * 0.2
+                local endY = cy + py2 * slashLen * 0.5 + ny2 * hexSize * 0.2
+                local ctrlX = cx + nx2 * curveOff
+                local ctrlY = cy + ny2 * curveOff
+
+                -- 主弧线（粗）
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, startX, startY)
+                nvgQuadTo(nvg, ctrlX, ctrlY, endX, endY)
+                nvgStrokeColor(nvg, nvgRGBA(mr, mg, mb, alpha))
+                nvgStrokeWidth(nvg, (9.0 - fadeOut * 5.0))
+                nvgLineCap(nvg, NVG_ROUND)
+                nvgStroke(nvg)
+
+                -- 刀光残影：多道平行弧线，形成“刀光剑影”层次
+                for i = 1, 4 do
+                    local side = (i % 2 == 0) and 1 or -1
+                    local layer = math.ceil(i / 2)
+                    local off = side * hexSize * (0.10 + layer * 0.13)
+                    local layerAlpha = math.floor(alpha * (0.5 - layer * 0.12))
+                    if layerAlpha > 8 then
+                        nvgBeginPath(nvg)
+                        nvgMoveTo(nvg, startX + px2 * off - nx2 * hexSize * 0.05 * layer, startY + py2 * off - ny2 * hexSize * 0.05 * layer)
+                        nvgQuadTo(nvg,
+                            ctrlX + px2 * off * 0.55 + nx2 * hexSize * 0.08 * layer,
+                            ctrlY + py2 * off * 0.55 + ny2 * hexSize * 0.08 * layer,
+                            endX + px2 * off + nx2 * hexSize * 0.10 * layer,
+                            endY + py2 * off + ny2 * hexSize * 0.10 * layer)
+                        nvgStrokeColor(nvg, nvgRGBA(hr, hg, hb, layerAlpha))
+                        nvgStrokeWidth(nvg, math.max(1.0, (4.2 - layer * 0.8) * (1.0 - fadeOut)))
+                        nvgLineCap(nvg, NVG_ROUND)
+                        nvgStroke(nvg)
+                    end
+                end
+
+                -- 高光弧线（细，偏白）
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, startX + px2 * 2, startY + py2 * 2)
+                nvgQuadTo(nvg, ctrlX + nx2 * 3, ctrlY + ny2 * 3, endX + px2 * 2, endY + py2 * 2)
+                nvgStrokeColor(nvg, nvgRGBA(hr, hg, hb, math.floor(alpha * 0.7)))
+                nvgStrokeWidth(nvg, (3.0 - fadeOut * 2.0))
+                nvgLineCap(nvg, NVG_ROUND)
+                nvgStroke(nvg)
+
+                -- 速度线（从英雄方向射出的平行短线）
+                if progress < 0.5 then
+                    local spdA = math.floor((1.0 - progress / 0.5) * 160)
+                    for i = 1, 5 do
+                        local offset = (i - 3) * hexSize * 0.2
+                        local sLen = hexSize * (0.3 + (i % 3) * 0.15) * appear
+                        local sx = cx - nx2 * hexSize * 0.8 + px2 * offset
+                        local sy = cy - ny2 * hexSize * 0.8 + py2 * offset
+                        nvgBeginPath(nvg)
+                        nvgMoveTo(nvg, sx, sy)
+                        nvgLineTo(nvg, sx + nx2 * sLen, sy + ny2 * sLen)
+                        nvgStrokeColor(nvg, nvgRGBA(hr, hg, hb, spdA))
+                        nvgStrokeWidth(nvg, 1.5)
+                        nvgStroke(nvg)
+                    end
+                end
+
+                -- 斩击命中闪光（中心十字爆）
+                if progress < 0.3 then
+                    local flashT = progress / 0.3
+                    local flashA = math.floor((1.0 - flashT) * 240)
+                    local crossLen = hexSize * (0.4 + flashT * 0.3)
+                    -- 十字
+                    nvgStrokeColor(nvg, nvgRGBA(255, 255, 220, flashA))
+                    nvgStrokeWidth(nvg, 3.0 * (1.0 - flashT))
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx - crossLen, cy)
+                    nvgLineTo(nvg, cx + crossLen, cy)
+                    nvgStroke(nvg)
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, cx, cy - crossLen * 0.8)
+                    nvgLineTo(nvg, cx, cy + crossLen * 0.8)
+                    nvgStroke(nvg)
+                    -- 中心白光
+                    local flashR = hexSize * 0.3 * (1.0 - flashT)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, flashR)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, flashR,
+                        nvgRGBA(255, 255, 255, flashA),
+                        nvgRGBA(mr, mg, mb, 0)))
+                    nvgFill(nvg)
+                end
+
+                -- 斩杀时额外：碎片飞散
+                if isExec and progress > 0.2 and progress < 0.7 then
+                    local fragT = (progress - 0.2) / 0.5
+                    local fragA = math.floor((1.0 - fragT) * 180)
+                    for i = 1, 8 do
+                        local angle = (i / 8) * math.pi * 2 + 0.3
+                        local dist = hexSize * fragT * 1.2 * (0.6 + (i % 3) * 0.2)
+                        local fx2 = cx + math.cos(angle) * dist
+                        local fy2 = cy + math.sin(angle) * dist
+                        local fSize = (3.0 - fragT * 2.5)
+                        if fSize > 0.3 then
+                            nvgBeginPath(nvg)
+                            nvgCircle(nvg, fx2, fy2, fSize)
+                            nvgFillColor(nvg, nvgRGBA(mr, mg - 50, mb - 30, fragA))
+                            nvgFill(nvg)
+                        end
+                    end
+                end
+            end
+
         elseif fx.type == "sword_slash" then
             -- ═══ 踏步斩剑光：3道剑气弧线斜劈向目标格，带拖尾消散 ═══
             local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
@@ -3781,11 +4133,13 @@ function BoardWidget_VFX.Render(ctx)
             local alpha = math.floor((1.0 - fadeOut) * 240)
 
             if alpha > 10 then
-                -- 剑光弧：3道平行弧线，宽度不同
+                -- 剑光弧：5道平行弧线，宽度不同，普通踏步斩也有明显刀光剑影
                 local slashDefs = {
-                    { offset = 0,    width = 4.5, lengthScale = 1.0,  alphaFactor = 1.0  },
-                    { offset =  hexSize * 0.18, width = 2.5, lengthScale = 0.85, alphaFactor = 0.7  },
-                    { offset = -hexSize * 0.18, width = 2.0, lengthScale = 0.75, alphaFactor = 0.55 },
+                    { offset = 0,                 width = 7.0, lengthScale = 1.12, alphaFactor = 1.0  },
+                    { offset =  hexSize * 0.18,   width = 4.0, lengthScale = 0.95, alphaFactor = 0.82 },
+                    { offset = -hexSize * 0.18,   width = 3.5, lengthScale = 0.90, alphaFactor = 0.72 },
+                    { offset =  hexSize * 0.36,   width = 2.2, lengthScale = 0.78, alphaFactor = 0.50 },
+                    { offset = -hexSize * 0.36,   width = 2.0, lengthScale = 0.72, alphaFactor = 0.42 },
                 }
                 for _, sd in ipairs(slashDefs) do
                     local slashLen = hexSize * 1.3 * appear * sd.lengthScale
@@ -3811,11 +4165,31 @@ function BoardWidget_VFX.Render(ctx)
                     end
                 end
 
+                -- 交叉短刀影：补一组反方向斜切，让“剑影”更明显
+                local crossAlpha = math.floor(alpha * 0.58)
+                if crossAlpha > 8 then
+                    for i = 1, 3 do
+                        local off = (i - 2) * hexSize * 0.16
+                        local slashLen = hexSize * (0.85 - i * 0.06) * appear
+                        local startX = cx - px * slashLen * 0.55 + nx * off
+                        local startY = cy - py * slashLen * 0.55 + ny * off
+                        local endX = cx + px * slashLen * 0.55 + nx * off
+                        local endY = cy + py * slashLen * 0.55 + ny * off
+                        nvgBeginPath(nvg)
+                        nvgMoveTo(nvg, startX, startY)
+                        nvgLineTo(nvg, endX, endY)
+                        nvgStrokeColor(nvg, nvgRGBA(r2, g2, b2, math.floor(crossAlpha * (0.85 - i * 0.12))))
+                        nvgStrokeWidth(nvg, math.max(1.0, (3.2 - i * 0.45) * (1.0 - fadeOut * 0.4)))
+                        nvgLineCap(nvg, NVG_ROUND)
+                        nvgStroke(nvg)
+                    end
+                end
+
                 -- 命中闪光：目标格中心短暂爆光
                 if progress < 0.35 then
                     local flashT  = progress / 0.35
-                    local flashA  = math.floor((1.0 - flashT) * 200)
-                    local flashR  = hexSize * (0.15 + flashT * 0.45)
+                    local flashA  = math.floor((1.0 - flashT) * 255)
+                    local flashR  = hexSize * (0.22 + flashT * 0.58)
                     nvgBeginPath(nvg)
                     nvgCircle(nvg, cx, cy, flashR)
                     nvgFillPaint(nvg, nvgRadialGradient(nvg,

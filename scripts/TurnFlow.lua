@@ -14,6 +14,7 @@ local GameUI = require "GameUI"
 local MenuSystem = require "MenuSystem"
 local AM = require "AudioManager"
 local WheelPopup = require "WheelPopup"
+local IceMechanic = require "IceMechanic"
 
 local TurnFlow = {}
 
@@ -452,6 +453,9 @@ function TurnFlow.StartPlayerTurn()
     -- 猎手印记: 每回合开始标记血量最高的敌人
     Battle.ApplyHunterMarks(G.battle)
 
+    -- 冰弹陷阱：每回合递减持续时间
+    Battle.TickIceTraps(G.battle)
+
     -- 厄运轮盘：承伤增加倒计时
     if G.battle.doomDamageTakenTurns and G.battle.doomDamageTakenTurns > 0 then
         G.battle.doomDamageTakenTurns = G.battle.doomDamageTakenTurns - 1
@@ -517,6 +521,19 @@ function TurnFlow.StartPlayerTurn()
         return
     end
 
+    -- 第五章冰晶体: 被冻结则跳过本回合玩家行动
+    if G.battle._heroFrozenTurns and G.battle._heroFrozenTurns > 0 then
+        G.battle._heroFrozenTurns = G.battle._heroFrozenTurns - 1
+        Battle.AddFloatingText(G.battle, G.battle.hero.col, G.battle.hero.row,
+            "❄冻结中!", {100, 200, 255, 255}, "combo", 1.5)
+        GameUI.UpdateLog("❄ 被冻结！本回合无法行动…")
+        GameUI.UpdateHUD()
+        if G.btnPanel then G.btnPanel:SetVisible(false) end
+        G.battle.phase = "ENEMY_TURN"
+        G.enemyTurnTimer = 1.2
+        return
+    end
+
     TurnFlow.RefreshHighlightsForSelect()
     GameUI.UpdateHUD()
     if G.btnPanel then G.btnPanel:SetVisible(false) end
@@ -538,6 +555,32 @@ function TurnFlow.RefreshHighlightsForSelect()
         return
     end
     G.validMoves = HexGrid.FindValidMoves(G.battle.board, hero.col, hero.row)
+    if Battle.GetChapterInfo(G.battle.level) == 5 then
+        local moveSet = {}
+        for _, m in ipairs(G.validMoves) do
+            moveSet[m.col .. "," .. m.row] = true
+        end
+        for _, move in ipairs(G.validMoves) do
+            local mx, my, mz = HexGrid.OffsetToCube(move.col, move.row)
+            local hx, hy, hz = HexGrid.OffsetToCube(hero.col, hero.row)
+            local dirX, dirY, dirZ = mx - hx, my - hy, mz - hz
+            local blockCol, blockRow = HexGrid.CubeToOffset(mx + dirX, my + dirY, mz + dirZ)
+            local obs = HexGrid.GetObstacleAt(G.battle.board, blockCol, blockRow)
+            if obs and obs.type == "ice_block" then
+                move.hasIceBlockAhead = true
+            end
+        end
+        for _, n in ipairs(HexGrid.GetNeighbors(hero.col, hero.row)) do
+            local obs = HexGrid.GetObstacleAt(G.battle.board, n.col, n.row)
+            if obs and obs.type == "ice_block" and not moveSet[n.col .. "," .. n.row] then
+                G.validMoves[#G.validMoves + 1] = {
+                    col = n.col,
+                    row = n.row,
+                    isIceBlockPush = true,
+                }
+            end
+        end
+    end
     -- 沉默状态：无法跳跃攻击
     if hero.silencedTurns and hero.silencedTurns > 0 then
         G.validJumps = {}
@@ -845,13 +888,24 @@ function TurnFlow.HandleSelectClick(col, row)
 
     for _, m in ipairs(G.validMoves) do
         if m.col == col and m.row == row then
-            Battle.ExecuteMove(G.battle, col, row, false)
-            -- 移动后检查轮盘道具（ExecuteMove内部的CheckItemPickup可能设置了pendingWheel）
-            if G.battle and G.battle.pendingWheel then
-                log:Write(LOG_INFO, "[Wheel] ShowWheelPopup after ExecuteMove")
-                TurnFlow.ShowWheelPopup()
+            if m.isIceBlockPush then
+                local hero = G.battle.hero
+                local pushed = IceMechanic.PushIceBlock(G.battle, Battle, col, row, hero.col, hero.row)
+                if pushed then
+                    G.validMoves = {}
+                    G.validJumps = {}
+                    GameUI.UpdateHUD()
+                    TurnFlow.EndPlayerTurn()
+                end
             else
-                TurnFlow.EndPlayerTurn()
+                Battle.ExecuteMove(G.battle, col, row, false)
+                -- 移动后检查轮盘道具（ExecuteMove内部的CheckItemPickup可能设置了pendingWheel）
+                if G.battle and G.battle.pendingWheel then
+                    log:Write(LOG_INFO, "[Wheel] ShowWheelPopup after ExecuteMove")
+                    TurnFlow.ShowWheelPopup()
+                else
+                    TurnFlow.EndPlayerTurn()
+                end
             end
             return
         end
@@ -1506,9 +1560,12 @@ function TurnFlow.ShowResult(result)
         return
     end
     -- 教程弹窗阻塞：教程显示期间不允许弹出技能选择/结算界面
-    -- proceedAfterTutorials 会在教程关闭后正确触发 ShowResult
     if G.comboTutorialShowing or G.comboSpotlightShowing then
-
+        return
+    end
+    -- 第五章冰面滑行未结束时延迟弹出（等滑行完再显示）
+    if G.battle._pendingIceSlide or (G.battle.hero and G.battle.hero.isSliding) then
+        G.battle._pendingShowResult = result
         return
     end
     G.battle.phase = result
@@ -1925,8 +1982,11 @@ function TurnFlow.Update(dt)
     -- 连击奖励等待：特效播完后再检查胜负，然后才进入敌人回合
     if G.battle and G.battle.phase == "COMBO_REWARD_WAIT" and G.comboRewardTimer then
         -- 连击教程弹窗期间暂停流程
-        if G.comboTutorialShowing or G.comboSpotlightShowing then
-            -- 不递减计时器，等弹窗/公告关闭后再继续
+        -- 第五章冰面滑行期间也暂停（等滑行结束再继续）
+        local iceSliding = G.battle._pendingIceSlide
+            or (G.battle.hero and G.battle.hero.isSliding)
+        if G.comboTutorialShowing or G.comboSpotlightShowing or iceSliding then
+            -- 不递减计时器，等弹窗/滑行结束后再继续
         else
         G.comboRewardTimer = G.comboRewardTimer - dt
         G.comboRewardElapsed = (G.comboRewardElapsed or 0) + dt

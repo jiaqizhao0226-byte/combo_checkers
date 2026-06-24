@@ -583,6 +583,8 @@ function BattleBoss.BossAct(state, boss)
         result = BattleBoss.BossAct_CoralGuardian(state, boss)
     elseif bt == "sand_worm" then
         result = BattleBoss.BossAct_SandWorm(state, boss)
+    elseif bt == "frost_king" then
+        result = BattleBoss.BossAct_FrostKing(state, boss)
     end
 
     -- 如果本回合释放了技能（非普攻/移动/等待），设置1回合全局冷却
@@ -1831,6 +1833,124 @@ function BattleBoss.ApplyBossDamage(state, boss, damage)
         boss.hp = boss.hp - damage
         boss.tookDamageThisTurn = true  -- 标记本回合受伤（珊瑚守卫被动回血判定用）
     end
+end
+
+-- ============================================================================
+-- 第五章Boss: 永冻之王
+-- 技能: 冰封领域(铺冰) / 冰甲凝聚(护盾) / 寒冰投枪(远程+冻结) / 暴风雪怒(狂暴)
+-- ============================================================================
+
+function BattleBoss.BossAct_FrostKing(state, boss)
+    local hero = state.hero
+    local IceMechanic = require "IceMechanic"
+
+    -- 狂暴判定: HP<30% 进入P2
+    if not boss.enraged and boss.hp <= boss.maxHp * 0.3 then
+        boss.enraged = true
+        boss.phase = 2
+        AddFloatingText(state, boss.col, boss.row,
+            "🔥永冻之怒!", {100, 180, 255, 255}, "combo", 2.0)
+        AddLog(state, "⚠️ 永冻之王进入狂暴状态！攻击力提升，技能冷却缩短！")
+        AM.PlaySFX("boss_enrage", 0.8)
+        state.screenShake = (state.screenShake or 0) + 0.6
+        -- 狂暴立即全场铺冰
+        for r = 1, HexGrid.ROWS do
+            for c = 1, HexGrid.COLS do
+                if HexGrid.InBounds(c, r) and math.random(1, 100) <= 60 then
+                    IceMechanic.AddIceTile(state, c, r)
+                end
+            end
+        end
+        AddVFX(state, "shockwave", { col = boss.col, row = boss.row, duration = 0.8 })
+        return { type = "enrage", enemy = boss }
+    end
+
+    -- 技能优先级: 冰甲(护盾空时) > 冰封领域(冷却好) > 寒冰投枪 > 普攻
+
+    -- === 冰甲凝聚: 护盾为0时生成护盾 ===
+    if (boss.iceArmorCooldown or 0) <= 0 and (boss.shieldHp or 0) <= 0 then
+        local shieldAmt = boss.shieldMax or 170
+        if boss.enraged then shieldAmt = math.floor(shieldAmt * 1.3) end
+        boss.shieldHp = shieldAmt
+        boss.iceArmorCooldown = boss.enraged and 3 or 4
+
+        AddFloatingText(state, boss.col, boss.row,
+            "🛡️冰甲+" .. shieldAmt, {140, 210, 255, 255}, "combo", 1.5)
+        AddLog(state, string.format("永冻之王凝聚冰甲！获得%d点护盾", shieldAmt))
+        AddVFX(state, "shield_cast", { col = boss.col, row = boss.row, duration = 0.6 })
+        AM.PlaySFX("shield_ward", 0.8)
+        return { type = "ice_armor", enemy = boss }
+    end
+
+    -- === 冰封领域: 在英雄周围铺设冰面 ===
+    if (boss.iceFieldCooldown or 0) <= 0 then
+        local placed = 0
+        for r = 1, HexGrid.ROWS do
+            for c = 1, HexGrid.COLS do
+                if HexGrid.InBounds(c, r) then
+                    local distToHero = HexGrid.CubeDistance(c, r, hero.col, hero.row)
+                    if distToHero <= 2 and not IceMechanic.IsIceTile(state, c, r) then
+                        if math.random(1, 100) <= 70 then
+                            IceMechanic.AddIceTile(state, c, r)
+                            placed = placed + 1
+                        end
+                    end
+                end
+            end
+        end
+        boss.iceFieldCooldown = boss.enraged and 2 or 3
+
+        AddFloatingText(state, hero.col, hero.row,
+            "❄冰封领域!", {100, 180, 240, 255}, "combo", 1.5)
+        AddLog(state, string.format("永冻之王释放冰封领域！你脚下%d格被冻结", placed))
+        AM.PlaySFX("hero_damage", 0.5, 1.5)
+        state.screenShake = (state.screenShake or 0) + 0.2
+        return { type = "ice_field", enemy = boss }
+    end
+
+    -- === 寒冰投枪: 远程攻击+冻结1回合 ===
+    if (boss.iceSpearCooldown or 0) <= 0 then
+        local range = boss.attackRange or 2
+        local dist = HexGrid.CubeDistance(boss.col, boss.row, hero.col, hero.row)
+        if dist <= range + 1 then  -- 投枪比普攻远1格
+            local baseDmg = boss.atk
+            if boss.enraged then baseDmg = math.floor(baseDmg * 1.4) end
+            local actualDmg = B().CalcEnemyDmg(baseDmg, hero.def or 0)
+
+            if state.hasShield then
+                actualDmg = math.floor(actualDmg / 2)
+                state.hasShield = false
+                AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+            end
+            if (hero._shield or 0) > 0 and actualDmg > 0 then
+                local absorbed = math.min(hero._shield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                hero._shield = hero._shield - absorbed
+            end
+
+            hero.hp = hero.hp - actualDmg
+            state.hitFlash = 0.3
+            state._heroFrozenTurns = (state._heroFrozenTurns or 0) + 1
+
+            boss.iceSpearCooldown = boss.enraged and 2 or 3
+            AddFloatingText(state, hero.col, hero.row,
+                "🔱投枪-" .. actualDmg .. "+❄冻结", {80, 160, 240, 255}, "hit")
+            AddLog(state, string.format("永冻之王投掷寒冰枪！-%d 并冻结你1回合", actualDmg))
+            AM.PlaySFX("hero_damage")
+            state.screenShake = (state.screenShake or 0) + 0.35
+            AddVFX(state, "freeze_ray", {
+                fromCol = boss.col, fromRow = boss.row,
+                toCol = hero.col, toRow = hero.row,
+                duration = 0.4,
+            })
+            return { type = "ice_spear", enemy = boss, damage = actualDmg }
+        end
+    end
+
+    -- 普攻/移动
+    local atk = BattleBoss.BossBasicAttack(state, boss)
+    if atk then return atk end
+    return BattleBoss.BossMoveToHero(state, boss)
 end
 
 

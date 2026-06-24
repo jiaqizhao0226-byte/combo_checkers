@@ -19,11 +19,12 @@ local BGM_NAMES = {
     boss_lava      = "熔岩领主",
     boss_abyss     = "深渊海妖",
     boss_coral     = "珊瑚守卫",
-    battle_endless = "无尽深渊",
+    battle_endless = "虚空试炼",
+    battle_ice     = "永冻绝境",
 }
 
 -- 可切换的 BGM 列表（按顺序）
-local BGM_KEYS = { "menu", "battle_calm", "battle", "boss", "boss_lava", "boss_abyss", "boss_coral", "battle_endless" }
+local BGM_KEYS = { "menu", "battle_calm", "battle", "battle_ice", "boss", "boss_lava", "boss_abyss", "boss_coral", "battle_endless" }
 
 --- 弹窗引用
 local popupRoot = nil

@@ -112,21 +112,21 @@ local BOARD_THEMES = {
         silClr      = {30, 22, 10, 180},
         silType     = "rocks",
     },
-    [5] = { -- 永冻绝境：冰白蓝主题
-        hexFill     = {38, 55, 78, 255},
-        hexStroke   = {70, 110, 150, 180},
-        hexGlow     = {100, 180, 240},
-        bgTop       = {12, 18, 38, 255},
-        bgBot       = {22, 30, 58, 255},
-        fogColor    = {20, 40, 70, 40},
+    [5] = { -- 永冻绝境：冰面玻璃感（浅灰蓝基底 + 亮描边）
+        hexFill     = {58, 68, 80, 255},
+        hexStroke   = {110, 140, 170, 200},
+        hexGlow     = {150, 190, 220},
+        bgTop       = {30, 35, 45, 255},
+        bgBot       = {40, 48, 58, 255},
+        fogColor    = {35, 42, 52, 40},
         particle    = "snowflake",
-        particleClr = {{200, 230, 255}, {160, 210, 245}, {240, 248, 255}},
-        shaftClr    = {80, 160, 220},
-        frameClr    = {120, 200, 240},
-        silClr      = {10, 15, 30, 180},
+        particleClr = {{200, 215, 230}, {170, 190, 210}, {230, 240, 250}},
+        shaftClr    = {100, 130, 160},
+        frameClr    = {140, 170, 200},
+        silClr      = {12, 14, 18, 180},
         silType     = "rocks",
     },
-    [0] = { -- 无尽深渊：紫色主题
+    [0] = { -- 虚空试炼：紫色主题
         hexFill     = {58, 40, 90, 255},
         hexStroke   = {90, 68, 135, 180},
         hexGlow     = {150, 110, 210},
@@ -675,6 +675,21 @@ function BoardWidget:Render(nvg)
                         nvgStrokeWidth(nvg, 1.2)
                         nvgStroke(nvg)
                     end
+                elseif pType == "snowflake" then
+                    -- 永冻绝境：冰面玻璃感（左上高光 + 微弱内渐变）
+                    -- 统一光照方向：从左上(-0.7, -0.7)照射
+                    local hlOx = -hexSize * 0.22
+                    local hlOy = -hexSize * 0.22
+                    local hlA = math.floor(28 * edgeDim)
+                    -- 左上角高光弧（模拟冰面一侧反光）
+                    local hlPaint = nvgRadialGradient(nvg,
+                        cx + hlOx, cy + hlOy, 0, hexSize * 0.45,
+                        nvgRGBA(220, 240, 255, hlA),
+                        nvgRGBA(180, 210, 235, 0))
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx + hlOx, cy + hlOy, hexSize * 0.45)
+                    nvgFillPaint(nvg, hlPaint)
+                    nvgFill(nvg)
                 end
             end
         end
@@ -1145,6 +1160,36 @@ function BoardWidget:Render(nvg)
         end
     end
 
+    -- 1.585 第五章冰面：少量格子有细冰裂纹（不是每格都有，避免视觉杂乱）
+    if pType == "snowflake" then
+        for r = 1, HexGrid.ROWS do
+            for c = 1, HexGrid.COLS do
+                if HexGrid.InBounds(c, r) then
+                    local seed = c * 3.7 + r * 5.3
+                    -- 只有约1/3的格子显示裂纹
+                    if math.floor(seed * 2.1) % 3 == 0 then
+                        local cx, cy = HexGrid.HexToPixel(c, r, hexSize, ox, oy)
+                        if IsCellOnScreen(cx, cy, hexSize, l.x, l.y, l.w, l.h) then
+                            nvgSave(nvg)
+                            nvgTranslate(nvg, cx, cy)
+                            -- 单条细裂纹
+                            local angle = seed * 0.7
+                            local len = hexSize * 0.25
+                            local dx, dy = math.cos(angle), math.sin(angle)
+                            nvgBeginPath(nvg)
+                            nvgMoveTo(nvg, -dx * len * 0.3, -dy * len * 0.3)
+                            nvgLineTo(nvg, dx * len, dy * len)
+                            nvgStrokeColor(nvg, nvgRGBA(200, 230, 250, 25))
+                            nvgStrokeWidth(nvg, 0.6)
+                            nvgStroke(nvg)
+                            nvgRestore(nvg)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     -- 1.6 绘制障碍物（岩石 / 触手 / 珊瑚）
     local obsChapter = G.battle and math.ceil((G.battle.level or 1) / Battle.LEVELS_PER_CHAPTER) or 1
     for _, obs in ipairs(board.obstacles) do
@@ -1299,6 +1344,128 @@ function BoardWidget:Render(nvg)
             nvgFillPaint(nvg, abyssPaint)
             nvgFill(nvg)
             IconAtlas.DrawNVG(nvg, "board_abyss", cx, cy, hexSize * 0.55)
+        elseif obs.type == "ice_block" then
+            -- 第五章冰块：恢复最早的“冰块 emoji”方向——接近不规则正六边形，轻量、清晰、可读
+            local t = G.time or 0
+            local life = obs.turns or 5
+            local meltPulse = life <= 1 and (0.90 + 0.10 * math.sin(t * 8.0)) or 1.0
+            local floatY = math.sin(t * 1.8 + obs.col * 1.7 + obs.row * 2.3) * hexSize * 0.018
+            local rs = hexSize * 0.56 * meltPulse
+            local y = cy + floatY
+            local pts = {
+                { cx - rs * 0.10, y - rs * 0.82 },
+                { cx + rs * 0.70, y - rs * 0.42 },
+                { cx + rs * 0.78, y + rs * 0.26 },
+                { cx + rs * 0.14, y + rs * 0.78 },
+                { cx - rs * 0.70, y + rs * 0.44 },
+                { cx - rs * 0.76, y - rs * 0.24 },
+            }
+
+            local function DrawPoly(points)
+                nvgBeginPath(nvg)
+                for i, p in ipairs(points) do
+                    if i == 1 then nvgMoveTo(nvg, p[1], p[2]) else nvgLineTo(nvg, p[1], p[2]) end
+                end
+                nvgClosePath(nvg)
+            end
+
+            -- 小投影，保持“轻巧冰块”而不是大石头感
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, cx + rs * 0.08, y + rs * 0.62, rs * 0.62, rs * 0.18)
+            nvgFillColor(nvg, nvgRGBA(0, 25, 55, 70))
+            nvgFill(nvg)
+
+            -- 外层冷光
+            local glow = nvgRadialGradient(nvg, cx, y, 0, rs * 1.18,
+                nvgRGBA(125, 225, 255, 85), nvgRGBA(80, 170, 230, 0))
+            nvgBeginPath(nvg)
+            nvgCircle(nvg, cx, y, rs * 1.15)
+            nvgFillPaint(nvg, glow)
+            nvgFill(nvg)
+
+            -- 主体：不规则六边形半透明冰蓝
+            DrawPoly(pts)
+            nvgFillPaint(nvg, nvgLinearGradient(nvg, cx, y - rs, cx, y + rs,
+                nvgRGBA(245, 255, 255, 225), nvgRGBA(70, 180, 240, 205)))
+            nvgFill(nvg)
+
+            -- 左下浅阴影面，给一点立体感但不变成大块立方体
+            nvgBeginPath(nvg)
+            nvgMoveTo(nvg, pts[4][1], pts[4][2])
+            nvgLineTo(nvg, pts[5][1], pts[5][2])
+            nvgLineTo(nvg, pts[6][1], pts[6][2])
+            nvgLineTo(nvg, cx - rs * 0.08, y + rs * 0.04)
+            nvgClosePath(nvg)
+            nvgFillColor(nvg, nvgRGBA(50, 135, 215, 68))
+            nvgFill(nvg)
+
+            -- 顶部白亮切面，接近 emoji 冰块的简洁高光
+            nvgBeginPath(nvg)
+            nvgMoveTo(nvg, pts[1][1], pts[1][2])
+            nvgLineTo(nvg, pts[2][1], pts[2][2])
+            nvgLineTo(nvg, cx + rs * 0.16, y - rs * 0.02)
+            nvgLineTo(nvg, cx - rs * 0.38, y - rs * 0.12)
+            nvgClosePath(nvg)
+            nvgFillColor(nvg, nvgRGBA(255, 255, 255, 112))
+            nvgFill(nvg)
+
+            -- 粗一点的外轮廓，保证棋盘上辨识度
+            DrawPoly(pts)
+            nvgStrokeColor(nvg, nvgRGBA(220, 250, 255, life <= 1 and 160 or 230))
+            nvgStrokeWidth(nvg, 2.4)
+            nvgStroke(nvg)
+            DrawPoly(pts)
+            nvgStrokeColor(nvg, nvgRGBA(45, 145, 215, 95))
+            nvgStrokeWidth(nvg, 1.0)
+            nvgStroke(nvg)
+
+            -- 简洁折射线：少量线条，避免现在这种复杂尖晶体造型
+            local ribAlpha = life <= 1 and 70 or 115
+            local ribs = {
+                { pts[1][1], pts[1][2], cx - rs * 0.06, y + rs * 0.10 },
+                { pts[2][1], pts[2][2], cx - rs * 0.06, y + rs * 0.10 },
+                { pts[5][1], pts[5][2], cx - rs * 0.06, y + rs * 0.10 },
+                { cx - rs * 0.34, y - rs * 0.34, cx + rs * 0.36, y + rs * 0.18 },
+            }
+            for _, line in ipairs(ribs) do
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, line[1], line[2])
+                nvgLineTo(nvg, line[3], line[4])
+                nvgStrokeColor(nvg, nvgRGBA(255, 255, 255, ribAlpha))
+                nvgStrokeWidth(nvg, 1.2)
+                nvgStroke(nvg)
+            end
+
+            -- 两个小高光点，让整体更像早期 emoji 图标，而不是复杂模型
+            local sparkle = 0.75 + 0.25 * math.sin(t * 3.0 + obs.col)
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, cx - rs * 0.30, y - rs * 0.22, rs * 0.08, rs * 0.045)
+            nvgFillColor(nvg, nvgRGBA(255, 255, 255, math.floor(160 * sparkle)))
+            nvgFill(nvg)
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, cx + rs * 0.22, y + rs * 0.06, rs * 0.055, rs * 0.032)
+            nvgFillColor(nvg, nvgRGBA(255, 255, 255, math.floor(120 * sparkle)))
+            nvgFill(nvg)
+
+            -- 寿命提示：只在快融化时显示，避免破坏造型
+            if life <= 2 then
+                nvgFontSize(nvg, hexSize * 0.24)
+                nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                nvgFillColor(nvg, nvgRGBA(30, 90, 130, 180))
+                nvgText(nvg, cx + 1, y - rs * 0.98 + 1, tostring(life))
+                nvgFillColor(nvg, nvgRGBA(235, 255, 255, 240))
+                nvgText(nvg, cx, y - rs * 0.98, tostring(life))
+            end
+            if life <= 1 then
+                for di = 1, 2 do
+                    local dx = (di - 1.5) * rs * 0.35
+                    local dy = y + rs * 0.84 + math.sin(t * 5.0 + di) * rs * 0.04
+                    nvgBeginPath(nvg)
+                    nvgEllipse(nvg, cx + dx, dy, rs * 0.035, rs * 0.06)
+                    nvgFillColor(nvg, nvgRGBA(120, 220, 255, 140))
+                    nvgFill(nvg)
+                end
+            end
         elseif obs.isBoulder then
             -- ── 巨岩碎石：沙黄色碎裂岩块，临时障碍 ──
             local t = G.time or 0
@@ -3107,6 +3274,23 @@ function BoardWidget:Render(nvg)
                 drawRadius = pieceRadius * p._diveScale
                 p._diveScale = nil  -- 一次性字段，用完清理
             end
+
+            -- 冰痕拖尾（英雄滑行时）
+            if p.team == "hero" and p.isSliding and p.animTimer and p.animTimer > 0
+               and p.animFromCol and p.animFromRow then
+                local fromX, fromY = HexGrid.HexToPixel(p.animFromCol, p.animFromRow, hexSize, ox, oy)
+                for ti = 1, 5 do
+                    local tt = (ti - 1) / 5
+                    local trailX = fromX + (cx - fromX) * tt
+                    local trailY = fromY + (cy - fromY) * tt
+                    local trailAlpha = math.floor(90 * (1.0 - tt))
+                    local trailR = hexSize * (0.1 - ti * 0.012)
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, trailX, trailY, trailR)
+                    nvgFillColor(nvg, nvgRGBA(180, 220, 255, trailAlpha))
+                    nvgFill(nvg)
+                end
+            end
             HexGrid.DrawPiece(nvg, cx, cy, drawRadius, p)
 
             -- 冰霜冻结蓝色遮罩（冻结中的敌人覆盖冰蓝色半透明层 + 冰晶边框）
@@ -3472,22 +3656,35 @@ function BoardWidget:Render(nvg)
     -- 7.5 英雄受击闪光
     if G.battle.hitFlash and G.battle.hitFlash > 0 and G.battle.hero.hp > 0 then
         local hx, hy = HexGrid.HexToPixel(G.battle.hero.col, G.battle.hero.row, hexSize, ox, oy)
-        local flashAlpha = math.min(255, math.floor(G.battle.hitFlash / 0.25 * 200))
+        local flashMax = G.battle.hitFlashMax or 0.25
+        local flashRatio = math.min(1.0, G.battle.hitFlash / flashMax)
+        local flashAlpha = math.min(255, math.floor((0.25 + flashRatio * 0.75) * 220))
         nvgBeginPath(nvg)
-        nvgCircle(nvg, hx, hy, hexSize * 0.75)
+        nvgCircle(nvg, hx, hy, hexSize * (0.72 + (1.0 - flashRatio) * 0.15))
         nvgFillColor(nvg, nvgRGBA(255, 40, 40, flashAlpha))
         nvgFill(nvg)
-        local ringRadius = hexSize * (0.6 + (0.25 - G.battle.hitFlash) * 2.0)
+        local ringRadius = hexSize * (0.58 + (1.0 - flashRatio) * 0.95)
         nvgBeginPath(nvg)
         nvgCircle(nvg, hx, hy, ringRadius)
-        nvgStrokeColor(nvg, nvgRGBA(255, 100, 80, math.floor(flashAlpha * 0.7)))
-        nvgStrokeWidth(nvg, 3)
+        nvgStrokeColor(nvg, nvgRGBA(255, 120, 90, math.floor(flashAlpha * 0.75)))
+        nvgStrokeWidth(nvg, 3 + (1.0 - flashRatio) * 2)
         nvgStroke(nvg)
     end
 
     -- 7.6 护盾指示器（多层盾形光晕）
     if G.battle.hasShield and G.battle.hero.hp > 0 then
-        local hx, hy = HexGrid.HexToPixel(G.battle.hero.col, G.battle.hero.row, hexSize, ox, oy)
+        local hero = G.battle.hero
+        local hx, hy
+        if hero.animTimer and hero.animTimer > 0 and hero.animFromCol then
+            local at = 1.0 - hero.animTimer / hero.animMaxTimer
+            at = 1.0 - (1.0 - at) * (1.0 - at)
+            local fx2, fy2 = HexGrid.HexToPixel(hero.animFromCol, hero.animFromRow, hexSize, ox, oy)
+            local tx2, ty2 = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+            hx = fx2 + (tx2 - fx2) * at
+            hy = fy2 + (ty2 - fy2) * at
+        else
+            hx, hy = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+        end
         local t = G.time or 0
         local pulse = math.sin(t * 3.0) * 0.3 + 0.7  -- 0.4~1.0 脉动
         local fastPulse = math.sin(t * 5.0) * 0.5 + 0.5
@@ -3531,7 +3728,18 @@ function BoardWidget:Render(nvg)
 
     -- 7.6.5 虹吸护盾指示器（紫色/深红光晕，与蓝色道具护盾区分）
     if G.battle.drainShield and G.battle.drainShield > 0 and G.battle.hero.hp > 0 then
-        local hx, hy = HexGrid.HexToPixel(G.battle.hero.col, G.battle.hero.row, hexSize, ox, oy)
+        local hero = G.battle.hero
+        local hx, hy
+        if hero.animTimer and hero.animTimer > 0 and hero.animFromCol then
+            local at = 1.0 - hero.animTimer / hero.animMaxTimer
+            at = 1.0 - (1.0 - at) * (1.0 - at)
+            local fx2, fy2 = HexGrid.HexToPixel(hero.animFromCol, hero.animFromRow, hexSize, ox, oy)
+            local tx2, ty2 = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+            hx = fx2 + (tx2 - fx2) * at
+            hy = fy2 + (ty2 - fy2) * at
+        else
+            hx, hy = HexGrid.HexToPixel(hero.col, hero.row, hexSize, ox, oy)
+        end
         local t = G.time or 0
         local pulse = math.sin(t * 2.5) * 0.3 + 0.7
         local fastPulse = math.sin(t * 4.0) * 0.5 + 0.5
@@ -4374,6 +4582,109 @@ function BoardWidget:Update(dt)
             if p.skillAnimTimer <= 0 then
                 p.skillAnim = 0
                 p.skillAnimType = ""
+            end
+        end
+    end
+
+    -- 第五章冰面滑行：等跳跃动画播完后执行延迟滑行
+    if G.battle._pendingIceSlide then
+        local hero = G.battle.hero
+        -- 只在跳跃动画结束后触发（animTimer <= 0 或无动画）
+        if not hero.animTimer or hero.animTimer <= 0 then
+            local slide = G.battle._pendingIceSlide
+            G.battle._pendingIceSlide = nil
+            local IceMechanic = require "IceMechanic"
+            IceMechanic.ApplySlide(G.battle, Battle, slide.landCol, slide.landRow, slide.dirFromCol, slide.dirFromRow)
+        end
+    end
+
+    -- 第五章冰面滑行结束检测：清除滑行状态 + 撞墙受伤 + 延迟弹窗
+    do
+        local hero = G.battle.hero
+        if hero.isSliding and (not hero.animTimer or hero.animTimer <= 0) then
+            hero.isSliding = false
+            -- 延迟滑行撞击秒杀：动画到位后才执行
+            if G.battle._pendingSlideKill then
+                local sk = G.battle._pendingSlideKill
+                G.battle._pendingSlideKill = nil
+                local enemy = sk.enemy
+                if enemy and enemy.hp > 0 then
+                    local AM = require "AudioManager"
+                    if enemy.isBoss then
+                        local slideDmg = math.max(5, math.floor((sk.heroAtk or 0) * 0.45))
+                        enemy.hp = enemy.hp - slideDmg
+                        G.battle.totalDamage = (G.battle.totalDamage or 0) + slideDmg
+                        Battle.AddFloatingText(G.battle, enemy.col, enemy.row,
+                            "-" .. slideDmg .. "🧊", {120, 200, 255, 255}, "hit")
+                        Battle.AddLog(G.battle, string.format("🧊 冰面滑行撞到%s，造成%d伤害", enemy.name or "Boss", slideDmg))
+                        AM.PlaySFX("ice_crash", 0.9, 1.2)
+                        enemy.hitFlash = 0.3
+                        G.battle.screenShake = (G.battle.screenShake or 0) + 0.25
+                        if enemy.hp <= 0 then
+                            Battle.HandleEnemyDeath(G.battle, enemy, false)
+                        end
+                    elseif enemy.rageable then
+                        -- 蓄怒冰熊：滑行撞击不秒杀，而是+怒气+受伤
+                        enemy._bearRage = (enemy._bearRage or 0) + 1
+                        local slideDmg = math.max(10, math.floor(enemy.maxHp * 0.2))
+                        enemy.hp = enemy.hp - slideDmg
+                        enemy.hitFlash = 0.3
+                        G.battle.totalDamage = (G.battle.totalDamage or 0) + slideDmg
+                        Battle.AddFloatingText(G.battle, enemy.col, enemy.row,
+                            "🧊-" .. slideDmg .. " 💢" .. enemy._bearRage .. "/3", {255, 180, 80, 255}, "hit", 1.0)
+                        Battle.AddVFX(G.battle, "ice_crash", { col = enemy.col, row = enemy.row, duration = 0.4, power = 2 })
+                        Battle.AddLog(G.battle, string.format("🐻 蓄怒冰熊被撞击！怒气+1 (%d/3)", enemy._bearRage))
+                        AM.PlaySFX("ice_crash", 0.8, 0.9)
+                        G.battle.screenShake = (G.battle.screenShake or 0) + 0.2
+                        if enemy.hp <= 0 then
+                            Battle.HandleEnemyDeath(G.battle, enemy, false)
+                        end
+                    else
+                        local killDmg = enemy.hp
+                        enemy.hp = 0
+                        enemy.hitFlash = 0.3
+                        G.battle.totalDamage = (G.battle.totalDamage or 0) + killDmg
+                        Battle.AddFloatingText(G.battle, enemy.col, enemy.row,
+                            "🧊秒杀!", {120, 220, 255, 255}, "hit", 1.0)
+                        Battle.AddVFX(G.battle, "ice_crash", { col = enemy.col, row = enemy.row, duration = 0.5, power = math.max(2, sk.slideDistance or 1) })
+                        Battle.AddLog(G.battle, string.format("🧊 冰面高速撞击！秒杀%s", enemy.name or "小怪"))
+                        AM.PlaySFX("ice_crash", 1.0, 1.12)
+                        G.battle.screenShake = (G.battle.screenShake or 0) + 0.3
+                        Battle.HandleEnemyDeath(G.battle, enemy, false)
+                    end
+                end
+            end
+            -- 延迟撞墙/撞障碍物伤害在滑行结束时执行
+            if G.battle._pendingCrash then
+                local crash = G.battle._pendingCrash
+                G.battle._pendingCrash = nil
+                local crashDistance = crash.slideDistance or 1
+                hero.hp = hero.hp - crash.damage
+                G.battle.hitFlash = 0.45
+                G.battle.hitFlashMax = 0.45
+                hero.hitFlash = 0.45
+                hero._hitFlash = 0.45
+                G.battle.screenShake = (G.battle.screenShake or 0) + math.min(0.65, 0.25 + crashDistance * 0.07)
+                Battle.AddFloatingText(G.battle, crash.col, crash.row,
+                    "-" .. crash.damage .. (crash.isWall and " 撞边!" or " 撞击!"), {255, 100, 50, 255}, "hit")
+                Battle.AddVFX(G.battle, "ice_crash", { col = crash.col, row = crash.row, duration = 0.55, power = crashDistance })
+                Battle.AddVFX(G.battle, "shockwave", { col = crash.col, row = crash.row, duration = 0.45 })
+                Battle.AddVFX(G.battle, "spawn_puff", { col = crash.col, row = crash.row, duration = 0.5 })
+                Battle.AddLog(G.battle, string.format("💥 冰面失控%s！滑行%d格，受到%d伤害", crash.isWall and "撞到边缘" or "撞到障碍", crashDistance, crash.damage))
+                local AM = require "AudioManager"
+                local crashPitch = crash.isWall and 0.95 or 1.08
+                AM.PlaySFX("ice_crash", 0.95, crashPitch - math.min(crashDistance, 6) * 0.03)
+                if crash.isWall then
+                    local IceMechanic = require "IceMechanic"
+                    IceMechanic.RecordWallCrashAndMaybeDrop(G.battle, Battle, crash.col, crash.row)
+                end
+            end
+            -- 滑行结束后触发被延迟的结算弹窗（三选一等）
+            if G.battle._pendingShowResult then
+                local pendResult = G.battle._pendingShowResult
+                G.battle._pendingShowResult = nil
+                local TurnFlow = require "TurnFlow"
+                TurnFlow.ShowResult(pendResult)
             end
         end
     end

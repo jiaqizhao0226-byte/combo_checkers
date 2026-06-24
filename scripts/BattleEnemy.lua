@@ -263,7 +263,8 @@ function Battle.CheckLowHpPotionSpawn(state)
     end
     if #candidates == 0 then return end
 
-    local pos = candidates[math.random(1, #candidates)]
+    local pos = Battle.PickItemSpawnPosition and Battle.PickItemSpawnPosition(state, candidates)
+        or candidates[math.random(1, #candidates)]
     HexGrid.AddItem(state.board, { col = pos.col, row = pos.row, type = "health_potion" })
     Battle.AddLog(state, "💊 危急时刻！一瓶小血药出现在了战场上！")
 end
@@ -288,6 +289,12 @@ function Battle.TickTerrain(state)
         if obs.turns then
             obs.turns = obs.turns - 1
             if obs.turns <= 0 then
+                if obs.type == "ice_block" then
+                    Battle.AddVFX(state, "spawn_puff", { col = obs.col, row = obs.row, duration = 0.45 })
+                    Battle.AddFloatingText(state, obs.col, obs.row,
+                        "融化", {150, 220, 255, 220}, "combo", 0.8)
+                    Battle.AddLog(state, "🧊 冰块融化消失了")
+                end
                 table.remove(state.board.obstacles, i)
             end
         end
@@ -631,6 +638,24 @@ function Battle.EnemyAct(state, enemy)
     if not isSilenced and enemy.enemyType == "venom_lizard" then
         return Battle.VenomLizardAct(state, enemy)
     end
+
+    -- === 第五章特殊机制敌人 ===
+    if not isSilenced and enemy.enemyType == "frost_barracuda" then
+        return Battle.FrostBarracudaAct(state, enemy)
+    end
+    if not isSilenced and enemy.enemyType == "aurora_jelly" then
+        return Battle.AuroraJellyAct(state, enemy)
+    end
+    if not isSilenced and enemy.enemyType == "ice_crystal" then
+        return Battle.IceCrystalAct(state, enemy)
+    end
+    if not isSilenced and enemy.enemyType == "blizzard_hawk" then
+        return Battle.BlizzardHawkAct(state, enemy)
+    end
+    if not isSilenced and enemy.enemyType == "frost_bear" then
+        return Battle.FrostBearAct(state, enemy)
+    end
+    -- frost_grunt: 无特殊行动，使用通用近战逻辑
 
     -- === 确定攻击目标：稻草人嘲讽优先 ===
     local target = hero
@@ -2087,6 +2112,469 @@ function Battle.CheckEndCondition(state)
         return "LOSE"
     end
     return nil
+end
+
+-- ============================================================================
+-- 第五章: 永冻绝境 - 特殊敌人AI
+-- ============================================================================
+
+--- 寒冰梭鱼: 直线冲刺攻击（冰面上无距离限制）
+function Battle.FrostBarracudaAct(state, enemy)
+    local hero = state.hero
+    local target = hero
+    if state.scarecrowActive and state.scarecrow and state.scarecrow.hp > 0 then
+        target = state.scarecrow
+    end
+
+    local IceMechanic = require "IceMechanic"
+    local chargeRange = enemy.chargeRange or 4
+    -- 冰面上冲刺无距离限制
+    if enemy.iceChargeUnlimited and IceMechanic.IsIceTile(state, enemy.col, enemy.row) then
+        chargeRange = 99
+    end
+
+    -- 检查是否在直线上且在冲刺范围内
+    local ex, ey, ez = HexGrid.OffsetToCube(enemy.col, enemy.row)
+    local tx, ty, tz = HexGrid.OffsetToCube(target.col, target.row)
+    local dx, dy, dz = tx - ex, ty - ey, tz - ez
+    local dist = math.max(math.abs(dx), math.abs(dy), math.abs(dz))
+
+    -- 必须在同一条直线上（cube坐标某轴差值==0或三轴差值成比例）
+    local onLine = (dx == 0 or dy == 0 or dz == 0)
+
+    if onLine and dist > 0 and dist <= chargeRange then
+        -- 检查路径是否畅通
+        local ux = dist > 0 and math.floor(dx / dist + 0.5) or 0
+        local uy = dist > 0 and math.floor(dy / dist + 0.5) or 0
+        local uz = dist > 0 and math.floor(dz / dist + 0.5) or 0
+        local pathClear = true
+        for step = 1, dist - 1 do
+            local sx, sy, sz = ex + ux * step, ey + uy * step, ez + uz * step
+            local sc, sr = HexGrid.CubeToOffset(sx, sy, sz)
+            if HexGrid.IsBlocked(state.board, sc, sr) then
+                pathClear = false; break
+            end
+            local piece = HexGrid.GetPieceAt(state.board, sc, sr)
+            if piece and piece ~= target and piece.hp > 0 then
+                pathClear = false; break
+            end
+        end
+
+        if pathClear then
+            -- 冲刺到目标旁边（距离目标1格）
+            local startCol, startRow = enemy.col, enemy.row
+            local landX, landY, landZ = ex + ux * (dist - 1), ey + uy * (dist - 1), ez + uz * (dist - 1)
+            local landC, landR = HexGrid.CubeToOffset(landX, landY, landZ)
+
+            enemy.animFromCol = startCol
+            enemy.animFromRow = startRow
+            enemy.animTimer = 0.25
+            enemy.animMaxTimer = 0.25
+            enemy.col = landC
+            enemy.row = landR
+
+            Battle.AddVFX(state, "frost_barracuda_charge", {
+                fromCol = startCol, fromRow = startRow,
+                toCol = target.col, toRow = target.row,
+                duration = 0.32,
+                power = dist,
+            })
+            AM.PlaySFX("ice_slide", 0.85, 1.25 - math.min(dist, 6) * 0.06)
+
+            -- 冲刺攻击伤害
+            local actualDmg = Battle.CalcEnemyDmg(enemy.atk, target.def or 0)
+            if target == hero then
+                if state.hasShield then
+                    actualDmg = math.floor(actualDmg / 2)
+                    state.hasShield = false
+                    Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+                end
+                if (hero._shield or 0) > 0 and actualDmg > 0 then
+                    local absorbed = math.min(hero._shield, actualDmg)
+                    actualDmg = actualDmg - absorbed
+                    hero._shield = hero._shield - absorbed
+                end
+                hero.hp = hero.hp - actualDmg
+                state.hitFlash = 0.2
+                Battle.AddFloatingText(state, hero.col, hero.row,
+                    "🐟冲刺-" .. actualDmg, {100, 180, 255, 255}, "hit")
+            else
+                target.hp = target.hp - actualDmg
+                target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+                target.hitCount = (target.hitCount or 0) + 1
+                if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+            end
+            AM.PlaySFX("ice_crash", 0.85, 1.12)
+            state.screenShake = (state.screenShake or 0) + math.min(0.45, 0.18 + dist * 0.04)
+            Battle.AddVFX(state, "ice_crash", { col = target.col, row = target.row, duration = 0.4, power = math.min(dist, 5) })
+            Battle.AddLog(state, string.format("🐟 寒冰梭鱼沿冰面冲刺%d格突刺！-%d", dist - 1, actualDmg))
+            return { type = "charge_attack", enemy = enemy, damage = actualDmg }
+        end
+    end
+
+    -- 普通接近逻辑
+    local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+    if #validMoves > 0 then
+        local bestMove = Battle.FindClosestMove(validMoves, target.col, target.row)
+        if bestMove then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.3
+            enemy.animMaxTimer = 0.3
+            enemy.col = bestMove.col
+            enemy.row = bestMove.row
+            return { type = "move", enemy = enemy }
+        end
+    end
+    return { type = "idle", enemy = enemy }
+end
+
+--- 极光水母: 魅惑光环（使英雄跳过下一回合），ATK=0不攻击
+function Battle.AuroraJellyAct(state, enemy)
+    local hero = state.hero
+    local charmRange = enemy.charmRange or 2
+    local dist = HexGrid.CubeDistance(enemy.col, enemy.row, hero.col, hero.row)
+
+    -- 在魅惑范围内且英雄无免疫则施放魅惑（使用现有charm机制）
+    local immune = (state.heroCharmImmunity or 0) > 0
+    if dist <= charmRange and not immune and (state.heroCharmedTurns or 0) <= 0 then
+        state.heroCharmedTurns = 1
+        Battle.AddFloatingText(state, hero.col, hero.row,
+            "💜魅惑!", {200, 100, 255, 255})
+        Battle.AddLog(state, "极光水母释放魅惑光环！你的行动被夺取...")
+        AM.PlaySFX("ui_click", 0.7, 0.6)
+        return { type = "charm", enemy = enemy }
+    end
+
+    -- 缓慢逃离英雄（保持距离）
+    local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+    if #validMoves > 0 and dist <= 2 then
+        local bestMove = Battle.FindFarthestMove(validMoves, hero.col, hero.row)
+        if bestMove then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.4
+            enemy.animMaxTimer = 0.4
+            enemy.col = bestMove.col
+            enemy.row = bestMove.row
+            return { type = "flee", enemy = enemy }
+        end
+    end
+    return { type = "idle", enemy = enemy }
+end
+
+--- 冰晶体: 固定不动，每2回合释放冻结射线
+function Battle.IceCrystalAct(state, enemy)
+    local hero = state.hero
+    -- 冷却倒计时
+    enemy.freezeRayCooldown = (enemy.freezeRayCooldown or 0) - 1
+
+    if enemy.freezeRayCooldown <= 0 then
+        local range = enemy.attackRange or 3
+        local dist = HexGrid.CubeDistance(enemy.col, enemy.row, hero.col, hero.row)
+
+        if dist <= range then
+            -- 释放冻结射线
+            local freezeDur = enemy.freezeDuration or 1
+            state._heroFrozenTurns = (state._heroFrozenTurns or 0) + freezeDur
+            enemy.freezeRayCooldown = 2  -- 重置冷却
+
+            Battle.AddFloatingText(state, hero.col, hero.row,
+                "❄冻结" .. freezeDur .. "回合!", {100, 200, 255, 255})
+            Battle.AddVFX(state, "freeze_ray", {
+                fromCol = enemy.col, fromRow = enemy.row,
+                toCol = hero.col, toRow = hero.row,
+                duration = 0.5,
+            })
+            Battle.AddLog(state, string.format("冰晶体释放冻结射线！英雄被冻结%d回合", freezeDur))
+            AM.PlaySFX("hero_damage", 0.6, 1.5)
+            state.screenShake = (state.screenShake or 0) + 0.15
+            return { type = "freeze_ray", enemy = enemy }
+        else
+            -- 目标不在范围内，冷却不消耗
+            enemy.freezeRayCooldown = 0
+        end
+    end
+
+    -- 冰晶体不移动(isStationary)
+    Battle.AddFloatingText(state, enemy.col, enemy.row,
+        "❄蓄力" .. math.max(0, enemy.freezeRayCooldown), {150, 200, 240, 180})
+    return { type = "idle", enemy = enemy }
+end
+
+--- 暴风雪鹰: 远程攻击 + 攻击路径铺冰面 + 英雄靠近时逃跑
+--- 暴风雪鹰: 远程AOE蓄力→投弹→持续陷阱
+--- 机制：回合1蓄力标记区域(预警) → 回合2投弹产生伤害陷阱 → 陷阱持续2回合
+function Battle.BlizzardHawkAct(state, enemy)
+    local hero = state.hero
+    local target = hero
+    if state.scarecrowActive and state.scarecrow and state.scarecrow.hp > 0 then
+        target = state.scarecrow
+    end
+
+    local dist = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
+    local fleeRange = 1
+
+    -- 英雄太近时优先逃跑（保持安全距离）
+    if dist <= fleeRange then
+        local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+        if #validMoves > 0 then
+            local bestMove = Battle.FindFarthestMove(validMoves, target.col, target.row)
+            if bestMove then
+                enemy.animFromCol = enemy.col
+                enemy.animFromRow = enemy.row
+                enemy.animTimer = 0.25
+                enemy.animMaxTimer = 0.25
+                enemy.col = bestMove.col
+                enemy.row = bestMove.row
+                return { type = "flee", enemy = enemy }
+            end
+        end
+    end
+
+    -- 状态机：蓄力 → 投弹 → 冷却
+    enemy._hawkPhase = enemy._hawkPhase or "ready"  -- ready / charging / cooldown
+    enemy._hawkCooldown = enemy._hawkCooldown or 0
+
+    if enemy._hawkPhase == "cooldown" then
+        enemy._hawkCooldown = enemy._hawkCooldown - 1
+        if enemy._hawkCooldown <= 0 then
+            enemy._hawkPhase = "ready"
+        end
+        -- 冷却期间缓慢保持距离
+        local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+        if #validMoves > 0 then
+            local bestMove = Battle.FindOptimalRangeMove(validMoves, target.col, target.row, 3)
+            if bestMove then
+                enemy.animFromCol = enemy.col
+                enemy.animFromRow = enemy.row
+                enemy.animTimer = 0.3
+                enemy.animMaxTimer = 0.3
+                enemy.col = bestMove.col
+                enemy.row = bestMove.row
+            end
+        end
+        return { type = "idle", enemy = enemy }
+
+    elseif enemy._hawkPhase == "charging" then
+        -- 蓄力完成 → 投弹！在标记区域产生伤害陷阱
+        local markers = enemy._hawkTargetCells or {}
+        local trapDmg = math.max(8, math.floor(enemy.atk * 0.7))
+        for _, cell in ipairs(markers) do
+            -- 创建冰弹陷阱（持续2回合）
+            if not state._iceTraps then state._iceTraps = {} end
+            state._iceTraps[#state._iceTraps + 1] = {
+                col = cell.col, row = cell.row,
+                damage = trapDmg,
+                turnsLeft = 2,
+                owner = enemy,
+            }
+            Battle.AddVFX(state, "ice_crash", { col = cell.col, row = cell.row, duration = 0.5, power = 2 })
+        end
+        -- 投弹时如果英雄在陷阱区域内，立即受伤
+        for _, cell in ipairs(markers) do
+            if target.col == cell.col and target.row == cell.row then
+                local actualDmg = trapDmg
+                if target == hero then
+                    if state.hasShield then
+                        actualDmg = math.floor(actualDmg / 2)
+                        state.hasShield = false
+                        Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+                    end
+                    if (hero._shield or 0) > 0 and actualDmg > 0 then
+                        local absorbed = math.min(hero._shield, actualDmg)
+                        actualDmg = actualDmg - absorbed
+                        hero._shield = hero._shield - absorbed
+                    end
+                    hero.hp = hero.hp - actualDmg
+                    state.hitFlash = 0.3
+                end
+                Battle.AddFloatingText(state, target.col, target.row,
+                    "🦅冰弹-" .. actualDmg, {140, 200, 255, 255}, "hit")
+                break
+            end
+        end
+        Battle.AddLog(state, "🦅 暴风雪鹰投下冰弹！陷阱持续2回合")
+        AM.PlaySFX("ice_crash", 0.8, 1.1)
+        state.screenShake = (state.screenShake or 0) + 0.2
+        enemy._hawkPhase = "cooldown"
+        enemy._hawkCooldown = 2
+        enemy._hawkTargetCells = nil
+        return { type = "attack", enemy = enemy }
+
+    else  -- ready
+        -- 开始蓄力：标记英雄当前位置周围1格为AOE区域
+        local centerCol, centerRow = target.col, target.row
+        local markers = { { col = centerCol, row = centerRow } }
+        local neighbors = HexGrid.GetNeighbors(centerCol, centerRow)
+        -- 随机选取2-3个相邻格作为AOE范围
+        for i = #neighbors, 2, -1 do
+            local j = math.random(1, i)
+            neighbors[i], neighbors[j] = neighbors[j], neighbors[i]
+        end
+        local aoeCells = math.min(2, #neighbors)
+        for i = 1, aoeCells do
+            if HexGrid.InBounds(neighbors[i].col, neighbors[i].row) then
+                markers[#markers + 1] = neighbors[i]
+            end
+        end
+        enemy._hawkTargetCells = markers
+        enemy._hawkPhase = "charging"
+
+        -- 显示预警标记
+        for _, cell in ipairs(markers) do
+            Battle.AddVFX(state, "aoe_warning", {
+                col = cell.col, row = cell.row,
+                duration = 1.8,  -- 持续到下回合投弹
+            })
+        end
+        Battle.AddFloatingText(state, enemy.col, enemy.row,
+            "🦅蓄力!", {180, 220, 255, 255}, "combo", 0.8)
+        Battle.AddLog(state, "🦅 暴风雪鹰蓄力中！标记区域将在下回合被轰炸")
+        AM.PlaySFX("ui_click", 0.5, 0.7)
+        return { type = "charge", enemy = enemy }
+    end
+end
+
+--- 寒霜巨熊(蓄怒冰熊): 缓慢追踪，被跳过/冰块击中时+1怒气，满3层冲锋
+--- 机制：平时每回合移1格追英雄；被跳过/被冰块砸中时积累怒气；
+---       满3层下回合释放全方位冲锋（高伤害），冲锋后怒气清零
+function Battle.FrostBearAct(state, enemy)
+    local hero = state.hero
+    local target = hero
+    if state.scarecrowActive and state.scarecrow and state.scarecrow.hp > 0 then
+        target = state.scarecrow
+    end
+
+    enemy._bearRage = enemy._bearRage or 0
+    local dist = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
+
+    -- 怒气满3层 → 冲锋攻击！
+    if enemy._bearRage >= 3 then
+        enemy._bearRage = 0
+        -- 冲锋：向英雄方向冲刺（最多3格），到达后造成高伤害
+        local chargeDist = 3
+        local ex, ey, ez = HexGrid.OffsetToCube(enemy.col, enemy.row)
+        local tx, ty, tz = HexGrid.OffsetToCube(target.col, target.row)
+        local ddx, ddy, ddz = tx - ex, ty - ey, tz - ez
+        local d = math.max(math.abs(ddx), math.abs(ddy), math.abs(ddz))
+        local finalCol, finalRow = enemy.col, enemy.row
+        if d > 0 then
+            local ux = math.floor(ddx / d + 0.5)
+            local uy = math.floor(ddy / d + 0.5)
+            local uz = math.floor(ddz / d + 0.5)
+            for step = 1, math.min(chargeDist, d) do
+                local nc, nr = HexGrid.CubeToOffset(ex + ux * step, ey + uy * step, ez + uz * step)
+                if not HexGrid.InBounds(nc, nr) then break end
+                -- 到达英雄位置即停（不越过）
+                if nc == target.col and nr == target.row then
+                    -- 停在英雄旁边（不重叠）
+                    break
+                end
+                if HexGrid.IsBlocked(state.board, nc, nr) then break end
+                local piece = HexGrid.GetPieceAt(state.board, nc, nr)
+                if piece and piece ~= enemy and piece.hp > 0 then break end
+                finalCol, finalRow = nc, nr
+            end
+        end
+        -- 移动到冲锋终点
+        if finalCol ~= enemy.col or finalRow ~= enemy.row then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.25
+            enemy.animMaxTimer = 0.25
+            enemy.col = finalCol
+            enemy.row = finalRow
+        end
+        -- 冲锋后检查是否到达攻击范围
+        local newDist = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
+        if newDist <= 1 then
+            local chargeDmg = math.floor(enemy.atk * 2.0)  -- 冲锋伤害翻倍
+            local actualDmg = Battle.CalcEnemyDmg(chargeDmg, target.def or 0)
+            if target == hero then
+                if state.hasShield then
+                    actualDmg = math.floor(actualDmg / 2)
+                    state.hasShield = false
+                    Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+                end
+                if (hero._shield or 0) > 0 and actualDmg > 0 then
+                    local absorbed = math.min(hero._shield, actualDmg)
+                    actualDmg = actualDmg - absorbed
+                    hero._shield = hero._shield - absorbed
+                end
+                hero.hp = hero.hp - actualDmg
+                state.hitFlash = 0.4
+                Battle.AddFloatingText(state, hero.col, hero.row,
+                    "🐻💢冲锋-" .. actualDmg, {255, 100, 80, 255}, "hit", 1.2)
+            else
+                target.hp = target.hp - actualDmg
+                target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+                target.hitCount = (target.hitCount or 0) + 1
+                if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+            end
+            AM.PlaySFX("hero_damage", 1.0, 0.7)
+            state.screenShake = (state.screenShake or 0) + 0.5
+            Battle.AddLog(state, "🐻💢 蓄怒冰熊爆发冲锋！造成巨额伤害！")
+        else
+            Battle.AddFloatingText(state, enemy.col, enemy.row,
+                "🐻💢冲锋!", {255, 150, 80, 255}, "combo")
+            Battle.AddLog(state, "🐻💢 蓄怒冰熊冲锋！但未到达目标")
+            AM.PlaySFX("hero_damage", 0.7, 0.8)
+        end
+        Battle.AddVFX(state, "shockwave", { col = enemy.col, row = enemy.row, duration = 0.5 })
+        return { type = "charge_attack", enemy = enemy }
+    end
+
+    -- 怒气未满：普通近战（伤害较低）或移动
+    if dist <= 1 and enemy.atk > 0 then
+        local actualDmg = Battle.CalcEnemyDmg(enemy.atk, target.def or 0)
+        if target == hero then
+            if state.hasShield then
+                actualDmg = math.floor(actualDmg / 2)
+                state.hasShield = false
+                Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+            end
+            if (hero._shield or 0) > 0 and actualDmg > 0 then
+                local absorbed = math.min(hero._shield, actualDmg)
+                actualDmg = actualDmg - absorbed
+                hero._shield = hero._shield - absorbed
+            end
+            hero.hp = hero.hp - actualDmg
+            state.hitFlash = 0.2
+            Battle.AddFloatingText(state, hero.col, hero.row,
+                "🐻-" .. actualDmg, {180, 220, 255, 255}, "hit")
+        else
+            target.hp = target.hp - actualDmg
+            target.totalDamageAbsorbed = (target.totalDamageAbsorbed or 0) + actualDmg
+            target.hitCount = (target.hitCount or 0) + 1
+            if target.hp <= 0 then state.scarecrowActive = false; state.scarecrow_destroyed = target end
+        end
+        AM.PlaySFX("hero_damage", 0.8)
+        state.screenShake = (state.screenShake or 0) + 0.2
+        Battle.AddLog(state, string.format("🐻 蓄怒冰熊攻击！-%d (怒气%d/3)", actualDmg, enemy._bearRage))
+        return { type = "attack", enemy = enemy, damage = actualDmg }
+    end
+
+    -- 缓慢追踪（每回合1格）
+    local validMoves = HexGrid.FindValidMoves(state.board, enemy.col, enemy.row)
+    if #validMoves > 0 then
+        local bestMove = Battle.FindClosestMove(validMoves, target.col, target.row)
+        if bestMove then
+            enemy.animFromCol = enemy.col
+            enemy.animFromRow = enemy.row
+            enemy.animTimer = 0.4
+            enemy.animMaxTimer = 0.4
+            enemy.col = bestMove.col
+            enemy.row = bestMove.row
+            -- 显示当前怒气
+            if enemy._bearRage > 0 then
+                Battle.AddFloatingText(state, enemy.col, enemy.row,
+                    "💢" .. enemy._bearRage .. "/3", {255, 150, 80, 200}, nil, 0.6)
+            end
+            return { type = "move", enemy = enemy }
+        end
+    end
+    return { type = "idle", enemy = enemy }
 end
 
 

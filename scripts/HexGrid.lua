@@ -308,9 +308,13 @@ end
 -- 障碍物 / 道具 / 毒雾
 -- ============================================================================
 
---- 添加障碍物（岩石）
-function HexGrid.AddObstacle(board, col, row)
-    board.obstacles[#board.obstacles + 1] = { col = col, row = row }
+--- 添加障碍物（岩石/冰块等）
+function HexGrid.AddObstacle(board, col, row, obstacleType)
+    local obstacle = { col = col, row = row, type = obstacleType }
+    if obstacleType == "ice_block" then
+        obstacle.turns = 5
+    end
+    board.obstacles[#board.obstacles + 1] = obstacle
 end
 
 --- 获取指定位置的障碍物
@@ -1161,6 +1165,7 @@ local PENGUIN_FRAMES = {
     attack_2 = "image/penguin_attack_2_20260423093826.png",
     hurt     = "image/penguin_hurt_20260423093817.png",
     jump     = "image/penguin_jump_20260423093816.png",
+    slide    = "image/penguin_slide_d_20260622090408.png",
 }
 
 --- 敌人精灵图资源路径 (enemyType → idle图)
@@ -1191,6 +1196,13 @@ local ENEMY_FRAMES = {
     sand_strider     = "image/enemy_sand_strider_idle_20260604061442.png",
     sand_rattler     = "image/enemy_sand_rattler_idle_20260604061452.png",
     venom_lizard     = "image/enemy_venom_lizard_idle_20260604061425.png",
+    -- 第五章: 永冻绝境
+    frost_grunt      = "image/enemy_frost_grunt_idle_20260622114714.png",
+    frost_barracuda  = "image/enemy_frost_barracuda_idle_20260622123652.png",
+    aurora_jelly     = "image/enemy_frost_wisp_idle_v2_20260624025908.png",
+    ice_crystal      = "image/enemy_ice_crystal_idle_20260624025347.png",
+    blizzard_hawk    = "image/enemy_blizzard_hawk_idle_20260624025342.png",
+    frost_bear       = "image/enemy_frost_bear_idle_20260624025350.png",
 }
 
 --- Boss 精灵图资源路径 (bossType → {normal, enraged})
@@ -1247,12 +1259,15 @@ end
 --- @param piece table 英雄棋子数据
 --- @return string 帧 key (如 "idle_1", "attack_1", "hurt", "jump")
 local function GetPenguinFrameKey(piece)
-    -- 优先级: dead > hurt > jump > attack > idle
+    -- 优先级: dead > hurt > slide > jump > attack > idle
     if piece._dead then
         return "hurt"  -- 死亡时使用受伤帧
     end
     if piece._hitFlash and piece._hitFlash > 0 then
         return "hurt"
+    end
+    if piece.isSliding and piece.animTimer and piece.animTimer > 0 then
+        return "slide"
     end
     if piece.animIsJump and piece.animTimer and piece.animTimer > 0 then
         return "jump"
@@ -1280,6 +1295,7 @@ local function GetEnemySpritePath(piece)
     if et == "hermit_crab" and not piece.hasShell then
         return ENEMY_FRAMES["hermit_crab_hurt"]
     end
+
     return ENEMY_FRAMES[et]
 end
 
@@ -1597,6 +1613,34 @@ local function DrawEnemyNVG(nvg, cx, cy, r, enemyType, gameTime)
         nvgFillColor(nvg, nvgRGBA(40, 20, 10, 255))
         nvgFill(nvg)
 
+    elseif enemyType == "frost_grunt" or enemyType == "frost_barracuda" then
+        -- 第五章冰系敌人 fallback（贴图加载失败时的矢量占位）
+        local isBarra = (enemyType == "frost_barracuda")
+        nvgBeginPath(nvg)
+        if isBarra then
+            -- 梭鱼形状：水平椭圆
+            nvgEllipse(nvg, cx, cy, r * 0.6, r * 0.3)
+        else
+            -- 冰锥兵：六边形
+            local sides = 6
+            for i = 0, sides - 1 do
+                local angle = math.pi * 2 * i / sides - math.pi / 2
+                local px = cx + math.cos(angle) * r * 0.5
+                local py = cy + math.sin(angle) * r * 0.5
+                if i == 0 then nvgMoveTo(nvg, px, py) else nvgLineTo(nvg, px, py) end
+            end
+            nvgClosePath(nvg)
+        end
+        nvgFillColor(nvg, nvgRGBA(100, 180, 240, 230))
+        nvgFill(nvg)
+        nvgStrokeColor(nvg, nvgRGBA(180, 220, 255, 255))
+        nvgStrokeWidth(nvg, 2)
+        nvgStroke(nvg)
+        -- 冰晶标记
+        nvgFontSize(nvg, r * 0.6)
+        nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 240))
+        nvgText(nvg, cx, cy, isBarra and "🐟" or "🧊")
     else
         -- 未知类型：画一个简单的带问号圆形
         nvgBeginPath(nvg)
@@ -2408,14 +2452,26 @@ function HexGrid.DrawPiece(nvg, cx, cy, radius, piece)
                 if isDying then
                     -- 死亡倒地：旋转 + 下沉 + 渐隐
                     nvgSave(nvg)
-                    local rot = deathProgress * math.pi * 0.5  -- 旋转90度倒地
-                    local sinkY = deathProgress * drawRadius * 0.4  -- 下沉
-                    local alpha = math.max(0.15, 1.0 - deathProgress * 0.7)  -- 渐隐到0.15
+                    local rot = deathProgress * math.pi * 0.5
+                    local sinkY = deathProgress * drawRadius * 0.4
+                    local alpha = math.max(0.15, 1.0 - deathProgress * 0.7)
                     nvgTranslate(nvg, cx, cy + breathOffset + sinkY)
                     nvgRotate(nvg, rot)
                     nvgGlobalAlpha(nvg, alpha)
                     DrawSpriteImage(nvg, 0, 0, drawRadius, imgHandle, 3.2, -drawRadius * 0.15, 1.0)
                     nvgGlobalAlpha(nvg, 1.0)
+                    nvgRestore(nvg)
+                elseif frameKey == "slide" and piece.animFromCol and piece.animFromRow then
+                    -- 滑行：朝滑行方向旋转，尺寸保持接近普通状态
+                    -- 用cube坐标差算方向角度（不依赖hexSize/ox/oy）
+                    local fx, fy, fz = HexGrid.OffsetToCube(piece.animFromCol, piece.animFromRow)
+                    local tx, ty, tz = HexGrid.OffsetToCube(piece.col, piece.row)
+                    local ddx, ddy = (tx - fx) + (tz - fz) * 0.5, (tz - fz) * 0.866
+                    local slideAngle = math.atan(ddy, ddx) - math.pi / 2  -- 图片头朝上
+                    nvgSave(nvg)
+                    nvgTranslate(nvg, cx, cy + breathOffset)
+                    nvgRotate(nvg, slideAngle)
+                    DrawSpriteImage(nvg, 0, 0, drawRadius, imgHandle, 3.25, -drawRadius * 0.12, 1.0)
                     nvgRestore(nvg)
                 else
                     DrawSpriteImage(nvg, cx, cy + breathOffset, drawRadius, imgHandle, 3.2, -drawRadius * 0.15, 1.0)

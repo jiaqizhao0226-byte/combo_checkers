@@ -20,6 +20,38 @@ local ENEMY_INTRO = BattleData.ENEMY_INTRO
 
 return function(Battle)
 
+local function IsBoardEdgeCell(col, row)
+    return HexGrid.CubeDistance(col, row, HexGrid.CENTER_COL, HexGrid.CENTER_ROW) == HexGrid.RADIUS
+end
+
+--- 第五章道具更偏向刷在棋盘最外圈，鼓励玩家用冰面滑行去边缘拾取。
+--- 非第五章保持普通随机。
+function Battle.PickItemSpawnPosition(state, candidates)
+    if #candidates == 0 then return nil end
+    local chapter = 1
+    if Battle.GetChapterInfo and state.level then
+        chapter = Battle.GetChapterInfo(state.level)
+    end
+    if chapter ~= 5 then
+        return candidates[math.random(1, #candidates)]
+    end
+
+    local totalWeight = 0
+    for _, pos in ipairs(candidates) do
+        pos._itemSpawnWeight = IsBoardEdgeCell(pos.col, pos.row) and 12 or 1
+        totalWeight = totalWeight + pos._itemSpawnWeight
+    end
+    local roll = math.random(1, totalWeight)
+    local cumulative = 0
+    for _, pos in ipairs(candidates) do
+        cumulative = cumulative + pos._itemSpawnWeight
+        if roll <= cumulative then
+            return pos
+        end
+    end
+    return candidates[#candidates]
+end
+
 function Battle.GenerateLevel(state, level)
     level = level or 1
     state.level = level
@@ -263,11 +295,12 @@ function Battle.GenerateLevel(state, level)
 
         -- Boss关放障碍当跳板（第4章沙虫身体段已足够，不额外放障碍）
         if chapter ~= 4 then
-            -- 第1章/第2章多放岩石弥补跳板不足，第3章适中
-            local obstacleCount = (chapter <= 2) and 5 or 3
+            -- 第五章冰块改为撞边后掉落的战术道具，不再开局预放。
+            local obstacleCount = (chapter <= 2) and 5 or (chapter == 5 and 0 or 3)
+            local obstacleType = nil
             for i = 1, obstacleCount do
                 local c, r = claimRandomPos()
-                if c then HexGrid.AddObstacle(board, c, r) end
+                if c then HexGrid.AddObstacle(board, c, r, obstacleType) end
             end
         end
 
@@ -282,7 +315,7 @@ function Battle.GenerateLevel(state, level)
         elseif chapter == 4 then
             bossChapterEnemies = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
         elseif chapter == 5 then
-            bossChapterEnemies = { "frost_grunt", "frost_barracuda", "blizzard_hawk", "ice_crystal", "frost_bear" }
+            bossChapterEnemies = { "frost_grunt", "frost_barracuda", "frost_grunt", "frost_barracuda" }
         else
             bossChapterEnemies = { "frost_grunt", "frost_barracuda", "blizzard_hawk" }
         end
@@ -521,23 +554,25 @@ function Battle.GenerateLevel(state, level)
                 enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
             end
         elseif chapter == 5 then
-            -- 第五章: 冰系敌人，后期加入精英
-            enemyTypes = { "frost_grunt", "frost_grunt", "aurora_jelly", "frost_barracuda" }
+            -- 第五章: 逐步解锁冰系敌人
+            enemyTypes = { "frost_grunt", "frost_grunt", "frost_barracuda" }
             if stageInChapter >= 3 then
-                enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal" }
+                enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly" }
             end
             if stageInChapter >= 5 then
-                enemyTypes = { "frost_grunt", "frost_barracuda", "ice_crystal", "blizzard_hawk", "aurora_jelly" }
+                enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal", "blizzard_hawk" }
             end
             if stageInChapter >= 7 then
-                enemyTypes = { "frost_grunt", "frost_barracuda", "blizzard_hawk", "ice_crystal", "frost_bear" }
+                enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal", "blizzard_hawk", "frost_bear" }
             end
         else
             enemyTypes = { "frost_grunt", "frost_barracuda", "blizzard_hawk" }
         end
 
-        -- 障碍物数量：只有第三章放珊瑚/礁石（配合寄居蟹营救机制）
+        -- 障碍物数量：只有第三章放珊瑚/礁石（配合寄居蟹营救机制）。
+        -- 第五章冰块由撞边累计掉落，作为风险换资源的战术道具。
         local obstacleCount = 0
+        local obstacleType = nil
         if chapter == 3 then
             obstacleCount = math.min(math.floor(stageInChapter / 3), 3)
         end
@@ -552,12 +587,23 @@ function Battle.GenerateLevel(state, level)
         -- 放置障碍物
         for i = 1, obstacleCount do
             local c, r = claimRandomPos()
-            if c then HexGrid.AddObstacle(board, c, r) end
+            if c then HexGrid.AddObstacle(board, c, r, obstacleType) end
         end
 
         -- 放置敌人
         local ghostSharkCount = 0
         local GHOST_SHARK_CAP = 2  -- 第一章同屏隐形鲨上限
+        -- 安全断言：确保第五章刷的是冰系敌人
+        if chapter == 5 then
+            local firstType = enemyTypes[1] or "?"
+            if firstType ~= "frost_grunt" and firstType ~= "frost_barracuda" then
+                -- 异常：强制修正
+                enemyTypes = { "frost_grunt", "frost_grunt", "frost_barracuda" }
+                Battle.AddLog(state, "⚠️ [BUG] chapter5 enemyTypes was wrong, forced fix!")
+            end
+            Battle.AddLog(state, string.format("❄️ 第%d章第%d关: 敌人池=%s (v2)",
+                chapter, stageInChapter, table.concat(enemyTypes, ",")))
+        end
         for i = 1, enemyCount do
             local c, r = claimRandomPos()
             if c then
@@ -570,7 +616,25 @@ function Battle.GenerateLevel(state, level)
                 end
                 if etype == "ghost_shark" then ghostSharkCount = ghostSharkCount + 1 end
                 local template = ENEMY_TEMPLATES[etype]
+                -- 第五章强制保护：如果模板查找失败，直接用内联数据兜底
+                if not template and chapter == 5 then
+                    if etype == "frost_barracuda" then
+                        template = { team = "enemy", enemyType = "frost_barracuda", hp = 30, maxHp = 30, atk = 28, attackRange = 1, attackLabel = "冲刺", name = "寒冰梭鱼", chargeRange = 4, iceChargeUnlimited = true }
+                    else
+                        template = { team = "enemy", enemyType = "frost_grunt", hp = 52, maxHp = 52, atk = 20, attackRange = 1, attackLabel = "冰锥刺击", name = "冰锥兵" }
+                    end
+                end
                 local piece = Battle.CreatePiece(template, c, r)
+                -- 第五章双重保险：确保piece类型正确，防止CreatePiece兜底为slime
+                if chapter == 5 and piece.enemyType == "slime" then
+                    piece.enemyType = etype
+                    piece.name = (etype == "frost_barracuda") and "寒冰梭鱼" or "冰锥兵"
+                    piece.hp = (etype == "frost_barracuda") and 30 or 52
+                    piece.maxHp = piece.hp
+                    piece.atk = (etype == "frost_barracuda") and 28 or 20
+                    piece.attackLabel = (etype == "frost_barracuda") and "冲刺" or "冰锥刺击"
+                    piece.attackRange = 1
+                end
                 piece.hp = math.floor(piece.hp * hpScale)
                 piece.maxHp = piece.hp
                 if piece.atk > 0 then
@@ -718,6 +782,12 @@ function Battle.GenerateLevel(state, level)
         Battle.TrySpawnItems(state, 1, itemOpts)
 
         Battle.AddLog(state, string.format("=== 第%d章 第%d关开始！===", chapter, stageInChapter))
+    end
+
+    -- Chapter 5: generate initial ice tiles
+    if chapter == 5 then
+        local IceMechanic = require "IceMechanic"
+        IceMechanic.GenerateInitialIce(state, stageInChapter)
     end
 end
 
@@ -1107,15 +1177,15 @@ function Battle.ContinueLevel(state, nextLevel)
             enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
         end
     elseif chapter == 5 then
-        enemyTypes = { "frost_grunt", "frost_grunt", "aurora_jelly", "frost_barracuda" }
+        enemyTypes = { "frost_grunt", "frost_grunt", "frost_barracuda" }
         if stageInChapter >= 3 then
-            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly" }
         end
         if stageInChapter >= 5 then
-            enemyTypes = { "frost_grunt", "frost_barracuda", "ice_crystal", "blizzard_hawk", "aurora_jelly" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal", "blizzard_hawk" }
         end
         if stageInChapter >= 7 then
-            enemyTypes = { "frost_grunt", "frost_barracuda", "blizzard_hawk", "ice_crystal", "frost_bear" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal", "blizzard_hawk", "frost_bear" }
         end
     else
         enemyTypes = { "frost_grunt", "frost_barracuda", "blizzard_hawk" }
@@ -1125,6 +1195,14 @@ function Battle.ContinueLevel(state, nextLevel)
     -- 辅助：在随机空位生成一个指定类型的敌人，返回是否成功
     local function spawnOneEnemy(etype)
         local template = ENEMY_TEMPLATES[etype]
+        -- 第五章强制保护
+        if not template and chapter == 5 then
+            if etype == "frost_barracuda" then
+                template = { team = "enemy", enemyType = "frost_barracuda", hp = 30, maxHp = 30, atk = 28, attackRange = 1, attackLabel = "冲刺", name = "寒冰梭鱼", chargeRange = 4, iceChargeUnlimited = true }
+            else
+                template = { team = "enemy", enemyType = "frost_grunt", hp = 52, maxHp = 52, atk = 20, attackRange = 1, attackLabel = "冰锥刺击", name = "冰锥兵" }
+            end
+        end
         if not template then return false end
         for attempts = 1, 80 do
             local tc = math.random(1, HexGrid.COLS)
@@ -1333,8 +1411,15 @@ function Battle.TrySpawnItems(state, maxCount, opts)
     for _, wt in ipairs(weightedTypes) do totalWeight = totalWeight + wt.weight end
 
     local spawned = 0
-    for _, pos in ipairs(candidates) do
-        if spawned >= toSpawn then break end
+    while spawned < toSpawn and #candidates > 0 do
+        local pos = Battle.PickItemSpawnPosition(state, candidates)
+        if not pos then break end
+        for i = #candidates, 1, -1 do
+            if candidates[i] == pos then
+                table.remove(candidates, i)
+                break
+            end
+        end
         local roll = math.random(1, totalWeight)
         local cumulative = 0
         local itemType = weightedTypes[1].type
@@ -1600,15 +1685,15 @@ function Battle.TrySpawnEnemies(state)
             enemyTypes = { "sand_hawk", "venom_lizard", "sand_rattler", "sand_strider" }
         end
     elseif chapter == 5 then
-        enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly" }
+        enemyTypes = { "frost_grunt", "frost_barracuda", "frost_grunt" }
         if stageInChapter >= 3 then
-            enemyTypes = { "frost_grunt", "frost_barracuda", "ice_crystal" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly" }
         end
         if stageInChapter >= 5 then
-            enemyTypes = { "frost_barracuda", "ice_crystal", "blizzard_hawk" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal", "blizzard_hawk" }
         end
         if stageInChapter >= 7 then
-            enemyTypes = { "frost_barracuda", "blizzard_hawk", "ice_crystal", "frost_bear" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal", "blizzard_hawk", "frost_bear" }
         end
     else
         enemyTypes = { "frost_grunt", "frost_barracuda", "blizzard_hawk" }
@@ -1625,7 +1710,7 @@ function Battle.TrySpawnEnemies(state)
         elseif chapter == 4 then
             enemyTypes = { "sand_scorpion", "sand_hawk", "venom_lizard" }
         elseif chapter == 5 then
-            enemyTypes = { "frost_grunt", "frost_barracuda", "blizzard_hawk" }
+            enemyTypes = { "frost_grunt", "frost_barracuda", "aurora_jelly", "ice_crystal" }
         else
             enemyTypes = { "frost_grunt", "frost_barracuda" }
         end
@@ -1686,7 +1771,25 @@ function Battle.TrySpawnEnemies(state)
         end
         if etype == "ghost_shark" then currentGhostSharks = currentGhostSharks + 1 end
         local template = ENEMY_TEMPLATES[etype]
+        -- 第五章强制保护：模板缺失时用内联数据兜底
+        if not template and chapter == 5 then
+            if etype == "frost_barracuda" then
+                template = { team = "enemy", enemyType = "frost_barracuda", hp = 30, maxHp = 30, atk = 28, attackRange = 1, attackLabel = "冲刺", name = "寒冰梭鱼", chargeRange = 4, iceChargeUnlimited = true }
+            else
+                template = { team = "enemy", enemyType = "frost_grunt", hp = 52, maxHp = 52, atk = 20, attackRange = 1, attackLabel = "冰锥刺击", name = "冰锥兵" }
+            end
+        end
         local piece = Battle.CreatePiece(template, pos.col, pos.row)
+        -- 第五章双重保险
+        if chapter == 5 and piece.enemyType == "slime" then
+            piece.enemyType = etype
+            piece.name = (etype == "frost_barracuda") and "寒冰梭鱼" or "冰锥兵"
+            piece.hp = (etype == "frost_barracuda") and 30 or 52
+            piece.maxHp = piece.hp
+            piece.atk = (etype == "frost_barracuda") and 28 or 20
+            piece.attackLabel = (etype == "frost_barracuda") and "冲刺" or "冰锥刺击"
+            piece.attackRange = 1
+        end
         piece.hp = math.floor(piece.hp * hpScale)
         piece.maxHp = piece.hp
         if piece.atk > 0 then
@@ -1785,6 +1888,12 @@ end
 
 --- 创建一个棋子实例
 function Battle.CreatePiece(template, col, row)
+    if not template then
+        print("[WARN] CreatePiece: nil template at col=" .. tostring(col) .. " row=" .. tostring(row))
+        -- 返回一个最小化占位棋子防止崩溃
+        return { team = "enemy", enemyType = "slime", hp = 1, maxHp = 1, atk = 0,
+                 attackRange = 1, attackLabel = "?", name = "???", col = col, row = row }
+    end
     local p = {}
     for k, v in pairs(template) do
         p[k] = v

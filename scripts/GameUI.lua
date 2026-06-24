@@ -524,12 +524,12 @@ end
 
 -- 章节背景主题色表（饱和度提高，确保棋盘外区域也能体现章节色）
 local BG_THEMES = {
-    [0] = { top={32,20,58,255},   bot={42,28,72,255}  },  -- 无尽深渊：紫色（与BoardWidget BOARD_THEMES[0]同步）
+    [0] = { top={32,20,58,255},   bot={42,28,72,255}  },  -- 虚空试炼：紫色（与BoardWidget BOARD_THEMES[0]同步）
     [1] = { top={15,25,60,255},   bot={22,42,85,255}  },  -- 深海蓝（保持不变）
     [2] = { top={40,16,8,255},    bot={58,22,10,255}  },  -- 熔岩暗红棕（调暗降饱和）
     [3] = { top={15,45,35,255},   bot={22,68,52,255}  },  -- 珊瑚深绿（保持不变）
     [4] = { top={40,30,12,255},   bot={55,40,18,255}  },  -- 流沙荒漠（与BoardWidget CHAPTER_THEMES[4]同步）
-    [5] = { top={12,18,38,255},   bot={22,30,58,255}  },  -- 永冻绝境（冰蓝，与BOARD_THEMES[5]同步）
+    [5] = { top={30,35,45,255},   bot={40,48,58,255}  },  -- 永冻绝境（冰面玻璃感，与BOARD_THEMES[5]同步）
 }
 
 --- 动态更新根面板背景渐变（换章节时调用）
@@ -1966,7 +1966,7 @@ local TUTORIAL_PAGES = {
             { emoji = "♟️", text = "棋步 — 每N跳后可跳至全图任意位置", skillId = "kingmaker" },
             { emoji = "🟣", text = "引力 — 落地后拉近周围敌人", skillId = "gravity_pull" },
             { emoji = "🗡️", text = "飞镖风暴 — 2连跳发射多枚飞镖，可穿透/灼烧", skillId = "dart_storm" },
-            { emoji = "🌀", text = "连锁释放 — 落地后概率额外重演落地效果(震地/地刺)", skillId = "multi_cast" },
+
             { emoji = "💪", text = "战意增幅 — 提升所有技能的伤害输出", skillId = "damage_amp" },
             { emoji = "🤐", text = "寂灭之路 — 连跳经过的敌人被沉默，无法用特殊技能", skillId = "silence_path" },
         },

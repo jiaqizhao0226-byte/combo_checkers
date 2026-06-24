@@ -902,47 +902,7 @@ function TestPanel.Show()
                                             end
                                         end,
                                     },
-                                    -- 连锁释放
-                                    UI.Button {
-                                        text = "🔮 连锁释放",
-                                        fontSize = 14, fontWeight = "bold",
-                                        flexGrow = 1, height = 38,
-                                        borderRadius = 0,
-                                        backgroundGradient = {
-                                            type = "linear", direction = "to-right",
-                                            from = {90, 40, 140, 255}, to = {60, 30, 100, 255},
-                                        },
-                                        fontColor = {220, 160, 255, 255},
-                                        borderWidth = 1,
-                                        borderColor = {150, 80, 220, 150},
-                                        pressedBackgroundColor = {70, 30, 100, 255},
-                                        onClick = function(self)
-                                            AM.PlaySFX("ui_click")
-                                            local needNewBattle = not G.battle or not G.battle.hero
-                                            if needNewBattle then
-                                                TestPanel.Close()
-                                                local TurnFlow = require "TurnFlow"
-                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
-                                                G.battle = Battle.New(bonus)
-                                                G.battle.skills["multi_cast"] = 1
-                                                -- 给一个落地技能方便测试连锁
-                                                G.battle.skills["quake_land"] = 3
-                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
-                                                TurnFlow.SnapCameraToHero()
-                                                TurnFlow.ClearPlan()
-                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
-                                                TurnFlow.StartPlayerTurn()
-                                            else
-                                                local cur = G.battle.skills["multi_cast"] or 0
-                                                local newLv = math.min(cur + 1, 5)
-                                                G.battle.skills["multi_cast"] = newLv
-                                                self:SetText("🔮 连锁Lv" .. newLv)
-                                                if newLv >= 5 then
-                                                    self:SetDisabled(true)
-                                                end
-                                            end
-                                        end,
-                                    },
+
                                 },
                             },
                             -- 第三行：战意增幅 + 寂灭之路
@@ -1051,7 +1011,7 @@ function TestPanel.Show()
                             },
                             UI.Panel {
                                 width = "100%",
-                                flexDirection = "row", gap = 8,
+                                flexDirection = "row", flexWrap = "wrap", gap = 8,
                                 children = {
                                     -- 第一章 Boss: 深渊海妖
                                     UI.Button {
@@ -1167,6 +1127,36 @@ function TestPanel.Show()
                                             TurnFlow.StartPlayerTurn()
                                         end,
                                     },
+                                    -- 第五章 Boss: 永冻之王
+                                    UI.Button {
+                                        text = "❄ 冰王",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {35, 45, 60, 255}, to = {22, 28, 38, 255},
+                                        },
+                                        fontColor = {160, 210, 240, 255},
+                                        borderWidth = 1,
+                                        borderColor = {100, 150, 190, 150},
+                                        pressedBackgroundColor = {18, 22, 32, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            TestPanel.Close()
+                                            local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            Battle.GenerateLevel(G.battle, 50)  -- 第5章Boss关
+                                            AM.UpdateBattleBGM(50)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            GameUI.UpdateBackground()
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
                                 },
                             },
                         },
@@ -1190,7 +1180,7 @@ function TestPanel.Show()
                             },
                             UI.Panel {
                                 width = "100%",
-                                flexDirection = "row", gap = 8,
+                                flexDirection = "row", flexWrap = "wrap", gap = 8,
                                 children = {
                                     -- 第二章
                                     UI.Button {
@@ -1281,6 +1271,37 @@ function TestPanel.Show()
                                             TurnFlow.ClearPlan()
                                             if G.resultPanel then G.resultPanel:SetVisible(false) end
                                             AM.UpdateBattleBGM(31)
+                                            GameUI.UpdateBackground()
+                                            TurnFlow.StartPlayerTurn()
+                                        end,
+                                    },
+                                    -- 第五章
+                                    UI.Button {
+                                        text = "❄ 第5章",
+                                        fontSize = 14, fontWeight = "bold",
+                                        flexGrow = 1, height = 38,
+                                        borderRadius = 0,
+                                        backgroundGradient = {
+                                            type = "linear", direction = "to-right",
+                                            from = {35, 45, 60, 255}, to = {22, 28, 38, 255},
+                                        },
+                                        fontColor = {160, 210, 240, 255},
+                                        borderWidth = 1,
+                                        borderColor = {100, 150, 190, 150},
+                                        pressedBackgroundColor = {18, 22, 32, 255},
+                                        onClick = function(self)
+                                            AM.PlaySFX("ui_click")
+                                            if G.playerData then PlayerData.Save(G.playerData) end
+                                            TestPanel.Close()
+                                            local TurnFlow = require "TurnFlow"
+                                            local GameUI = require "GameUI"
+                                            local bonus = PlayerData.GetTotalBonus(G.playerData)
+                                            G.battle = Battle.New(bonus)
+                                            Battle.GenerateLevel(G.battle, 41)
+                                            TurnFlow.SnapCameraToHero()
+                                            TurnFlow.ClearPlan()
+                                            if G.resultPanel then G.resultPanel:SetVisible(false) end
+                                            AM.UpdateBattleBGM(41)
                                             GameUI.UpdateBackground()
                                             TurnFlow.StartPlayerTurn()
                                         end,

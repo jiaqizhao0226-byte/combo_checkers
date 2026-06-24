@@ -347,12 +347,12 @@ BattleData.ENEMY_INTRO = {
     swift_barracuda = { icon = "💨", name = "疾梭鱼", desc = "每回合最多移动3格，来势凶猛" },
     charm_jelly  = { icon = "💜", name = "魅惑水母", desc = "英雄进入2格范围将被魅惑，跳过一回合" },
     -- 第五章
-    sand_scorpion   = { icon = "🦂", name = "沙蝎",   desc = "沙漠中的伏击者" },
-    quicksand_worm  = { icon = "🪱", name = "流沙虫", desc = "潜伏沙中的蠕虫，近距啃噬" },
-    sand_hawk       = { icon = "🦅", name = "沙鹰",   desc = "远程俯冲，靠近会后退" },
-    sand_strider    = { icon = "🌪️", name = "沙暴行者", desc = "蓄力一回合后可攻击全图任意目标！" },
-    sand_rattler    = { icon = "🐍", name = "响尾蛇", desc = "被攻击或跳过后狂怒，下回合造成双倍伤害" },
-    venom_lizard    = { icon = "🦎", name = "毒尾蜥", desc = "攻击附带剧毒，持续掉血" },
+    frost_grunt      = { icon = "🧊", name = "冰锥兵", desc = "基础近战敌人，可作为滑行终点，也适合用冰块炮弹砸碎" },
+    frost_barracuda  = { icon = "🐟", name = "寒冰梭鱼", desc = "与英雄处在同一直线且路径畅通时，会沿冰面高速突刺" },
+    aurora_jelly     = { icon = "👻", name = "冰雾精灵", desc = "释放寒气迷惑英雄，使其跳过一回合行动" },
+    ice_crystal      = { icon = "🔷", name = "冰晶体", desc = "固定不动，会释放冻结射线" },
+    blizzard_hawk    = { icon = "🦅", name = "暴风雪鹰", desc = "蓄力后投掷AOE冰弹，产生持续2回合的伤害陷阱" },
+    frost_bear       = { icon = "🐻", name = "蓄怒冰熊", desc = "被跳过或冰块击中时积累怒气，满3层爆发冲锋" },
 }
 
 BattleData.BOSS_TEMPLATES = {
@@ -434,13 +434,11 @@ BattleData.BOSS_TEMPLATES = {
     -- ====== 第五章: 永冻绝境 ======
     frost_grunt = {
         team = "enemy", enemyType = "frost_grunt",
-        hp = 48, maxHp = 48,
-        atk = 24,
+        hp = 52, maxHp = 52,
+        atk = 20,
         attackRange = 1,
-        attackLabel = "冰锥",
+        attackLabel = "冰锥刺击",
         name = "冰锥兵",
-        iceImmune = true,      -- 免疫冰面滑行推动
-        deathSpawnIce = true,  -- 死亡时生成冰面格
     },
     aurora_jelly = {
         team = "enemy", enemyType = "aurora_jelly",
@@ -448,7 +446,7 @@ BattleData.BOSS_TEMPLATES = {
         atk = 0,
         attackRange = 1,
         attackLabel = "魅惑",
-        name = "极光水母",
+        name = "冰雾精灵",
         charmRange = 2,        -- 魅惑光环范围
         iceSpeedBoost = true,  -- 冰面上移速×2
     },
@@ -476,22 +474,21 @@ BattleData.BOSS_TEMPLATES = {
     blizzard_hawk = {
         team = "enemy", enemyType = "blizzard_hawk",
         hp = 26, maxHp = 26,
-        atk = 20,
-        attackRange = 3,
-        attackLabel = "暴风吐息",
+        atk = 18,
+        attackRange = 4,
+        attackLabel = "冰弹轰炸",
         name = "暴风雪鹰",
         fleeRange = 1,         -- 英雄靠近1格时逃跑
-        iceTrailAttack = true, -- 攻击路径铺冰面
     },
     frost_bear = {
         team = "enemy", enemyType = "frost_bear",
         hp = 90, maxHp = 90,
-        atk = 30,
+        atk = 22,
         attackRange = 1,
-        attackLabel = "冰面推击",
-        name = "寒霜巨熊",
-        pushDistance = 3,      -- 推飞英雄距离
-        iceImmune = true,      -- 免疫冰面滑行推动
+        attackLabel = "冰爪",
+        name = "蓄怒冰熊",
+        rageMax = 3,           -- 满怒气层数
+        rageable = true,       -- 标记：被跳过/冰块击中时+怒气
     },
     -- 第五章Boss: 永冻之王
     frost_king = {

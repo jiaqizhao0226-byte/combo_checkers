@@ -95,12 +95,12 @@ end
 
 --- 章节名称
 Battle.CHAPTER_NAMES = {
-    [0] = "无尽深渊",   -- 特殊模式：在第1章左边（菜单导航用）
+    [0] = "虚空试炼",   -- 特殊模式：在第1章左边（菜单导航用）
     [1] = "深渊海沟",
     [2] = "烈焰山脉",
     [3] = "珊瑚迷宫",
     [4] = "流沙荒漠",
-    [5] = "永冻绝境",   -- 第五章：冰原主题
+    [5] = "永冻绝境 🚧",   -- 第五章：冰原主题（施工中）
 }
 
 --- 每章10关的关卡信息（按章节索引）
@@ -1664,6 +1664,23 @@ function Battle.ExecuteMove(state, targetCol, targetRow, isFreeMove)
     end
     Battle.AddLog(state, "剑士移动到 (" .. targetCol .. "," .. targetRow .. ")")
 
+    -- 第五章冰块：企鹅移动到冰块边时，会沿本次移动方向把冰块推出去
+    -- 示意：旧位置 A -> 新位置 B -> 冰块 C，冰块从 C 继续向前飞出，清掉路径上的小怪。
+    if Battle.GetChapterInfo(state.level) == 5 then
+        local dx, dy, dz = HexGrid.OffsetToCube(targetCol, targetRow)
+        local ox, oy, oz = HexGrid.OffsetToCube(oldCol, oldRow)
+        local dirX, dirY, dirZ = dx - ox, dy - oy, dz - oz
+        local dist = math.max(math.abs(dirX), math.abs(dirY), math.abs(dirZ))
+        if dist == 1 then
+            local blockCol, blockRow = HexGrid.CubeToOffset(dx + dirX, dy + dirY, dz + dirZ)
+            local obs = HexGrid.GetObstacleAt(state.board, blockCol, blockRow)
+            if obs and obs.type == "ice_block" then
+                local IceMechanic = require "IceMechanic"
+                IceMechanic.PushIceBlock(state, Battle, blockCol, blockRow, targetCol, targetRow)
+            end
+        end
+    end
+
     -- 简单移动不触发震地落（只有跳跃最终落点才触发）
 
     -- 踏步斩: 移动时对最近敌人发起近战攻击
@@ -1698,12 +1715,14 @@ function Battle.ExecuteMove(state, targetCol, targetRow, isFreeMove)
                     target.hp = 0
                     state.totalDamage = state.totalDamage + overkill
                     target.hitFlash = 0.15
-                    Battle.AddVFX(state, "execution", {
-                        col = target.col, row = target.row, duration = 1.0,
+                    Battle.AddVFX(state, "step_strike_slash", {
+                        col = target.col, row = target.row,
+                        fromCol = targetCol, fromRow = targetRow,
+                        duration = 0.6, isExecute = true,
                     })
                     Battle.AddFloatingText(state, target.col, target.row,
-                        "💀斩杀!", {255, 50, 10, 255}, "execution", 2.0)
-                    AM.PlaySFX("attack_hit", 1.1, 0.8)  -- 低沉重斩音
+                        "⚔斩杀", {255, 80, 30, 255}, "hit", 0.8)
+                    AM.PlaySFX("attack_hit", 1.1, 0.8)
                     Battle.HandleEnemyDeath(state, target, false)
                 else
                     -- 保底近战伤害(Boss/高血敌人)
@@ -1744,6 +1763,50 @@ function Battle.ExecuteMove(state, targetCol, targetRow, isFreeMove)
 
     -- 检查停沙格
     Battle.CheckSandStopTile(state, targetCol, targetRow)
+
+    -- 检查冰弹陷阱
+    Battle.CheckIceTrap(state, targetCol, targetRow)
+end
+
+--- 检查英雄是否踩到冰弹陷阱（暴风雪鹰投下的AOE持续伤害区域）
+function Battle.CheckIceTrap(state, col, row)
+    if not state._iceTraps then return end
+    local hero = state.hero
+    for _, trap in ipairs(state._iceTraps) do
+        if trap.col == col and trap.row == row and trap.turnsLeft > 0 then
+            local dmg = trap.damage or 12
+            if state.hasShield then
+                dmg = math.floor(dmg / 2)
+                state.hasShield = false
+                Battle.AddFloatingText(state, hero.col, hero.row, "🛡️挡!", {120, 180, 255, 255})
+            end
+            if (hero._shield or 0) > 0 and dmg > 0 then
+                local absorbed = math.min(hero._shield, dmg)
+                dmg = dmg - absorbed
+                hero._shield = hero._shield - absorbed
+            end
+            hero.hp = hero.hp - dmg
+            state.hitFlash = 0.25
+            state.screenShake = (state.screenShake or 0) + 0.15
+            Battle.AddFloatingText(state, col, row,
+                "🦅陷阱-" .. dmg, {140, 200, 255, 255}, "hit")
+            Battle.AddLog(state, string.format("踩到冰弹陷阱！受到%d伤害", dmg))
+            local AM = require "AudioManager"
+            AM.PlaySFX("hero_damage", 0.7, 1.3)
+            break  -- 同格只触发一次
+        end
+    end
+end
+
+--- 每回合开始递减冰弹陷阱倒计时，到期清除
+function Battle.TickIceTraps(state)
+    if not state._iceTraps then return end
+    for i = #state._iceTraps, 1, -1 do
+        state._iceTraps[i].turnsLeft = state._iceTraps[i].turnsLeft - 1
+        if state._iceTraps[i].turnsLeft <= 0 then
+            table.remove(state._iceTraps, i)
+        end
+    end
 end
 
 --- 执行跳跃 (跳过敌人造成伤害, 或跳过岩石不造成伤害)
@@ -2261,6 +2324,17 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         state.totalDamage = state.totalDamage + damage
     end
     enemy.hitFlash = 0.2  -- per-piece 受击闪白
+    -- 蓄怒冰熊：被跳过时+1怒气
+    if enemy.rageable and damage > 0 then
+        enemy._bearRage = (enemy._bearRage or 0) + 1
+        Battle.AddFloatingText(state, enemy.col, enemy.row,
+            "💢" .. enemy._bearRage .. "/3", {255, 150, 80, 255}, nil, 0.7)
+        if enemy._bearRage >= 3 then
+            Battle.AddFloatingText(state, enemy.col, enemy.row,
+                "🐻怒气满！", {255, 80, 40, 255}, "combo", 1.0)
+            Battle.AddLog(state, "🐻 蓄怒冰熊怒气爆满！下回合将冲锋！")
+        end
+    end
     -- 打击音效随combo递进：音调升高+音量加大，打击感更强（棋步跳有专属音效，跳过通用音效）
     if not state._isKingmakerJump then
         local hitGain = math.min(1.0 + state.combo * 0.06, 1.5)
@@ -2657,6 +2731,24 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         Battle.ApplyGravityPull(state, jumpInfo.col, jumpInfo.row)
     end
 
+    -- === 第五章: 冰面滑行（延迟执行，等跳跃动画播完后再滑行）===
+    if isLastStep then
+        local IceMechanic = require "IceMechanic"
+        if IceMechanic.IsIceTile(state, jumpInfo.col, jumpInfo.row) then
+            local dirFromCol = jumpInfo.jumpedCol or jumpFromCol
+            local dirFromRow = jumpInfo.jumpedRow or jumpFromRow
+            -- 预计算滑行结果，标记为待执行
+            local slideResult = IceMechanic.CalcSlide(state, jumpInfo.col, jumpInfo.row, dirFromCol, dirFromRow)
+            if slideResult then
+                state._pendingIceSlide = {
+                    landCol = jumpInfo.col, landRow = jumpInfo.row,
+                    dirFromCol = dirFromCol, dirFromRow = dirFromRow,
+                    result = slideResult,
+                }
+            end
+        end
+    end
+
     -- 连击奖励已移至 TurnFlow.FinishExecution（落地后触发）
 
     return enemy
@@ -2827,39 +2919,10 @@ function Battle.DoLandingReplay(state, col, row)
     Battle.PlaceSpikeTraps(state, col, row)     -- 在落地点周围额外布一圈地刺（需地刺陷阱技能）
 end
 
---- 统一落地技能入口: 执行一次正常落地效果，并处理"连锁释放"概率额外触发
---- 正常流程下地刺(在起跳点)/引力(落地点)由 ExecuteJump 外层单独调用，此处只做落地AOE；
---- 连锁释放额外触发时则重演落地序列(AOE+地刺)，不再只依赖震地落
+--- 统一落地技能入口: 执行一次正常落地效果
+--- 正常流程下地刺(在起跳点)/引力(落地点)由 ExecuteJump 外层单独调用，此处只做落地AOE
 function Battle.ApplyLandingSkills(state, col, row)
-    -- 先执行一次正常的落地效果（地刺/引力由 ExecuteJump 在外层单独处理）
     Battle.DoLandingEffect(state, col, row)
-
-    -- === 连锁释放: 落地后概率额外重演一次完整落地序列 ===
-    if state._multiCastActive then return end  -- 连锁释放进行中，不再嵌套
-    local mcLv = Skills.Level(state.skills, "multi_cast")
-    if mcLv < 1 then return end
-    local chance = (15 + mcLv * 8) / 100  -- Lv1=23%, Lv2=31%, ..., Lv5=55%
-    if math.random() >= chance then return end
-
-    state._multiCastActive = true
-    Battle.AddFloatingText(state, col, row, "🔮连锁释放!", {180, 100, 255, 255})
-    Battle.AddLog(state, "🔮 连锁释放触发！落地效果额外重演(震地/地刺)！")
-    -- 链式魔法光环 + 魔法音效（升调营造"再次充能"感）
-    Battle.AddVFX(state, "combo_thunder_ring", { col = col, row = row, duration = 0.7 })
-    AM.PlaySFX("time_freeze", 0.8, 1.25)
-    Battle.DoLandingReplay(state, col, row)  -- 额外触发：AOE + 地刺
-
-    -- Lv5: 12%概率三重释放
-    if mcLv >= 5 and math.random() < 0.12 then
-        Battle.AddFloatingText(state, col, row, "🔮🔮三重释放!", {220, 80, 255, 255})
-        Battle.AddLog(state, "🔮🔮 三重释放！")
-        -- 三重释放：更强的双层光环 + 屏幕轻抖 + 更亮音效
-        state.screenShake = (state.screenShake or 0) + 0.3
-        Battle.AddVFX(state, "combo_thunder_ring", { col = col, row = row, duration = 0.9 })
-        AM.PlaySFX("time_freeze", 1.0, 1.5)
-        Battle.DoLandingReplay(state, col, row)
-    end
-    state._multiCastActive = nil
 end
 
 --- 延迟应用漩涡鳗的打乱效果（在英雄落地动画完成后调用）
@@ -2970,6 +3033,10 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         ghost_shark = {100, 140, 200}, spine_anemone = {200, 80, 150},
         coral_priest = {255, 180, 120}, fission_flame = {255, 100, 30}, flame_shard = {255, 160, 60},
         splitting_urchin = {200, 100, 220},
+        -- 第五章
+        frost_grunt = {140, 200, 240}, aurora_jelly = {180, 120, 255},
+        frost_barracuda = {80, 160, 220}, ice_crystal = {200, 230, 255},
+        blizzard_hawk = {120, 180, 240}, frost_bear = {160, 200, 230},
     }
     Battle.AddVFX(state, "death_puff", {
         col = enemy.col, row = enemy.row, duration = 0.7,
@@ -3092,7 +3159,25 @@ function Battle.HandleEnemyDeath(state, enemy, fromChain, skipShockwave, skipDea
         Battle.AddLog(state, "熔岩巨人倒下，留下灼热的熔岩地形！")
     end
 
-
+    -- === 第五章: 冰锥兵死亡生成冰面格 ===
+    if enemy.deathSpawnIce then
+        local IceMechanic = require "IceMechanic"
+        IceMechanic.AddIceTile(state, enemy.col, enemy.row)
+        -- 30%概率扩展到1个相邻空格
+        local neighbors = HexGrid.GetNeighbors(enemy.col, enemy.row)
+        for _, n in ipairs(neighbors) do
+            if math.random(1, 100) <= 30 and HexGrid.InBounds(n.col, n.row) then
+                if not HexGrid.GetPieceAt(state.board, n.col, n.row)
+                   and not HexGrid.IsBlocked(state.board, n.col, n.row) then
+                    IceMechanic.AddIceTile(state, n.col, n.row)
+                    break
+                end
+            end
+        end
+        Battle.AddFloatingText(state, enemy.col, enemy.row,
+            "🧊冰面扩展!", {140, 210, 255, 255})
+        Battle.AddLog(state, "冰锥兵倒下，地面凝结成冰！")
+    end
 
     -- === 第二章: 漩涡鳗死亡打乱周围棋子（延迟到英雄落地后执行） ===
     if enemy.shuffleOnDeath then

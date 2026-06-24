@@ -327,20 +327,6 @@ Skills.SKILLS = {
         end,
     },
 
-    -- 21. 连锁释放 - 技能多次触发
-    multi_cast = {
-        name = "连锁释放",
-        icon = "skill_multi_cast",
-        color = {180, 100, 255},
-        maxLevel = 5,
-        rarity = {1, 2, 2, 3, 4},
-        desc = function(lv)
-            local chance = 15 + lv * 8          -- Lv1=23%, Lv2=31%, ..., Lv5=55%
-            local extra = ""
-            if lv >= 5 then extra = "；可触发三重释放(12%)" end
-            return string.format("落地后%d%%概率额外重演一次落地效果(震地落AOE+地刺)%s", chance, extra)
-        end,
-    },
 
     -- 22. 战意增幅 - 全技能伤害加成
     damage_amp = {

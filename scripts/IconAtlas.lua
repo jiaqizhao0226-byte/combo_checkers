@@ -88,7 +88,7 @@ IconAtlas.PATHS = {
     combo_tier2            = "icons/combo/combo_tier2_20260427110618.png",
     combo_tier3            = "icons/combo/combo_tier3_20260427111118.png",
     combo_tier4            = "icons/combo/combo_tier4_20260427111117.png",
-    combo_tier5            = "image/combo_tier5_meteor_20260516141940.png",
+    combo_tier5            = "image/icon_fx_meteor_20260513073757.png",
     combo_tier6            = "icons/combo/combo_tier6_20260427111120.png",
 
     -- === 棋盘元素图标 (10) ===

@@ -29,13 +29,14 @@ AM.BGM = {
     menu           = "audio/bgm_menu.ogg",
     battle         = "audio/bgm_battle.ogg",
     battle_calm    = "audio/bgm_battle_calm.ogg",
-    battle_endless = "audio/music_1779603354052.ogg", -- 无尽深渊专属（暗黑电子管弦）
+    battle_endless = "audio/music_1779603354052.ogg", -- 虚空试炼专属（暗黑电子管弦）
     boss           = "audio/bgm_boss.ogg",            -- 通用Boss BGM
     boss_lava      = "audio/bgm_boss_lava.ogg",       -- 熔岩领主专属（史诗管弦+战鼓）
     boss_abyss     = "audio/bgm_boss_abyss.ogg",      -- 深渊海妖专属（深海压迫恐惧）
     boss_coral     = "audio/music_1780643113805.ogg",  -- 珊瑚守卫专属（8bit激烈水下Boss战）
     battle_desert  = "audio/music_1779955577605.ogg", -- 第四章沙漠战斗（阿拉伯风打击乐）
     boss_sand      = "audio/music_1780643223086.ogg", -- 沙丘巨虫专属（8bit激烈沙漠Boss战）
+    battle_ice     = "audio/music_1782114803094.ogg", -- 第五章永冻绝境（8bit冰霜芯片音乐）
 }
 
 -- ============================================================================
@@ -128,6 +129,9 @@ AM.SFX = {
     boss_aoe             = "audio/sfx/boss_aoe.ogg",
     boss_stomp           = "audio/sfx/boss_stomp.ogg",
     quicksand_spawn      = "audio/sfx/quicksand_spawn.ogg",
+    -- 第五章冰面
+    ice_slide            = "audio/sfx/ice_slide_soft.ogg",
+    ice_crash            = "audio/sfx/ice_crash.ogg",
     -- 冰霜印记
     frost_freeze         = "audio/sfx/frost_freeze.ogg",
     -- 棋步跳跃
@@ -325,12 +329,6 @@ function AM.UpdateBattleBGM(level)
     local Battle = require "Battle"
     local chapter = math.ceil(level / Battle.LEVELS_PER_CHAPTER)
 
-    -- 第5章及以上 fallback 到战斗BGM（无尽模式由 EnterEndless 单独设置）
-    if chapter >= 5 then
-        AM.PlayBGM("battle")
-        return
-    end
-
     if Battle.IsBossLevel and Battle.IsBossLevel(level) then
         -- 根据Boss类型选择专属BGM
         local bossType = Battle.CHAPTER_BOSS and Battle.CHAPTER_BOSS[chapter]
@@ -344,6 +342,8 @@ function AM.UpdateBattleBGM(level)
             AM.PlayBGM("battle_calm")
         elseif chapter == 4 then
             AM.PlayBGM("battle_desert")
+        elseif chapter == 5 then
+            AM.PlayBGM("battle_ice")
         else
             AM.PlayBGM("battle")
         end

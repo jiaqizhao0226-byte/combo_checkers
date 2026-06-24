@@ -69,7 +69,16 @@ local CHAPTER_THEMES = {
         accentColor = {240, 190, 80},
         borderColor = {200, 160, 50, 140},
         isoImage = "image/edited_chapter4_desert_v3_nobg_20260529052411.png",
-        isoOffsetY = 0,  -- 与前三章底缘比例一致(94.6%)
+        isoOffsetY = 0,
+    },
+    [5] = {
+        icon = "❄",
+        glowColor = {130, 160, 190},
+        gradTop = {45, 50, 58, 245},
+        gradBot = {55, 62, 72, 245},
+        accentColor = {160, 200, 230},
+        borderColor = {100, 140, 170, 140},
+        isoImage = "image/chapter5_pure_a_20260618081508.png",
     },
     [0] = {
         icon = "🌀",
@@ -382,6 +391,124 @@ local function DrawChapterCardIso(nvg, chapter, cardX, cardY, cardW, cardH, isUn
                     nvgRGBA(255, 180, 30, 0))
                 nvgFillPaint(nvg, goldGlow)
                 nvgFill(nvg)
+            end
+        end
+
+    elseif chapter == 5 then
+        -- ── 第五章：飘雪粒子 ──
+        -- 1. 飘落的雪花（大小不一，左右摇摆）
+        for i = 1, 25 do
+            local seed = i * 193.47
+            local rndSpeed = ((seed * 7.13) % 73) / 73
+            local rndPhase = ((seed * 4.91) % 89) / 89
+            local rndSize  = ((seed * 11.67) % 61) / 61
+            local rndX     = ((seed * 6.29) % 97) / 97
+
+            -- 垂直下落循环（加速：0.08~0.16）
+            local lifeT = ((G.time * (0.08 + rndSpeed * 0.08) + rndPhase * 6.28) % 1.0)
+            local sx = cardX + cardW * (rndX * 0.9 + 0.05)
+            local sy = cardY + cardH * (-0.05 + lifeT * 1.1)
+            -- 左右飘荡（加大幅度和频率）
+            sx = sx + math.sin(G.time * (1.2 + rndSpeed * 0.8) + seed) * 18
+
+            local snowR = 2.5 + rndSize * 4.5
+            local fadeA = math.sin(lifeT * math.pi) * 0.85
+            local alpha = math.floor(fadeA * 200)
+
+            if alpha > 8 then
+                -- 六角雪花形状（6条辐射线 + 小分叉）
+                nvgSave(nvg)
+                nvgTranslate(nvg, sx, sy)
+                -- 缓慢旋转
+                nvgRotate(nvg, G.time * (0.3 + rndSpeed * 0.4) + seed)
+                nvgStrokeColor(nvg, nvgRGBA(220, 240, 255, alpha))
+                nvgStrokeWidth(nvg, math.max(0.8, snowR * 0.35))
+                local armLen = snowR * 1.8
+                for arm = 1, 6 do
+                    local angle = (arm - 1) * math.pi / 3
+                    local ax = math.cos(angle) * armLen
+                    local ay = math.sin(angle) * armLen
+                    -- 主臂
+                    nvgBeginPath(nvg)
+                    nvgMoveTo(nvg, 0, 0)
+                    nvgLineTo(nvg, ax, ay)
+                    nvgStroke(nvg)
+                    -- 小分叉（在臂的60%位置）
+                    if snowR > 2.0 then
+                        local bx = ax * 0.6
+                        local by = ay * 0.6
+                        local branchLen = armLen * 0.35
+                        local ba1 = angle + 0.5
+                        local ba2 = angle - 0.5
+                        nvgBeginPath(nvg)
+                        nvgMoveTo(nvg, bx, by)
+                        nvgLineTo(nvg, bx + math.cos(ba1) * branchLen, by + math.sin(ba1) * branchLen)
+                        nvgStroke(nvg)
+                        nvgBeginPath(nvg)
+                        nvgMoveTo(nvg, bx, by)
+                        nvgLineTo(nvg, bx + math.cos(ba2) * branchLen, by + math.sin(ba2) * branchLen)
+                        nvgStroke(nvg)
+                    end
+                end
+                nvgRestore(nvg)
+                -- 柔和光晕
+                if snowR > 2.5 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, sx, sy, snowR * 2.0)
+                    local snowGlow = nvgRadialGradient(nvg, sx, sy, snowR * 0.2, snowR * 2.0,
+                        nvgRGBA(200, 225, 250, math.floor(alpha * 0.2)),
+                        nvgRGBA(200, 225, 250, 0))
+                    nvgFillPaint(nvg, snowGlow)
+                    nvgFill(nvg)
+                end
+            end
+        end
+
+        -- 2. 底部薄雾层（白色冷雾，缓慢漂移）
+        for i = 1, 3 do
+            local seed = i * 257.3
+            local fogX = cardX + cardW * (((G.time * 0.06 + seed) % 1.5) - 0.25)
+            local fogY = cardY + cardH * (0.78 + i * 0.06)
+            local fogW = cardW * (0.3 + ((seed * 3.1) % 41) / 41 * 0.2)
+            local fogH = cardH * 0.12
+            local fogA = math.floor(25 + math.sin(G.time * 0.8 + seed) * 12)
+            nvgBeginPath(nvg)
+            nvgEllipse(nvg, fogX + fogW / 2, fogY, fogW / 2, fogH / 2)
+            local fogPaint = nvgRadialGradient(nvg, fogX + fogW / 2, fogY, fogW * 0.1, fogW / 2,
+                nvgRGBA(200, 220, 240, fogA),
+                nvgRGBA(180, 200, 220, 0))
+            nvgFillPaint(nvg, fogPaint)
+            nvgFill(nvg)
+        end
+
+        -- 3. 偶尔闪烁的冰晶光点
+        for i = 1, 8 do
+            local seed = i * 311.7
+            local blinkPhase = G.time * (0.8 + ((seed * 2.3) % 53) / 53 * 1.0) + seed
+            local blinkVal = math.max(0, math.sin(blinkPhase))
+            blinkVal = blinkVal * blinkVal * blinkVal
+            local sx = cardX + cardW * (0.08 + (((seed * 4.7) % 84) / 100))
+            local sy = cardY + cardH * (0.1 + (((seed * 3.1) % 80) / 100))
+            local alpha = math.floor(blinkVal * 180)
+
+            if alpha > 15 then
+                local starR = 1.5 + ((seed * 5.9) % 47) / 47 * 2
+                nvgBeginPath(nvg)
+                nvgCircle(nvg, sx, sy, starR * 0.5)
+                nvgFillColor(nvg, nvgRGBA(180, 220, 255, alpha))
+                nvgFill(nvg)
+                -- 十字光芒
+                local crossLen = starR * 1.5 * blinkVal
+                nvgStrokeWidth(nvg, 1.0)
+                nvgStrokeColor(nvg, nvgRGBA(180, 220, 255, math.floor(alpha * 0.6)))
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, sx - crossLen, sy)
+                nvgLineTo(nvg, sx + crossLen, sy)
+                nvgStroke(nvg)
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, sx, sy - crossLen * 0.7)
+                nvgLineTo(nvg, sx, sy + crossLen * 0.7)
+                nvgStroke(nvg)
             end
         end
 
