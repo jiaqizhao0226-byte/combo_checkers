@@ -312,7 +312,7 @@ end
 function HexGrid.AddObstacle(board, col, row, obstacleType)
     local obstacle = { col = col, row = row, type = obstacleType }
     if obstacleType == "ice_block" then
-        obstacle.turns = 5
+        obstacle.turns = 10
     end
     board.obstacles[#board.obstacles + 1] = obstacle
 end

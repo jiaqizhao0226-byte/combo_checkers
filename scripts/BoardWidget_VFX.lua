@@ -3610,6 +3610,78 @@ function BoardWidget_VFX.Render(ctx)
                 end
             end
 
+        elseif fx.type == "thanos_snap" then
+            -- 灭霸响指：紫金色宇宙冲击 + 尘化粒子
+            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
+            local targetOnly = fx.targetOnly == true
+            local fade = progress < 0.75 and 1.0 or math.max(0, 1.0 - (progress - 0.75) / 0.25)
+            local alpha = math.floor(255 * fade)
+
+            if not targetOnly then
+                local pulseT = math.min(1.0, progress * 1.6)
+                local ringR = hexSize * (0.8 + pulseT * 5.2)
+                local ringA = math.floor(alpha * (1.0 - pulseT) * 0.55)
+                if ringA > 4 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, ringR)
+                    nvgStrokeColor(nvg, nvgRGBA(190, 120, 255, ringA))
+                    nvgStrokeWidth(nvg, hexSize * 0.08)
+                    nvgStroke(nvg)
+                end
+
+                local flashA = math.floor(alpha * math.max(0, 1.0 - progress * 4.0) * 0.55)
+                if flashA > 3 then
+                    nvgBeginPath(nvg)
+                    nvgCircle(nvg, cx, cy, hexSize * 4.2)
+                    nvgFillPaint(nvg, nvgRadialGradient(nvg, cx, cy, 0, hexSize * 4.2,
+                        nvgRGBA(255, 230, 170, flashA),
+                        nvgRGBA(120, 60, 220, 0)))
+                    nvgFill(nvg)
+                end
+
+                nvgFontFace(nvg, "sans")
+                nvgFontSize(nvg, hexSize * (0.9 + math.sin(progress * math.pi) * 0.2))
+                nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+                nvgFillColor(nvg, nvgRGBA(255, 220, 120, math.floor(alpha * 0.9)))
+                nvgText(nvg, cx, cy - hexSize * 0.05, "🫰")
+
+                local total = fx.total or 0
+                local targets = fx.targets or 0
+                if total > 0 then
+                    nvgFontSize(nvg, hexSize * 0.28)
+                    nvgFillColor(nvg, nvgRGBA(220, 190, 255, math.floor(alpha * 0.75)))
+                    nvgText(nvg, cx, cy + hexSize * 0.62, targets .. "/" .. total)
+                end
+
+                G.battle.screenShake = math.max(G.battle.screenShake or 0, 0.35 * fade)
+            end
+
+            local dustCount = targetOnly and 18 or 28
+            for i = 1, dustCount do
+                local seed = i * 2.399963 + (fx.col or 0) * 0.71 + (fx.row or 0) * 1.37
+                local delay = targetOnly and ((i % 5) * 0.04) or ((i % 7) * 0.025)
+                local p = math.max(0, math.min(1, (progress - delay) / math.max(0.01, 1.0 - delay)))
+                if p > 0 and p < 1 then
+                    local angle = seed + p * (targetOnly and 1.8 or 0.8)
+                    local dist = hexSize * ((targetOnly and 0.15 or 0.25) + p * (targetOnly and 1.35 or 2.3))
+                    local px = cx + math.cos(angle) * dist
+                    local py = cy + math.sin(angle) * dist - p * hexSize * (targetOnly and 0.55 or 0.25)
+                    local pFade = p < 0.25 and p / 0.25 or math.max(0, 1.0 - (p - 0.25) / 0.75)
+                    local pA = math.floor(alpha * pFade * (targetOnly and 0.95 or 0.65))
+                    local pSize = hexSize * (0.035 + (i % 4) * 0.018) * (1.1 - p * 0.45)
+                    if pA > 3 then
+                        nvgBeginPath(nvg)
+                        nvgCircle(nvg, px, py, pSize)
+                        if i % 3 == 0 then
+                            nvgFillColor(nvg, nvgRGBA(255, 210, 110, pA))
+                        else
+                            nvgFillColor(nvg, nvgRGBA(175, 100, 255, pA))
+                        end
+                        nvgFill(nvg)
+                    end
+                end
+            end
+
         elseif fx.type == "doomsday_explosion" then
             -- ═══ 末日炸弹：蓄力 → 短白闪 → 粒子飞散 → 消散 ═══
             local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
@@ -5472,111 +5544,6 @@ function BoardWidget_VFX.Render(ctx)
             nvgFillColor(nvg, nvgRGBA(255, 220, 60, math.floor(alpha * 0.85)))
             nvgText(nvg, 0, 0, "♟")
             nvgRestore(nvg)
-
-        elseif fx.type == "gravity_pull" then
-            -- ═══ 引力场：从英雄位置爆发紫黑色引力漩涡，向内收缩的力场 ═══
-            local cx, cy = HexGrid.HexToPixel(fx.col, fx.row, hexSize, ox, oy)
-            local range = fx.range or 2
-            local maxR = hexSize * range * 1.2
-
-            -- 阶段1(0~0.3): 引力场扩张   阶段2(0.3~0.7): 向内收缩   阶段3(0.7~1): 消散
-            local fade = 1.0
-            if progress < 0.3 then
-                fade = progress / 0.3
-            elseif progress > 0.7 then
-                fade = 1.0 - (progress - 0.7) / 0.3
-            end
-            local alpha = math.floor(fade * 255)
-
-            -- 向内收缩的同心圆环（引力波）
-            for ring = 1, 4 do
-                local ringPhase = (progress * 3.0 + ring * 0.25) % 1.0
-                local ringR = maxR * (1.0 - ringPhase)  -- 从外向内收缩
-                local ringAlpha = math.floor(alpha * (1.0 - ringPhase) * 0.6)
-                if ringAlpha > 5 and ringR > 5 then
-                    nvgBeginPath(nvg)
-                    nvgCircle(nvg, cx, cy, ringR)
-                    nvgStrokeColor(nvg, nvgRGBA(120, 50, 200, ringAlpha))
-                    nvgStrokeWidth(nvg, 2.5 * (1.0 - ringPhase))
-                    nvgStroke(nvg)
-                end
-            end
-
-            -- 中心漩涡（深紫色旋转渐变）
-            local vortexR = hexSize * 0.6 * fade
-            local rotAngle = progress * math.pi * 6  -- 快速旋转
-            nvgSave(nvg)
-            nvgTranslate(nvg, cx, cy)
-            nvgRotate(nvg, rotAngle)
-
-            -- 漩涡臂（4条螺旋线）
-            for arm = 0, 3 do
-                local armAngle = arm * math.pi / 2
-                nvgBeginPath(nvg)
-                local prevX, prevY = 0, 0
-                nvgMoveTo(nvg, 0, 0)
-                for seg = 1, 8 do
-                    local segT = seg / 8
-                    local spiralR = vortexR * segT * (1.0 + math.sin(progress * 8 + seg) * 0.2)
-                    local spiralA = armAngle + segT * math.pi * 1.5
-                    local sx = math.cos(spiralA) * spiralR
-                    local sy = math.sin(spiralA) * spiralR
-                    nvgLineTo(nvg, sx, sy)
-                    prevX, prevY = sx, sy
-                end
-                local armAlpha = math.floor(alpha * 0.8)
-                nvgStrokeColor(nvg, nvgRGBA(160, 80, 255, armAlpha))
-                nvgStrokeWidth(nvg, 2.0 * fade)
-                nvgStroke(nvg)
-            end
-            nvgRestore(nvg)
-
-            -- 中心引力核心光球
-            local coreR = hexSize * 0.25 * fade * (0.9 + math.sin(progress * 12) * 0.1)
-            local corePaint = nvgRadialGradient(nvg, cx, cy, 0, coreR,
-                nvgRGBA(80, 20, 180, math.floor(alpha * 0.9)),
-                nvgRGBA(40, 10, 100, 0))
-            nvgBeginPath(nvg)
-            nvgCircle(nvg, cx, cy, coreR)
-            nvgFillPaint(nvg, corePaint)
-            nvgFill(nvg)
-
-            -- 飞向中心的粒子（模拟物体被吸入）
-            for i = 0, 11 do
-                local pAngle = i * math.pi / 6 + progress * 2.0
-                local pPhase = (progress * 2.5 + i * 0.08) % 1.0
-                local pDist = maxR * (1.0 - pPhase)  -- 从外向中心飞
-                local px = cx + math.cos(pAngle) * pDist
-                local py = cy + math.sin(pAngle) * pDist
-                local pSize = (2.0 + pPhase * 2.0) * fade
-                local pAlpha = math.floor(alpha * pPhase * 0.7)
-                if pAlpha > 10 then
-                    nvgBeginPath(nvg)
-                    nvgCircle(nvg, px, py, pSize)
-                    nvgFillColor(nvg, nvgRGBA(140, 60, 220, pAlpha))
-                    nvgFill(nvg)
-                end
-            end
-
-            -- 扭曲线条（表现空间扭曲感）
-            for i = 0, 5 do
-                local wAngle = i * math.pi / 3 + progress * 1.5
-                local wR1 = hexSize * 0.4 * fade
-                local wR2 = maxR * 0.7 * fade
-                local wx1 = cx + math.cos(wAngle) * wR1
-                local wy1 = cy + math.sin(wAngle) * wR1
-                local wx2 = cx + math.cos(wAngle + 0.3) * wR2
-                local wy2 = cy + math.sin(wAngle + 0.3) * wR2
-                local wAlpha = math.floor(alpha * 0.35)
-                if wAlpha > 5 then
-                    nvgBeginPath(nvg)
-                    nvgMoveTo(nvg, wx1, wy1)
-                    nvgLineTo(nvg, wx2, wy2)
-                    nvgStrokeColor(nvg, nvgRGBA(100, 40, 180, wAlpha))
-                    nvgStrokeWidth(nvg, 1.5 * fade)
-                    nvgStroke(nvg)
-                end
-            end
 
         end
         ::continue_fx::

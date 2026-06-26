@@ -1426,7 +1426,7 @@ function Battle.GenerateTestLevel_Items(state)
     Battle.AddLog(state, "=== 🎒 道具系统测试关卡 ===")
     Battle.AddLog(state, "棋盘中央有各种道具，走过去拾取测试效果")
     Battle.AddLog(state, "道具: 小血瓶/大血瓶/金币袋/护盾/幸运轮盘/厄运轮盘")
-    Battle.AddLog(state, "四角放了靶子(HP80)用于测试幸运一击等需要敌人的效果")
+    Battle.AddLog(state, "四角放了靶子(HP80)用于测试灭霸响指等需要敌人的效果")
 end
 
 --- 刷新所有敌人的祭坛减伤状态
@@ -2690,18 +2690,6 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
         end
     end
 
-    -- === 第三章: 火灵灼烧DOT ===
-    if enemy.enemyType == "fire_sprite" and enemy.burnDamage then
-        state.heroBurn = enemy.burnDuration or 2
-        state.heroBurnDmg = enemy.burnDamage or 5
-        Battle.AddFloatingText(state, hero.col, hero.row,
-            "🔥灼烧!" .. state.heroBurnDmg .. "/回合", {255, 120, 30, 255})
-        Battle.AddLog(state, string.format("火灵灼烧！每回合%d伤害，持续%d回合", state.heroBurnDmg, state.heroBurn))
-    end
-
-
-
-
 
     -- 落地技能（震地落/天崩地裂/地震连锁）—— 只在最终落点触发
     if isLastStep then
@@ -2725,11 +2713,6 @@ function Battle.ExecuteJump(state, jumpInfo, isLastStep)
 
     -- 地刺陷阱: 在跳跃出发位置周围放置地刺
     Battle.PlaceSpikeTraps(state, jumpFromCol, jumpFromRow)
-
-    -- === 引力: 落地后拉近周围敌人 ===
-    if isLastStep then
-        Battle.ApplyGravityPull(state, jumpInfo.col, jumpInfo.row)
-    end
 
     -- === 第五章: 冰面滑行（延迟执行，等跳跃动画播完后再滑行）===
     if isLastStep then
@@ -2909,7 +2892,6 @@ end
 
 --- 落地完整重演: 连锁释放额外触发时调用，重新结算"落地点"的落地相关效果
 --- 包含: 落地AOE(震地落/基础冲击/天崩地裂) + 地刺布置
---- 注意: 引力拖拽不参与重演(避免连锁释放反复把敌人拉到身边)
 --- 这样连锁释放不再只依赖震地落——地刺陷阱玩家同样能从额外触发中受益
 ---@param state table
 ---@param col integer
@@ -2920,7 +2902,7 @@ function Battle.DoLandingReplay(state, col, row)
 end
 
 --- 统一落地技能入口: 执行一次正常落地效果
---- 正常流程下地刺(在起跳点)/引力(落地点)由 ExecuteJump 外层单独调用，此处只做落地AOE
+--- 正常流程下地刺由 ExecuteJump 外层单独调用，此处只做落地AOE
 function Battle.ApplyLandingSkills(state, col, row)
     Battle.DoLandingEffect(state, col, row)
 end
@@ -3540,86 +3522,6 @@ function Battle.ApplyHunterMarks(state)
     if marked then
         AM.PlaySFX("hunter_mark", 0.5)
     end
-end
-
---- 引力: 落地后拉最近的1个敌人到身边（英雄相邻空格）
-function Battle.ApplyGravityPull(state, heroCol, heroRow)
-    local gravLv = Skills.Level(state.skills, "gravity_pull")
-    if gravLv < 1 then return end
-
-    local range = gravLv >= 3 and 3 or 2  -- Lv3+: 感应范围3格
-    local enemies = HexGrid.GetTeamPieces(state.board, "enemy")
-
-    -- 找范围内最近的1个敌人（不含已相邻的）
-    local target = nil
-    local targetDist = 999
-    for _, enemy in ipairs(enemies) do
-        if enemy.hp > 0 then
-            local dist = HexGrid.CubeDistance(enemy.col, enemy.row, heroCol, heroRow)
-            if dist > 1 and dist <= range and dist < targetDist then
-                target = enemy
-                targetDist = dist
-            end
-        end
-    end
-    if not target then return end
-
-    -- 在英雄周围找一个空的相邻格作为拉动目标（直接拉到身边）
-    local heroNeighbors = HexGrid.GetNeighbors(heroCol, heroRow)
-    local destNb = nil
-    local bestApproach = 999
-    for _, nb in ipairs(heroNeighbors) do
-        if not HexGrid.IsBlocked(state.board, nb.col, nb.row) then
-            -- 优先选离敌人原始位置最近的格（动画更自然）
-            local d = HexGrid.CubeDistance(nb.col, nb.row, target.col, target.row)
-            if d < bestApproach then
-                bestApproach = d
-                destNb = nb
-            end
-        end
-    end
-    if not destNb then return end
-
-    -- 设置移动动画
-    target.animFromCol = target.col
-    target.animFromRow = target.row
-    target.animTimer = 0.35
-    target.animMaxTimer = 0.35
-    target._gravPullFromCol = target.col
-    target._gravPullFromRow = target.row
-
-    -- 移动敌人到英雄身边
-    target.col = destNb.col
-    target.row = destNb.row
-    Battle.AddFloatingText(state, destNb.col, destNb.row,
-        "🌀引力", {100, 60, 200, 255})
-
-    -- Lv4+: 拉动附带10伤害
-    if gravLv >= 4 then
-        local pullDmg = 10
-        target.hp = target.hp - pullDmg
-        state.totalDamage = state.totalDamage + pullDmg
-        Battle.AddFloatingText(state, destNb.col, destNb.row,
-            "-" .. pullDmg .. "🌀", {180, 100, 255, 255})
-        if target.hp <= 0 then
-            Battle.HandleEnemyDeath(state, target, false)
-        end
-    end
-
-    -- 眩晕（无法行动/攻击主角）— Lv1起就有
-    if target.hp > 0 then
-        local stunTurns = gravLv >= 5 and 3 or (gravLv >= 4 and 2 or 1)
-        target._stunnedTurns = (target._stunnedTurns or 0) + stunTurns
-        Battle.AddFloatingText(state, destNb.col, destNb.row,
-            string.format("💫眩晕%d回合", stunTurns), {255, 200, 0, 255})
-    end
-
-    Battle.AddLog(state, "🌀 引力将敌人拉到身边！")
-    Battle.AddVFX(state, "gravity_pull", {
-        col = heroCol, row = heroRow, duration = 0.8, range = range,
-        pulled = 1,
-    })
-    AM.PlaySFX("gravity_pull", 1.0, 1.0)
 end
 
 --- 地刺陷阱: 跳跃落地后在起点周围空格放置地刺

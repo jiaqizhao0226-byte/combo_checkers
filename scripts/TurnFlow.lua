@@ -18,6 +18,12 @@ local IceMechanic = require "IceMechanic"
 
 local TurnFlow = {}
 
+local GOLD_GAIN_MULT = 1.8
+
+local function CalcFinalGoldGain(baseGold)
+    return math.floor((baseGold or 0) * GOLD_GAIN_MULT)
+end
+
 --- 构建 FindValidJumps 的 opts: 所有章节障碍物（岩石、珊瑚、祭坛等）均可作为飞跃先锋支点
 local function buildJumpOpts()
     local opts = { ch3Rocks = true }
@@ -35,10 +41,9 @@ local function SettleBattleRewards()
     if not G.battle or G.battle._rewardsSettled then return end
     G.battle._rewardsSettled = true
 
-    -- 金币（无论胜负都结算当局累计金币）；全局 +20% 产出加成
+    -- 金币（无论胜负都结算当局累计金币）；全局 +80% 产出加成
     -- 注：作用于"本局累计总额"而非每笔小额，避免第一章低基数金币(1~2)被 floor 截断
-    local GOLD_GAIN_MULT = 1.2
-    PlayerData.AddGold(G.playerData, math.floor((G.battle.gold or 0) * GOLD_GAIN_MULT))
+    PlayerData.AddGold(G.playerData, CalcFinalGoldGain(G.battle.gold))
     G.battle.gold = 0
 
     -- 进度
@@ -1426,7 +1431,7 @@ function TurnFlow.ProcessEnemyTurn()
             or t == "boss_tentacle" or t == "boss_whirlpool"
             or t == "boss_shrink" then
             bossActCount = bossActCount + 1
-        elseif t == "dormant" or t == "shelled" or t == "frozen" or t == "idle" then
+        elseif t == "dormant" or t == "shelled" or t == "frozen" or t == "silenced" or t == "idle" then
             specialCount = specialCount + 1
         end
     end
@@ -1669,7 +1674,8 @@ function TurnFlow.ShowChapterClear(chapter)
     -- 统计数据
     local skillIcons = Skills.GetOwnedIcons(G.battle.skills)
     local skillLine = skillIcons ~= "" and ("技能: " .. skillIcons) or nil
-    local goldLine = G.battle.gold > 0 and ("💰 +" .. G.battle.gold .. " 金币") or nil
+    local finalGoldGain = CalcFinalGoldGain(G.battle.gold)
+    local goldLine = finalGoldGain > 0 and ("💰 +" .. finalGoldGain .. " 金币") or nil
 
     local UI = require("urhox-libs/UI")
     local clearPopup
@@ -1699,7 +1705,7 @@ function TurnFlow.ShowChapterClear(chapter)
         TurnFlow._MakeClearStatRow("💥 总伤害", tostring(G.battle.totalDamage)),
     }
     if goldLine then
-        statChildren[#statChildren + 1] = TurnFlow._MakeClearStatRow("💰 获得金币", "+" .. G.battle.gold)
+        statChildren[#statChildren + 1] = TurnFlow._MakeClearStatRow("💰 获得金币", "+" .. finalGoldGain)
     end
     if skillLine then
         statChildren[#statChildren + 1] = UI.Label {

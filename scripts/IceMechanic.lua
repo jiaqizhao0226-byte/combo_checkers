@@ -417,7 +417,7 @@ end
 -- 滑行撞墙/撞障碍伤害：滑得越远，撞击越重，但整体保持为可承受的风险。
 -- 1格=轻微擦伤；长距离失控仍然危险，但不会过早打空血量。
 local SLIDE_CRASH_BASE_DAMAGE = 1
-local SLIDE_CRASH_DAMAGE_PER_TILE = 2
+local SLIDE_CRASH_DAMAGE_PER_TILE = 1
 
 --- Calculate hero crash damage from slide distance.
 ---@param slideDistance integer

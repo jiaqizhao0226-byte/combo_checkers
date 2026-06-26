@@ -90,9 +90,7 @@ BattleData.ENEMY_TEMPLATES = {
         hp = 32, maxHp = 32,
         atk = 11,
         attackRange = 1,
-        attackLabel = "灼烧",
-        burnDamage = 7,     -- 跳过时附加灼烧DOT（每回合7伤害，持续2回合）
-        burnDuration = 2,
+        attackLabel = "火击",
         name = "火灵",
     },
     lava_giant = {
@@ -336,7 +334,7 @@ BattleData.ENEMY_INTRO = {
     archerfish   = { icon = "🐠", name = "射水鱼",   desc = "远程攻击，靠近会后退" },
     electric_ray = { icon = "⚡", name = "电鳐",     desc = "攻击会波及周围目标" },
     reef_starfish= { icon = "⭐", name = "礁石海星", desc = "每回合自动回复生命" },
-    fire_sprite  = { icon = "🔥", name = "火灵",     desc = "跳过会被灼烧，持续掉血" },
+    fire_sprite  = { icon = "🔥", name = "火灵",     desc = "基础近战火焰敌人" },
     lava_giant   = { icon = "🗿", name = "熔岩巨人", desc = "死后留下熔岩地形" },
     mushroom     = { icon = "🍄", name = "毒蘑菇",   desc = "死亡时释放毒孢子" },
     spine_anemone= { icon = "🌺", name = "棘刺海葵", desc = "超远程攻击，靠近会后退" },
@@ -540,7 +538,7 @@ BattleData.LUCKY_WHEEL_POOL = {
     { id = "shield",       name = "神圣护盾",   desc = "获得一次性护盾(30点)", icon = "🛡️", color = {120, 180, 255, 255} },
     { id = "extra_skill",  name = "天赋觉醒",   desc = "额外技能三选一",      icon = "⭐",  color = {255, 215, 0, 255} },
     { id = "extra_turn",   name = "时光加速",   desc = "获得额外一回合行动",   icon = "⏩",  color = {180, 120, 255, 255} },
-    { id = "lucky_strike", name = "幸运一击",   desc = "对随机敌人造成50伤害", icon = "⚡",  color = {255, 220, 80, 255} },
+    { id = "lucky_strike", name = "灭霸响指",   desc = "随机消灭半数小怪",    icon = "🫰",  color = {190, 120, 255, 255} },
     { id = "max_hp_up",    name = "体魄强化",   desc = "本次战斗最大HP+25",   icon = "💗",  color = {255, 100, 150, 255} },
     { id = "atk_up_buff",  name = "战意高涨",   desc = "10回合内攻击力+30%",  icon = "🔥",  color = {255, 140, 50, 255} },
 }

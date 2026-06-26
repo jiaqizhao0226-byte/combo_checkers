@@ -1347,7 +1347,7 @@ function BoardWidget:Render(nvg)
         elseif obs.type == "ice_block" then
             -- 第五章冰块：恢复最早的“冰块 emoji”方向——接近不规则正六边形，轻量、清晰、可读
             local t = G.time or 0
-            local life = obs.turns or 5
+            local life = obs.turns or 10
             local meltPulse = life <= 1 and (0.90 + 0.10 * math.sin(t * 8.0)) or 1.0
             local floatY = math.sin(t * 1.8 + obs.col * 1.7 + obs.row * 2.3) * hexSize * 0.018
             local rs = hexSize * 0.56 * meltPulse
@@ -4823,6 +4823,7 @@ local FULLSCREEN_VFX_TYPES = {
     doomsday_explosion = true,
     life_drain = true,
     time_freeze = true,
+    thanos_snap = true,
     boss_enrage = true,
 }
 

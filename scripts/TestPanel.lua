@@ -817,45 +817,6 @@ function TestPanel.Show()
                                             end
                                         end,
                                     },
-                                    -- 引力
-                                    UI.Button {
-                                        text = "⬇ 引力",
-                                        fontSize = 14, fontWeight = "bold",
-                                        flexGrow = 1, height = 38,
-                                        borderRadius = 0,
-                                        backgroundGradient = {
-                                            type = "linear", direction = "to-right",
-                                            from = {70, 30, 120, 255}, to = {50, 20, 90, 255},
-                                        },
-                                        fontColor = {200, 140, 255, 255},
-                                        borderWidth = 1,
-                                        borderColor = {140, 80, 220, 150},
-                                        pressedBackgroundColor = {50, 20, 80, 255},
-                                        onClick = function(self)
-                                            AM.PlaySFX("ui_click")
-                                            local needNewBattle = not G.battle or not G.battle.hero
-                                            if needNewBattle then
-                                                TestPanel.Close()
-                                                local TurnFlow = require "TurnFlow"
-                                                local bonus = PlayerData.GetTotalBonus(G.playerData)
-                                                G.battle = Battle.New(bonus)
-                                                G.battle.skills["gravity_pull"] = 1
-                                                Battle.GenerateTestLevel_ComboMastery(G.battle)
-                                                TurnFlow.SnapCameraToHero()
-                                                TurnFlow.ClearPlan()
-                                                if G.resultPanel then G.resultPanel:SetVisible(false) end
-                                                TurnFlow.StartPlayerTurn()
-                                            else
-                                                local cur = G.battle.skills["gravity_pull"] or 0
-                                                local newLv = math.min(cur + 1, 5)
-                                                G.battle.skills["gravity_pull"] = newLv
-                                                self:SetText("⬇ 引力Lv" .. newLv)
-                                                if newLv >= 5 then
-                                                    self:SetDisabled(true)
-                                                end
-                                            end
-                                        end,
-                                    },
                                 },
                             },
                             -- 第二行：飞镖风暴 + 连锁释放

@@ -96,6 +96,7 @@ AM.SFX = {
     combo_bomb_clear = "audio/sfx/combo_bomb_clear.ogg",
     combo_doomsday_blast = "audio/sfx/combo_doomsday_blast.ogg",
     combo_doomsday_announce = "audio/sfx/combo_doomsday_announce.ogg",
+    thanos_snap     = "audio/sfx/combo_doomsday_blast.ogg",
     -- 连跳音阶基础音效（8bit风格）
     combo_note = "audio/sfx/note_do_C4.ogg",
     -- 金色套装效果触发
@@ -136,8 +137,6 @@ AM.SFX = {
     frost_freeze         = "audio/sfx/frost_freeze.ogg",
     -- 棋步跳跃
     kingmaker_jump       = "audio/sfx/kingmaker_jump.ogg",
-    -- 引力拉扯
-    gravity_pull         = "audio/sfx/gravity_pull_new.ogg",
     -- 未注册补录
     combo_shield_gain    = "audio/sfx/combo_shield_gain.ogg",
     vampiric_drain       = "audio/sfx/vampiric_drain.ogg",

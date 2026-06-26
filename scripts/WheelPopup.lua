@@ -814,22 +814,46 @@ function WheelPopup.ApplyOutcome(outcome)
         local enemies = state.enemies or {}
         local alive = {}
         for _, e in ipairs(enemies) do
-            if e.hp and e.hp > 0 then alive[#alive + 1] = e end
+            if e.hp and e.hp > 0 and e.team == "enemy" and not e.isBoss and not e.isSegment then
+                alive[#alive + 1] = e
+            end
         end
         if #alive > 0 then
-            local target = alive[math.random(1, #alive)]
-            local dmg = 50
-            target.hp = target.hp - dmg
-            Battle.AddFloatingText(state, target.col, target.row, "⚡-" .. dmg, {255, 220, 80, 255}, "hit", 3.0)
-            Battle.AddLog(state, "幸运轮盘：幸运一击！对" .. (target.name or "敌人") .. "造成" .. dmg .. "点伤害！")
-            if target.hp <= 0 then
-                target.hp = 0
-                Battle.AddLog(state, (target.name or "敌人") .. "被幸运一击击败！")
+            for i = #alive, 2, -1 do
+                local j = math.random(1, i)
+                alive[i], alive[j] = alive[j], alive[i]
+            end
+            local killCount = math.max(1, math.ceil(#alive / 2))
+            Battle.AddVFX(state, "thanos_snap", {
+                col = hero.col, row = hero.row,
+                duration = 1.25,
+                targets = killCount,
+                total = #alive,
+            })
+            AM.PlaySFX("thanos_snap", 1.0, 0.9)
+            Battle.AddFloatingText(state, hero.col, hero.row,
+                "🫰响指! " .. killCount .. "/" .. #alive, {210, 140, 255, 255}, "combo", 3.0)
+            Battle.AddLog(state, string.format("幸运轮盘：灭霸响指！随机消灭%d/%d只小怪！", killCount, #alive))
+            for i = 1, killCount do
+                local target = alive[i]
+                if target and target.hp and target.hp > 0 then
+                    target.hp = 0
+                    Battle.AddFloatingText(state, target.col, target.row,
+                        "🫰灰飞烟灭", {190, 120, 255, 255}, "hit", 2.0)
+                    Battle.AddVFX(state, "thanos_snap", {
+                        col = target.col, row = target.row,
+                        duration = 0.9,
+                        targetOnly = true,
+                    })
+                    Battle.HandleEnemyDeath(state, target, true, true)
+                end
             end
         else
-            state.gold = (state.gold or 0) + 2
-            Battle.AddFloatingText(state, hero.col, hero.row, "⚡+2金币", {255, 220, 80, 255}, nil, 3.0)
-            Battle.AddLog(state, "幸运一击：场上无敌人，获得2金币补偿")
+            state.gold = (state.gold or 0) + 5
+            Battle.AddVFX(state, "thanos_snap", { col = hero.col, row = hero.row, duration = 0.8, targets = 0, total = 0 })
+            AM.PlaySFX("thanos_snap", 0.7, 1.1)
+            Battle.AddFloatingText(state, hero.col, hero.row, "🫰+5金币", {190, 120, 255, 255}, nil, 3.0)
+            Battle.AddLog(state, "灭霸响指：场上没有小怪，获得5金币补偿")
         end
 
     elseif outcome.id == "max_hp_up" then

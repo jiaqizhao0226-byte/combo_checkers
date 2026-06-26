@@ -31,7 +31,6 @@ IconAtlas.PATHS = {
     skill_step_strike      = "image/skill_step_strike_20260601033527.png",
     skill_frost_mark       = "image/skill_frost_mark_20260617123756.png",
     skill_kingmaker        = "image/skill_kingmaker_20260617123811.png",
-    skill_gravity_pull     = "image/skill_gravity_pull_20260617123924.png",
     skill_dart_storm       = "image/skill_dart_storm_20260617123810.png",
     skill_multi_cast       = "image/skill_multi_cast_20260617123804.png",
     skill_damage_amp       = "image/skill_damage_amp_20260617124030.png",

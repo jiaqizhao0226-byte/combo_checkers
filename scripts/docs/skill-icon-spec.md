@@ -130,7 +130,6 @@
 | combo_thorn | 血棘共生 | 红绿色 | 血液缠绕荆棘藤蔓 |
 | frost_mark | 冰霜印记 | 淡蓝色 | 雪花冰晶 |
 | kingmaker | 棋步 | 金色 | 国际象棋骑士棋子 |
-| gravity_pull | 引力 | 紫色 | 引力漩涡吸引 |
 | dart_storm | 飞镖风暴 | 橙红色 | 多枚飞镖飞散 |
 | multi_cast | 连锁释放 | 紫色 | 魔法漩涡能量循环 |
 | damage_amp | 战意增幅 | 红色 | 向上箭头烈焰 |

@@ -293,23 +293,6 @@ Skills.SKILLS = {
         end,
     },
 
-    -- 19. 引力 - 落地拉1个敌人到身边
-    gravity_pull = {
-        name = "引力",
-        icon = "skill_gravity_pull",
-        color = {140, 80, 220},
-        maxLevel = 5,
-        rarity = {1, 1, 2, 3, 4},
-        desc = function(lv)
-            local range = lv >= 3 and 3 or 2
-            local stunTurns = lv >= 5 and 3 or (lv >= 4 and 2 or 1)
-            local extra = string.format("；眩晕%d回合", stunTurns)
-            if lv >= 3 then extra = extra .. "；感应范围3格" end
-            if lv >= 4 then extra = extra .. "；拉动附带10伤害" end
-            return string.format("落地后将%d格内最近的1个敌人拉到身边%s", range, extra)
-        end,
-    },
-
     -- 20. 飞镖风暴 - 连跳飞镖数量增加
     dart_storm = {
         name = "飞镖风暴",
@@ -357,7 +340,7 @@ Skills.SKILLS = {
             local extra = ""
             if lv >= 3 then extra = extra .. "；被沉默敌人受伤+15%" end
             if lv >= 5 then extra = extra .. "；沉默结束时造成20固定伤害" end
-            return string.format("连跳经过的敌人被沉默%d回合(无法使用技能)，影响范围%d格%s", turns, range, extra)
+            return string.format("连跳经过的敌人被沉默%d回合(无法攻击)，影响范围%d格%s", turns, range, extra)
         end,
     },
 }

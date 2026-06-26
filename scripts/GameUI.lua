@@ -1180,6 +1180,18 @@ local CHAPTER_TUTORIALS = {
         goal = "⚔️ 击杀目标 + 🛑 善用停沙格 = 通关",
         buttonText = "征服沙漠！🏜️",
     },
+    [5] = {
+        title = "永冻绝境",
+        accentColor = {90, 190, 255, 255},
+        steps = {
+            { icon = "🐧 ❄️ ➡️ 🧊", caption = "落到冰面后会沿方向继续滑行" },
+            { icon = "🧊 🧱 💥 🛑", caption = "撞到墙壁或障碍才会停下来" },
+            { icon = "🐧 👉 🧊 ➡️ 🔴", caption = "推动冰块可当炮弹砸碎敌人" },
+            { icon = "🐻 🌨️ 🔷 ⚠️", caption = "冰熊、暴雪鹰和冰晶体会控制战场" },
+        },
+        goal = "❄️ 预判滑行路线 + 🧊 善用冰块炮弹 = 通关",
+        buttonText = "踏入冰原！❄️",
+    },
 }
 
 --- 创建单个步骤卡片
@@ -1855,7 +1867,7 @@ local TUTORIAL_PAGES = {
         accent = {230, 120, 50},
         icon = "🔥",
         entries = {
-            { emoji = "🔥", text = "火灵 — HP22 ATK8 | 灼烧：附加每回合5伤害，持续2回合" },
+            { emoji = "🔥", text = "火灵 — HP32 ATK11 | 基础近战火焰敌人" },
             { emoji = "🗿", text = "熔岩巨人 — HP55 ATK14 | 死亡留岩浆：每回合8伤害" },
             { emoji = "🍄", text = "毒蘑菇 — HP18 ATK0 | 死亡爆炸：对周围造成8伤害" },
             { emoji = "✨", text = "裂焰精 — HP28 ATK8 | 分裂：死亡时变成两个焰碎片" },
@@ -1964,11 +1976,10 @@ local TUTORIAL_PAGES = {
             { emoji = "📦", text = "收集者 — 对残血敌人造成额外伤害", skillId = "collector" },
             { emoji = "❄️", text = "冰霜印记 — 攻击叠层，满层冻结敌人", skillId = "frost_mark" },
             { emoji = "♟️", text = "棋步 — 每N跳后可跳至全图任意位置", skillId = "kingmaker" },
-            { emoji = "🟣", text = "引力 — 落地后拉近周围敌人", skillId = "gravity_pull" },
             { emoji = "🗡️", text = "飞镖风暴 — 2连跳发射多枚飞镖，可穿透/灼烧", skillId = "dart_storm" },
 
             { emoji = "💪", text = "战意增幅 — 提升所有技能的伤害输出", skillId = "damage_amp" },
-            { emoji = "🤐", text = "寂灭之路 — 连跳经过的敌人被沉默，无法用特殊技能", skillId = "silence_path" },
+            { emoji = "🤐", text = "寂灭之路 — 连跳经过的敌人被沉默，无法攻击", skillId = "silence_path" },
         },
     },
     -- ========== Page 10: 装备与套装 ==========

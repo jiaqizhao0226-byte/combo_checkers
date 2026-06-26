@@ -1402,9 +1402,9 @@ function Battle.TrySpawnItems(state, maxCount, opts)
         { type = "shield",            weight = 25 },
     }
     if not noWheel then
-        weightedTypes[#weightedTypes + 1] = { type = "lucky_wheel", weight = 18 }
+        weightedTypes[#weightedTypes + 1] = { type = "lucky_wheel", weight = 24 }
         if not noDoomWheel then
-            weightedTypes[#weightedTypes + 1] = { type = "doom_wheel",  weight = 9  }
+            weightedTypes[#weightedTypes + 1] = { type = "doom_wheel",  weight = 12  }
         end
     end
     local totalWeight = 0

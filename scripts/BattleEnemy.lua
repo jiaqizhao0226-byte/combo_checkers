@@ -534,6 +534,13 @@ function Battle.EnemyAct(state, enemy)
         local range = enemy.attackRange or 1
         local distToTarget = HexGrid.CubeDistance(enemy.col, enemy.row, sealTarget.col, sealTarget.row)
         if distToTarget <= range and enemy.atk > 0 then
+            if enemy._silencedTurns and enemy._silencedTurns > 0 then
+                Battle.AddFloatingText(state, enemy.col, enemy.row,
+                    "🤐无法攻击", {140, 80, 220, 255})
+                Battle.AddLog(state, string.format("🤐%s 被沉默，无法攻击", enemy.name))
+                return { type = "silenced", enemy = enemy }
+            end
+
             -- 在攻击范围内：可以攻击，但伤害降低50%
             local reduction = enemy._sealedDmgReduction or 0.5
             local targetDef = sealTarget.def or 0
@@ -584,9 +591,9 @@ function Battle.EnemyAct(state, enemy)
 
     local hero = state.hero
 
-    -- === 寂灭之路: 被沉默的敌人无法使用特殊技能，只能普通移动+攻击 ===
+    -- === 寂灭之路: 被沉默的敌人无法使用特殊技能，进入攻击范围时也无法攻击 ===
     local isSilenced = enemy._silencedTurns and enemy._silencedTurns > 0
-    -- 沉默状态由头顶持续标记显示（见 BoardWidget 渲染），此处不再弹一次性浮字
+    -- 沉默状态由头顶持续标记显示（见 BoardWidget 渲染），此处只在拦截攻击时提示
 
     -- === 幽灵鲨: 瞬移到英雄身边攻击 ===
     if not isSilenced and enemy.enemyType == "ghost_shark" then
@@ -669,6 +676,13 @@ function Battle.EnemyAct(state, enemy)
     local range = enemy.attackRange or 1
     local distToTarget = HexGrid.CubeDistance(enemy.col, enemy.row, target.col, target.row)
     local canAttack = distToTarget <= range and enemy.atk > 0
+
+    if isSilenced and canAttack then
+        Battle.AddFloatingText(state, enemy.col, enemy.row,
+            "🤐无法攻击", {140, 80, 220, 255})
+        Battle.AddLog(state, string.format("🤐%s 被沉默，无法攻击", enemy.name))
+        return { type = "silenced", enemy = enemy }
+    end
 
     if canAttack then
         -- 铁龟防御减伤
