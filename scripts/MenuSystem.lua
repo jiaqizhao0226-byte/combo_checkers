@@ -1935,7 +1935,7 @@ function MenuSystem.CreateMenuUI()
             -- 顶部安全区（避开刘海+左右系统UI，透明）
             UI.SafeAreaView {
                 width = "100%",
-                edges = { "top", "left", "right" },
+                edges = { "top", "left", "right", "bottom" },
                 children = {
                     -- 顶栏内容行
                     (function()

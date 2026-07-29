@@ -5,7 +5,7 @@
     "id": "2047389104"
   },
   "entry": "main.lua",
-  "version": "1.0.93",
+  "version": "1.0.94",
   "taptap_publish": {
     "title": "棋妙英雄 Combo Checkers",
     "description": "一款融合跳棋与Roguelite元素的策略战斗游戏。规划跳跃路线，触发连击消灭敌人，收集金币解锁技能，挑战越来越难的关卡。简单易上手，策略性十足！",

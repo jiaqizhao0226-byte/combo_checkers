@@ -155,8 +155,14 @@ function Start()
                 normal = "Fonts/FusionPixel-12px-Mono-zh_hans.ttf",
             } },
         },
-        scale = UI.Scale.DEFAULT,
+        -- 竖屏统一按 480 设计宽度布局，高度随设备比例动态延展。
+        -- 这样固定字号/间距在不同 DPR 和预览尺寸下保持一致的视觉密度。
+        scale = UI.Scale.DESIGN_SHORT_SIDE(480),
     })
+
+    print(string.format("[UI] physical=%dx%d dpr=%.2f scale=%.3f base=%.1fx%.1f",
+        graphics:GetWidth(), graphics:GetHeight(), graphics:GetDPR(),
+        UI.GetScale(), UI.GetWidth(), UI.GetHeight()))
 
     -- 注册模块间回调
     RegisterCallbacks()
