@@ -1,35 +1,29 @@
-# 项目备忘录
+# 棋妙英雄 — 项目核心记忆
 
-## 发布前检查清单
+> AI 自维护，每次 POST 自动更新。详细规则见 memory-system skill。
 
-### 测试代码检查（必须！）
+## 当前状态
+- 版本: 1.0.94
+- 进度: 竖屏 UI 缩放与安全区适配已提交并同步 GitHub
+- 上次交付: `73629a0` 修复不同 DPR/预览尺寸下的 UI 视觉密度，并清理旧演示视频
 
-正式发布前（调用 `publish_to_taptap` 或 `generate_test_qrcode`），**必须确认测试代码已关闭**：
+## 用户画像摘要
+- 使用简体中文，倾向直接下达任务并由助手完成 Git 操作
 
-1. **TestPanel 入口**：`scripts/main.lua` 中 `HandleKeyDown` 的 `KEY_T` 快捷键触发 `TestPanel.Show()` —— 发布时需注释掉或删除该段
-2. **TestPanel 模块引用**：`scripts/main.lua` 顶部的 `local TestPanel = require "TestPanel"` —— 发布时需注释掉
-3. **无敌模式**：确认 `G.godMode` 为 nil/false（TestPanel 中可开启无敌模式）
+## 预测下一步
+- likely_next_task: 验证 v1.0.94 真机竖屏显示，或准备后续测试/正式发布
+- 相关文件: `scripts/main.lua`、`scripts/MenuSystem.lua`、`.project/project.json`
 
-**发布前务必执行以下操作**：
-```lua
--- main.lua 中注释掉以下两处：
--- local TestPanel = require "TestPanel"   -- ← 注释掉
--- if key == KEY_T then TestPanel.Show() return end  -- ← 注释掉
-```
+## 恢复指令（新会话必执行）
+1. 读本文件，获取项目状态和避雷清单
+2. 读 `docs/memory-index.md`，恢复项目上下文
+3. 读 `docs/persona.md`，加载用户画像和偏好
+4. 自测：项目是什么？上次做了什么？下一步？不够清楚就多读文件
+5. 如有 likely_next_task，预加载相关文件
+6. 详细规则见 memory-system skill
 
-如果用户要求发布但测试代码仍然开启，**必须主动提醒用户**并询问是否关闭测试代码后再发布。
-
-### Git 同步提交（必须！）
-
-**每次发布版本时，必须同步提交到 GitHub**：
-
-1. 发布前将所有变更 `git add` 并 `git commit`（commit message 包含版本号和变更摘要）
-2. 执行 `git push` 推送到远程仓库
-3. 如果 push 失败，必须提醒用户处理后再继续发布
-
-**执行顺序**：
-```
-关闭测试代码 → git add + commit + push → 调用发布工具
-```
-
-如果用户要求发布但代码尚未提交到 GitHub，**必须主动执行 git commit 和 push**，确保远程仓库与发布版本一致。
+## 避雷清单
+- 发布前关闭 `scripts/main.lua` 的 TestPanel 模块引用和 `KEY_T` 快捷入口，并确认 `G.godMode` 未开启
+- 每次发布版本必须先提交并推送 GitHub，再调用正式发布工具
+- 运行时 `.cli/`、`logs/` 与本地 `screenshots/` 不应作为普通功能更新提交
+- POST 是记忆存活唯一入口，每次交付后必须执行并判定 3 步 POST
