@@ -26,6 +26,8 @@ ossutil_output/
 .emmylua/
 .installer/
 .maker/
+.agent/memory-runtime/
+screenshots/
 
 # Maker engine assets & agent files (provided by ai-dev-kit, not user source)
 engine-docs/
