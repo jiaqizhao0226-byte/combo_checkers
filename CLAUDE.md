@@ -4,8 +4,8 @@
 
 ## 当前状态
 - 版本: 1.0.94
-- 进度: 项目源码与 GitHub `origin/master` 保持同步，仓库已补充私有记忆和本地截图忽略规则
-- 上次交付: 仓库同步维护；排除 `.agent/memory-runtime/`、`screenshots/`、`.cli/` 与 `logs/` 临时状态
+- 进度: 项目源码与 GitHub `origin/master` 保持同步，UI 缩放验证截图已纳入仓库
+- 上次交付: 上传 `screenshots/` 中 4 张竖屏 UI 缩放对比图；继续排除 `.agent/memory-runtime/`、`.cli/` 与 `logs/` 临时状态
 
 ## 用户画像摘要
 - 使用简体中文，倾向直接下达任务并由助手完成 Git 操作
@@ -25,5 +25,5 @@
 ## 避雷清单
 - 发布前关闭 `scripts/main.lua` 的 TestPanel 模块引用和 `KEY_T` 快捷入口，并确认 `G.godMode` 未开启
 - 每次发布版本必须先提交并推送 GitHub，再调用正式发布工具
-- 运行时 `.cli/`、`logs/` 与本地 `screenshots/` 不应作为普通功能更新提交
+- 运行时 `.cli/`、`logs/` 不应作为普通功能更新提交；`screenshots/` 当前用于保存并同步 UI 验证截图
 - POST 是记忆存活唯一入口，每次交付后必须执行并判定 3 步 POST
