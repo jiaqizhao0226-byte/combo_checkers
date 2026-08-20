@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#071521">
+  <title>棋妙英雄 · 3D 像素原型</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <main id="stage" aria-label="棋妙英雄 Three.js 像素渲染原型">
+    <canvas id="game" aria-label="六角棋盘"></canvas>
+
+    <section class="hud" aria-label="战斗信息">
+      <div class="top-row">
+        <div class="chip hp"><span class="mini-icon">HP</span><strong>110/110</strong></div>
+        <div class="chip chapter"><strong>第1章 1/10</strong><span>·</span><span>回合3</span></div>
+        <div class="chip gold"><span class="mini-icon">G</span><strong>24</strong></div>
+      </div>
+
+      <div class="utility-row">
+        <button class="square-button" type="button" id="settings" aria-label="设置">设置</button>
+        <span class="prototype-badge">纯 3JS · 精细像素</span>
+        <button class="square-button danger" type="button" id="exit" aria-label="退出">退出</button>
+      </div>
+
+      <div class="objective"><span>击杀目标</span><strong>3/8</strong></div>
+    </section>
+
+    <div class="route-status" id="routeStatus">点击六角格规划跳跃</div>
+
+    <section class="actions" aria-label="跳跃操作">
+      <button class="action secondary" id="undo" type="button">撤销</button>
+      <button class="action primary" id="confirm" type="button">确认跳跃</button>
+    </section>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

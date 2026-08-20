@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第一章小怪模型验收台</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="review-shell">
+    <header class="review-header">
+      <div>
+        <p class="eyebrow">COMBO CHECKERS · LOCAL MODEL REVIEW</p>
+        <h1>第一章小怪模型验收台</h1>
+      </div>
+      <div class="local-status"><span></span>仅本地验收 · 未接入游戏</div>
+    </header>
+
+    <main class="review-layout">
+      <aside class="model-catalog" aria-label="小怪列表">
+        <div class="panel-heading">
+          <span>模型清单</span>
+          <small id="review-progress">01 / 08</small>
+        </div>
+        <div id="enemy-list" class="enemy-list"></div>
+      </aside>
+
+      <section class="stage-panel" aria-label="三维模型展示棋盘">
+        <canvas id="review-canvas"></canvas>
+        <div class="stage-topbar">
+          <div>
+            <span id="stage-index" class="stage-index">MODEL 01</span>
+            <strong id="stage-name">史莱姆</strong>
+          </div>
+          <span id="stage-type" class="stage-type">近战基础单位</span>
+        </div>
+        <div class="stage-hint">拖动旋转 · 滚轮缩放 · 点击视角按钮复位</div>
+        <div class="camera-controls" aria-label="观察视角">
+          <button type="button" data-view="game" class="active">游戏视角</button>
+          <button type="button" data-view="front">正面</button>
+          <button type="button" data-view="side">侧面</button>
+          <button type="button" data-view="back">背面</button>
+        </div>
+      </section>
+
+      <aside class="inspection-panel">
+        <div class="panel-heading"><span>验收信息</span><small>CHAPTER 1</small></div>
+        <div class="model-title-block">
+          <span id="enemy-stage">1-1 初次出现</span>
+          <h2 id="enemy-name">史莱姆</h2>
+          <p id="enemy-desc">近距离移动并攻击企鹅。</p>
+        </div>
+
+        <dl class="stat-grid">
+          <div><dt>生命</dt><dd id="enemy-hp">25</dd></div>
+          <div><dt>攻击</dt><dd id="enemy-atk">5</dd></div>
+          <div><dt>射程</dt><dd id="enemy-range">1</dd></div>
+        </dl>
+
+        <div class="control-section">
+          <span class="control-label">轮廓演示</span>
+          <div id="motion-controls" class="motion-controls">
+            <button type="button" data-motion="idle" class="active">静止</button>
+            <button type="button" data-motion="turntable">转台</button>
+            <button type="button" data-motion="move">移动</button>
+            <button type="button" data-motion="attack">攻击</button>
+            <button type="button" data-motion="hit">受击</button>
+          </div>
+          <p class="control-note">动作仅用于观察轮廓，不代表最终战斗动画。</p>
+        </div>
+
+        <div class="control-section display-options">
+          <label><input id="show-reference" type="checkbox" checked> 显示企鹅比例参照</label>
+          <label><input id="show-health" type="checkbox"> 显示当前血条</label>
+          <label>
+            展示尺寸
+            <select id="display-scale">
+              <option value="1">游戏尺寸</option>
+              <option value="1.35">细节放大</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="review-checklist">
+          <span class="control-label">本轮只验收模型</span>
+          <p>正面物种辨识 · 侧面轮廓 · 棋盘占比 · 材质层次</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+  <script type="module" src="./main.js?v=20260820f"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企鹅主角模型 V2 验收台</title>
+  <link rel="stylesheet" href="./styles.css?v=20260820j">
+</head>
+<body>
+  <div class="review-shell">
+    <header>
+      <div>
+        <p class="eyebrow">COMBO CHECKERS · HERO MODEL REVIEW</p>
+        <h1>企鹅主角模型 V2</h1>
+      </div>
+      <div class="local-status"><span></span>仅本地候选 · 尚未接入游戏</div>
+    </header>
+
+    <main>
+      <aside class="brief-panel">
+        <div class="panel-heading"><span>当前问题</span><small>OLD</small></div>
+        <ol>
+          <li><strong>嘴部丢失</strong><span>橙色喙太小、太扁，正面几乎被脸罩吞掉。</span></li>
+          <li><strong>表情发呆</strong><span>眼睛偏小，瞳孔和高光层次不足。</span></li>
+          <li><strong>轮廓偏软</strong><span>头、身体、鳍肢之间缺少清楚的主次关系。</span></li>
+          <li><strong>主角感不足</strong><span>材质与装备细节没有形成视觉焦点。</span></li>
+        </ol>
+      </aside>
+
+      <section class="stage-panel">
+        <canvas id="review-canvas"></canvas>
+        <div class="comparison-labels" aria-hidden="true">
+          <span>当前游戏版</span>
+          <span>V2 候选版</span>
+        </div>
+        <div class="stage-hint">拖动旋转 · 滚轮缩放 · 重点检查正面嘴部与 45° 轮廓</div>
+        <div class="camera-controls" aria-label="观察视角">
+          <button type="button" data-view="game">游戏视角</button>
+          <button type="button" data-view="front" class="active">正面</button>
+          <button type="button" data-view="threequarter">45°</button>
+          <button type="button" data-view="side">侧面</button>
+          <button type="button" data-view="back">背面</button>
+        </div>
+        <div class="stage-motion-controls" aria-label="窄屏动作检查">
+          <button type="button" data-motion="idle" class="active">静止</button>
+          <button type="button" data-motion="move">移动</button>
+          <button type="button" data-motion="attack">攻击</button>
+          <button type="button" data-motion="hit">受击</button>
+        </div>
+        <div class="attack-scrubber" id="attack-scrubber">
+          <label>
+            <span>攻击定帧 <output id="attack-progress-label">0%</output></span>
+            <input id="attack-progress" type="range" min="0" max="100" value="0" step="1">
+          </label>
+          <div class="attack-frame-presets" aria-label="攻击关键帧">
+            <button type="button" data-attack-frame="0">起始</button>
+            <button type="button" data-attack-frame="28">蓄力</button>
+            <button type="button" data-attack-frame="50">命中</button>
+            <button type="button" data-attack-frame="65">随挥</button>
+            <button type="button" data-attack-frame="100">收招</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="inspection-panel">
+        <div class="panel-heading"><span>V2 改进</span><small>CANDIDATE</small></div>
+        <div class="hero-title">
+          <span>主角辨识优先</span>
+          <h2>剑士企鹅</h2>
+          <p>更明确的企鹅脸、更自然的表情、更清晰的装备层次。</p>
+        </div>
+        <ul class="improvement-list">
+          <li><i></i>突出并前推的闭合橙色喙</li>
+          <li><i></i>更完整的心形奶油色脸罩</li>
+          <li><i></i>大眼、暖色瞳孔与自然高光</li>
+          <li><i></i>梨形身体、黑色鳍肢与小型厚脚掌</li>
+          <li><i></i>金属剑刃、围巾和材质高光分层</li>
+        </ul>
+        <div class="rig-status"><span></span>独立关节：头 / 左右鳍 / 左右脚 / 持剑手</div>
+        <div class="control-section">
+          <span class="control-label">动作检查</span>
+          <div id="motion-controls" class="motion-controls">
+            <button type="button" data-motion="idle" class="active">静止</button>
+            <button type="button" data-motion="turntable">转台</button>
+            <button type="button" data-motion="move">移动</button>
+            <button type="button" data-motion="attack">攻击</button>
+            <button type="button" data-motion="hit">受击</button>
+          </div>
+        </div>
+        <label class="scale-control">展示尺寸
+          <select id="display-scale">
+            <option value="1">游戏尺寸</option>
+            <option value="1.25">细节放大</option>
+          </select>
+        </label>
+      </aside>
+    </main>
+  </div>
+  <script type="module" src="./main.js?v=20260820j"></script>
+</body>
+</html>
