@@ -18,6 +18,19 @@ function smoothLathe(profile, segments = 48) {
   return geometry;
 }
 
+function bendIntegratedCrown(geometry) {
+  const positions = geometry.getAttribute('position');
+  for (let index = 0; index < positions.count; index += 1) {
+    const y = positions.getY(index);
+    const crownBlend = THREE.MathUtils.smoothstep(y, 0.86, 1.14);
+    positions.setX(index, positions.getX(index) + crownBlend * 0.055);
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function makeHealthBar(color) {
   const group = new THREE.Group();
   const track = new THREE.Mesh(
@@ -61,33 +74,26 @@ export function createSlimeCandidate() {
   group.add(rig);
 
   const gel = new THREE.MeshPhysicalMaterial({
-    color: 0x79d94a,
-    emissive: 0x163d0d,
-    emissiveIntensity: 0.08,
-    roughness: 0.38,
+    color: 0x62cbed,
+    emissive: 0x0e3658,
+    emissiveIntensity: 0.1,
+    roughness: 0.36,
     metalness: 0,
-    clearcoat: 0.38,
-    clearcoatRoughness: 0.34,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.28,
     flatShading: false,
   });
   const eyeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x102019,
+    color: 0x102431,
     roughness: 0.34,
     flatShading: false,
   });
   const glintMaterial = new THREE.MeshBasicMaterial({
-    color: 0xf5ffe9,
-    toneMapped: false,
-  });
-  const highlightMaterial = new THREE.MeshBasicMaterial({
-    color: 0xd8ffad,
-    transparent: true,
-    opacity: 0.42,
-    depthWrite: false,
+    color: 0xf3fdff,
     toneMapped: false,
   });
 
-  const body = add(rig, smoothLathe([
+  const body = add(rig, bendIntegratedCrown(smoothLathe([
     [0, 0.12],
     [0.24, 0.12],
     [0.4, 0.17],
@@ -96,9 +102,11 @@ export function createSlimeCandidate() {
     [0.52, 0.63],
     [0.43, 0.78],
     [0.29, 0.9],
-    [0.13, 0.97],
-    [0, 0.99],
-  ]), gel, [0, 0, 0], [1, 1, 0.88], 'SlimeCandidateBody');
+    [0.17, 0.99],
+    [0.09, 1.065],
+    [0.035, 1.12],
+    [0, 1.14],
+  ])), gel, [0, 0, 0], [1, 1, 0.88], 'SlimeCandidateBody');
   // LatheGeometry closes at local +Z. Rotate that harmless duplicate-vertex
   // seam behind the character so it cannot read as a stripe down the face.
   body.rotation.y = Math.PI;
@@ -115,22 +123,11 @@ export function createSlimeCandidate() {
   add(rig, new THREE.SphereGeometry(0.021, 16, 10), glintMaterial,
     [0.126, 0.622, 0.484], [1, 1.15, 0.55], 'SlimeCandidateGlintRight');
 
-  add(rig, new THREE.SphereGeometry(0.12, 28, 18), highlightMaterial,
-    [-0.28, 0.74, 0.337], [0.72, 1.18, 0.2], 'SlimeCandidateHighlightLarge');
-  add(rig, new THREE.SphereGeometry(0.052, 20, 14), highlightMaterial,
-    [-0.19, 0.84, 0.31], [0.7, 1, 0.2], 'SlimeCandidateHighlightSmall');
-
-  // A soft, asymmetric crown keeps the silhouette lively without using a
-  // visibly faceted cone.
-  const crown = add(rig, new THREE.SphereGeometry(0.105, 30, 20), gel,
-    [0.06, 1.01, -0.005], [0.72, 1.28, 0.7], 'SlimeCandidateCrown');
-  crown.rotation.z = -0.22;
-
   const contactShadow = makeContactShadow();
   group.add(contactShadow);
   group.userData.contactShadow = contactShadow;
 
-  const healthBar = makeHealthBar(0x79d94a);
+  const healthBar = makeHealthBar(0x63cfee);
   group.add(healthBar);
   group.userData.healthBar = healthBar;
 

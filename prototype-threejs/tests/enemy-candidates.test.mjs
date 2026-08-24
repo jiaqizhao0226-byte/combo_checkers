@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { createEnemyCandidate } from '../model-review/EnemyCandidates.js';
+import { createChapterOneEnemy, createSlime } from '../src/game/Units.js';
 
 const CASES = [
   ['jellyfish', 'JellyfishCandidateRig', 'JellyfishCandidateDome', 'JellyfishBell'],
@@ -47,7 +48,20 @@ for (const [type, rigName, primaryName, actionNodeName] of CASES) {
     || !actionNode.rotation.equals(beforeRotation)
     || !actionNode.scale.equals(beforeScale);
   assert(changed, `${type} attack must articulate a real model part`);
+
+  const gameEnemy = createChapterOneEnemy(type);
+  assert.equal(gameEnemy.userData.modelVersion, 'approved-chapter-one-v2',
+    `${type} approved model must be wired into the WeChat game enemy factory`);
+  assert(gameEnemy.getObjectByName(primaryName),
+    `${type} game-facing model must retain the approved review silhouette`);
+  assert.equal(gameEnemy.userData.enemyType, type);
 }
+
+const gameSlime = createSlime();
+assert.equal(gameSlime.userData.modelVersion, 'approved-chapter-one-v2',
+  'slime approved model must be wired into the WeChat game enemy factory');
+assert(gameSlime.getObjectByName('SlimeCandidateBody'));
+assert.equal(gameSlime.userData.enemyType, 'slime');
 
 assert.equal(createEnemyCandidate('unknown'), null, 'unknown enemy types must fall back cleanly');
 

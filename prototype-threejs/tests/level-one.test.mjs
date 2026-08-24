@@ -48,7 +48,8 @@ assert.deepEqual(
 
 const tutorial = createLevelOne({ rng: fixedRng });
 assert.equal(tutorial.state.tutorialOverlay?.id, 'board');
-tutorial.dismissTutorial();
+assert.equal(tutorial.state.tutorialOverlay?.interaction, 'board');
+assert.deepEqual(tutorial.availableActions().map(({ q, r }) => ({ q, r })), [{ q: -1, r: 4 }], '聚光灯只开放指定移动格');
 assert.deepEqual(
   { q: tutorial.state.hero.q, r: tutorial.state.hero.r },
   { q: -2, r: 4 },
@@ -60,12 +61,13 @@ assert(tutorial.availableActions().every(action => action.kind === 'move'));
 
 let outcome = tutorial.select(-1, 4);
 assert.equal(outcome.kind, 'move');
+assert.equal(tutorial.state.tutorialOverlay, null, '点击聚光目标后移动教学应自动收起');
 assert.equal(tutorial.state.turn, 1, 'the turn counter waits for the enemy phase');
 assert.equal(tutorial.state.phase, 'ENEMY_TURN');
 assert.equal(tutorial.state.enemies.length, 0, 'scripted spawning happens after enemy actions');
 resolveEnemyTurn(tutorial);
 assert.equal(tutorial.state.tutorialOverlay?.id, 'jump');
-tutorial.dismissTutorial();
+assert.deepEqual(tutorial.availableActions().map(({ q, r }) => ({ q, r })), [{ q: 1, r: 2 }], '基础跳跃只开放橙色落点');
 assert.equal(tutorial.state.turn, 2);
 assert.equal(tutorial.state.tutorialPhase, 1);
 assert.equal(tutorial.state.enemies.length, 1);
@@ -84,7 +86,7 @@ assert(
 assert.equal(tutorial.state.hero.hp, 100, 'the enemy must not act before the jump finishes');
 resolveEnemyTurn(tutorial);
 assert.equal(tutorial.state.tutorialOverlay?.id, 'multiHop');
-tutorial.dismissTutorial();
+assert.deepEqual(tutorial.availableActions().map(({ q, r }) => ({ q, r })), [{ q: 1, r: -2 }], '远距跳跃只开放路径终点');
 assert.equal(tutorial.state.hero.hp, 95, 'an adjacent enemy attacks during its following enemy phase');
 assert.equal(tutorial.state.tutorialPhase, 2);
 assert.equal(tutorial.state.message, '直线上隔一格的敌人也能跳过');
@@ -94,12 +96,13 @@ outcome = tutorial.select(1, -2);
 assert.equal(outcome.kind, 'jump');
 resolveEnemyTurn(tutorial);
 assert.equal(tutorial.state.tutorialOverlay?.id, 'chainJump');
-tutorial.dismissTutorial();
+assert.equal(tutorial.state.tutorialOverlay?.stage, 1);
 assert.equal(tutorial.state.tutorialPhase, 3);
 assert.equal(tutorial.state.message, '连续选择落点，完成二连跳');
 
 outcome = tutorial.select(3, -4);
 assert.equal(outcome.kind, 'planned', 'the scripted third lesson must offer a chain jump');
+assert.equal(tutorial.state.tutorialOverlay?.stage, 2, '首跳规划后聚光灯应切换到第二个落点');
 assert.equal(tutorial.state.phase, 'PLAYER_PLAN');
 assert.equal(tutorial.state.plan.length, 1);
 assert.deepEqual(
@@ -109,6 +112,7 @@ assert.deepEqual(
 
 outcome = tutorial.select(1, -4);
 assert.equal(outcome.kind, 'jump_start', 'the last planned landing begins execution');
+assert.equal(tutorial.state.tutorialOverlay, null, '第二个落点选中后路径教学自动结束');
 ({ summary: outcome } = resolveJumpExecution(tutorial, outcome));
 assert.equal(outcome.combo, 2);
 assert.equal(tutorial.state.lastReward?.name, '追踪飞镖');
@@ -456,6 +460,15 @@ assert.equal(critStart.kind, 'jump_start');
 assert.equal(critStep.hit.damage, 45, '100%暴击使30点基础跳跃伤害按原版1.5倍计算');
 assert.equal(metaBattle.state.gold, 2, '点金手100%使1金币击杀奖励翻倍');
 assert(metaBattle.state.presentationQueue.some(event => event.type === 'crit'));
+const critNumberEvents = metaBattle.state.presentationQueue.filter(event =>
+  (event.type === 'crit' || event.type === 'damage') && !event.suppressNumber
+);
+assert.equal(critNumberEvents.length, 1, '一次暴击只能生成一张合并后的伤害浮字');
+assert.equal(
+  metaBattle.state.presentationQueue.find(event => event.type === 'damage')?.suppressNumber,
+  true,
+  '暴击的 damage 事件仍负责受击动作和命中特效，但不得重复显示数字'
+);
 
 const spikePlacement = createLevelOne({ tutorialSeen: true, rng: fixedRng, skills: { spike_trap: 3 } });
 spikePlacement.state.items.length = 0; spikePlacement.state.enemies.length = 0;
@@ -721,5 +734,62 @@ const tauntedAction = bossTaunt.processEnemyTurn();
 assert.equal(tauntedAction.actions.find(action => action.enemyId === bossTaunt.state.boss.id)?.target, 'scarecrow');
 assert.equal(bossTaunt.state.hero.hp, heroBeforeTaunt, 'Boss普攻受稻草人嘲讽');
 assert(bossTaunt.state.scarecrow.hp < scarecrowBefore);
+
+const timeStop = createLevelOne({ tutorialSeen: true, rng: fixedRng });
+timeStop.state.items.length = 0;
+timeStop.state.enemies = [{
+  id: 'time-stop-slime', type: 'slime', name: '史莱姆', q: 0, r: 1,
+  hp: 25, maxHp: 25, attack: 5, defense: 0, range: 1, gold: 1,
+  stunnedTurns: 0, frozenTurns: 0, silencedTurns: 0,
+}];
+Object.assign(timeStop.state.hero, { q: 0, r: 2, hp: 100 });
+timeStop.state.timeStopTurns = 2;
+timeStop.state.phase = 'ENEMY_TURN';
+const frozenTurnOne = timeStop.processEnemyTurn();
+assert(frozenTurnOne.actions.every(action => action.type === 'time_stopped'));
+assert.equal(timeStop.state.hero.hp, 100, '六连必须完整跳过第一次敌方行动');
+assert.equal(timeStop.state.timeStopTurns, 1);
+timeStop.startPlayerTurn();
+timeStop.state.phase = 'ENEMY_TURN';
+const frozenTurnTwo = timeStop.processEnemyTurn();
+assert(frozenTurnTwo.actions.every(action => action.type === 'time_stopped'));
+assert.equal(timeStop.state.hero.hp, 100, '六连必须完整跳过第二次敌方行动');
+assert.equal(timeStop.state.timeStopTurns, 0);
+assert(timeStop.state.presentationQueue.filter(event => event.type === 'time_stop_turn').length >= 2,
+  '每个被跳过的敌方阶段都必须发出时间静止状态事件');
+
+const absoluteReflect = createLevelOne({ tutorialSeen: true, rng: fixedRng });
+absoluteReflect.state.items.length = 0;
+absoluteReflect.state.enemies = [{
+  id: 'reflect-slime', type: 'slime', name: '史莱姆', q: 0, r: 1,
+  hp: 25, maxHp: 25, attack: 5, defense: 0, range: 1, gold: 1,
+  stunnedTurns: 0, frozenTurns: 0, silencedTurns: 0,
+}];
+Object.assign(absoluteReflect.state.hero, { q: 0, r: 2, hp: 100 });
+absoluteReflect.state.absoluteReflectTurns = 4;
+absoluteReflect.state.phase = 'ENEMY_TURN';
+const reflectTurn = absoluteReflect.processEnemyTurn();
+assert.equal(absoluteReflect.state.hero.hp, 100, '八连反射期间企鹅受到的敌方伤害必须为零');
+assert.equal(absoluteReflect.state.enemies[0].hp, 20, '八连必须把同额伤害返还给攻击者');
+assert.equal(reflectTurn.actions[0].reflected, 5);
+assert.equal(absoluteReflect.state.absoluteReflectTurns, 3, '八连效果按真实敌方回合消耗，初始持续四回合');
+assert(absoluteReflect.state.presentationQueue.some(event => event.type === 'absolute_reflect_hit' && event.damage === 5));
+
+const scarecrowHealth = createLevelOne({ tutorialSeen: true, rng: fixedRng });
+scarecrowHealth.state.items.length = 0;
+scarecrowHealth.state.enemies = [{
+  id: 'scarecrow-slime', type: 'slime', name: '史莱姆', q: 0, r: 1,
+  hp: 25, maxHp: 25, attack: 5, defense: 0, range: 1, gold: 1,
+  stunnedTurns: 0, frozenTurns: 0, silencedTurns: 0,
+}];
+Object.assign(scarecrowHealth.state.hero, { q: 0, r: 3, hp: 100 });
+scarecrowHealth.state.scarecrow = { q: 0, r: 2, hp: 6, maxHp: 100, defense: 0 };
+scarecrowHealth.state.phase = 'ENEMY_TURN';
+scarecrowHealth.processEnemyTurn();
+assert.equal(scarecrowHealth.state.scarecrow.hp, 1, '稻草人承伤后只要仍有生命就必须继续存在');
+scarecrowHealth.startPlayerTurn();
+scarecrowHealth.state.phase = 'ENEMY_TURN';
+scarecrowHealth.processEnemyTurn();
+assert.equal(scarecrowHealth.state.scarecrow, null, '稻草人仅在生命耗尽时消散，不再按回合到期');
 
 console.log('level-one tests passed');

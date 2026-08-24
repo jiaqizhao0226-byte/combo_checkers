@@ -10,11 +10,9 @@ assert.equal(
   4,
   'tracking dart must have four readable metal blades'
 );
-assert.equal(
-  dart.getObjectByName('TrackingDartBlade1').material.metalness,
-  1,
-  'tracking dart blades must use a real reflective metal material'
-);
+const bladeMaterial = dart.getObjectByName('TrackingDartBlade1').material;
+assert(bladeMaterial.metalness >= 0.4 && bladeMaterial.roughness <= 0.3,
+  'tracking dart blades must keep a readable brushed-metal response under the dark game lighting');
 assert(dart.getObjectByName('TrackingDartMetalRing'), 'tracking dart must have a polished metal hub ring');
 assert(dart.getObjectByName('TrackingDartEnergyCore'), 'tracking dart must keep energy color limited to its core');
 assert(dart.getObjectByName('TrackingDartTrail'), 'tracking dart must carry a directional flight trail');

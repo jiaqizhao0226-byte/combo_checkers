@@ -1,3 +1,21 @@
+export function threatLineStyle(link) {
+  const immediateMelee = !link.pending && (link.distance == null || link.distance <= 1);
+  return {
+    color: immediateMelee ? 0xff3048 : link.pending ? 0xffd23f : 0xff8b24,
+    opacity: link.pending ? 0.82 : 0.88,
+    radius: link.pending ? 0.032 : immediateMelee ? 0.044 : 0.036,
+    outlineScale: 1.65,
+    outlineOpacity: null,
+    dashed: Boolean(link.pending || !immediateMelee),
+    dashLength: 0.34,
+    gapLength: 0.13,
+    arrowAt: 0.67,
+    arrowRadius: 0.12,
+    arrowHeight: 0.27,
+    arrowOutlineScale: 1.42,
+  };
+}
+
 export function buildThreatLinks(state) {
   const enemies = (state.enemies || []).filter(enemy => enemy.hp > 0 && enemy.attack > 0);
 

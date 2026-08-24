@@ -78,11 +78,10 @@ export function createLevelOne(options = {}) {
     baseHero: { maxHp: heroInput.maxHp ?? heroInput.hp ?? HERO_TEMPLATE.hp, attack: heroInput.attack ?? HERO_TEMPLATE.attack },
     skills: normalizeSkills(options.skills), enemies: [], items: [], traps: [], obstacles: [], scarecrow: null,
     isBossStage: initialStage === 10, boss: null, bossIntent: null,
-    drainShield: 0, oneHitShield: false, plan: [], threatPreview: [],
+    drainShield: 0, oneHitShield: false, timeStopTurns: 0, absoluteReflectTurns: 0,
+    scarecrowMaxHp: Math.max(1, options.scarecrowMaxHp || 100), plan: [], threatPreview: [],
     tutorialPhase: initialStage === 1 && !tutorialSeen ? 0 : 4,
-    tutorialOverlay: initialStage === 1 && !tutorialSeen
-      ? { id: 'board', title: '六角棋盘', desc: '点击相邻的绿色格子移动企鹅。每次行动后，敌人才会行动。' }
-      : null,
+    tutorialOverlay: null,
     tutorialQueue: [],
     tutorialFlags: { ...tutorialFlags },
     tutorialJustCompleted: false, lastReward: null, lastAction: null, skillChoices: [],
@@ -331,15 +330,34 @@ export function createLevelOne(options = {}) {
   function tryScriptedSpawn() {
     if (state.tutorialPhase === 0) {
       spawnJumpSetup(1); state.tutorialPhase = 1; state.message = '敌人出现！跳过它即可攻击';
-      if (!state.tutorialFlags.jumpTutorialSeen) state.tutorialOverlay = { id: 'jump', title: '跳跃攻击', desc: '橙色落点表示可跳跃。越过敌人并落在对称位置，就会对它造成伤害。' };
+      const action = filteredJumpOptions(state.hero)[0];
+      if (action) state.tutorialOverlay = actionTutorial({
+        id: 'jump', stepLabel: '2 / 5', title: '跳过敌人',
+        desc: '越过敌人并落到对称位置，就会立刻发动攻击。',
+        hint: '点击橙色落点', accent: '#ffb25f', action,
+        focusCells: [state.hero, action.jumpedAt, action],
+      });
     }
     else if (state.tutorialPhase === 1) {
       spawnJumpSetup(2); state.tutorialPhase = 2; state.message = '直线上隔一格的敌人也能跳过';
-      if (!state.tutorialFlags.multiHopTutorialSeen) state.tutorialOverlay = { id: 'multiHop', title: '远距跳跃', desc: '同一直线上遇到的第一个敌人，即使相隔一格，也能以相同距离越过。' };
+      const action = filteredJumpOptions(state.hero).sort((a, b) => (b.distance || 0) - (a.distance || 0))[0];
+      if (action) state.tutorialOverlay = actionTutorial({
+        id: 'multiHop', stepLabel: '3 / 5', title: '远距跳跃',
+        desc: '直线上遇到的第一个敌人，即使相隔一格，也能以相同距离越过。',
+        hint: '点击路径尽头', accent: '#61ddff', action,
+        focusCells: [state.hero, action.jumpedAt, action],
+      });
     }
     else if (state.tutorialPhase === 2) {
       spawnChainSetup(); state.tutorialPhase = 3; state.message = '连续选择落点，完成二连跳';
-      if (!state.tutorialFlags.chainJumpTutorialSeen) state.tutorialOverlay = { id: 'chainJump', title: '规划连跳', desc: '连续选择发光落点；点当前落点可提前执行，没有后续跳点时会自动执行。' };
+      const chain = findTutorialChain();
+      if (chain) state.tutorialOverlay = actionTutorial({
+        id: 'chainJump', stage: 1, stepLabel: '4 / 5', title: '连续跳跃',
+        desc: '落点旁还有可跳过的敌人时，可以继续规划下一跳。',
+        hint: '先点击第一个金色落点', accent: '#ffd56c', action: chain.first,
+        focusCells: [state.hero, chain.first.jumpedAt, chain.first, chain.second.jumpedAt, chain.second],
+        futureCell: chain.second,
+      });
     }
     else if (state.tutorialPhase === 3) {
       const spawned = spawnAtRandomCells(3, ['slime'], true);
@@ -384,11 +402,39 @@ export function createLevelOne(options = {}) {
   }
 
   function availableActions() {
-    if (state.result || state.tutorialOverlay || !['PLAYER_SELECT', 'PLAYER_PLAN'].includes(state.phase)) return [];
+    if (state.result || !['PLAYER_SELECT', 'PLAYER_PLAN'].includes(state.phase)) return [];
     const from = plannedCell();
     const jumps = filteredJumpOptions(from);
     const attackOptions = state.hero.silencedTurns > 0 ? [] : jumps;
-    return state.plan.length ? attackOptions : [...adjacentMoves(from, blockingUnits(), state.obstacles), ...attackOptions];
+    const actions = state.plan.length ? attackOptions : [...adjacentMoves(from, blockingUnits(), state.obstacles), ...attackOptions];
+    if (!state.tutorialOverlay) return actions;
+    if (state.tutorialOverlay.interaction !== 'board') return [];
+    const target = state.tutorialOverlay.targetCell;
+    return target ? actions.filter(action => action.q === target.q && action.r === target.r) : [];
+  }
+
+  function actionTutorial({ id, stage = 1, stepLabel, title, desc, hint, accent, action, focusCells, futureCell = null }) {
+    return {
+      id, stage, stepLabel, title, desc, hint, accent,
+      interaction: 'board', targetCell: copyCell(action),
+      focusCells: focusCells.filter(Boolean).map(copyCell),
+      futureCell: futureCell ? copyCell(futureCell) : null,
+    };
+  }
+
+  function completeActionTutorial(id) {
+    state.tutorialFlags[`${id}TutorialSeen`] = true;
+    state.tutorialOverlay = null;
+  }
+
+  function findTutorialChain() {
+    for (const first of filteredJumpOptions(state.hero)) {
+      state.plan.push(first);
+      const second = filteredJumpOptions(first)[0] || null;
+      state.plan.pop();
+      if (second) return { first, second };
+    }
+    return null;
   }
 
   function computeThreats(cell) {
@@ -413,8 +459,26 @@ export function createLevelOne(options = {}) {
     }
     const action = availableActions().find(option => option.q === q && option.r === r);
     if (!action) { state.message = state.plan.length ? '请选择发光的后续跳跃落点' : '请选择绿色移动格或橙色跳跃落点'; return { kind: 'invalid' }; }
-    if (action.kind === 'move') return commitMove(action);
+    const tutorial = state.tutorialOverlay?.interaction === 'board' ? state.tutorialOverlay : null;
+    if (action.kind === 'move') {
+      if (tutorial) completeActionTutorial(tutorial.id);
+      return commitMove(action);
+    }
     state.phase = 'PLAYER_PLAN'; state.plan.push(action); computeThreats(action);
+    if (tutorial?.id === 'chainJump' && tutorial.stage === 1) {
+      const next = filteredJumpOptions(action)[0];
+      if (next) {
+        state.tutorialOverlay = actionTutorial({
+          id: 'chainJump', stage: 2, stepLabel: '4 / 5', title: '接上第二跳',
+          desc: '第一段已经规划好了。继续选择第二个落点，整条路线才会开始执行。',
+          hint: '再点击蓝色终点', accent: '#61ddff', action: next,
+          focusCells: [state.hero, action.jumpedAt, action, next.jumpedAt, next],
+        });
+        state.message = '第一跳已规划，选择聚光灯中的第二个落点';
+        return { kind: 'planned', action };
+      }
+    }
+    if (tutorial) completeActionTutorial(tutorial.id);
     if (!filteredJumpOptions(action).length) return confirm();
     state.message = `${state.plan.length} 步已规划，点当前格或确认结束`;
     return { kind: 'planned', action };
@@ -427,7 +491,7 @@ export function createLevelOne(options = {}) {
     return true;
   }
 
-  function pickupItemAt(q, r) {
+  function pickupItemAt(q, r, options = {}) {
     const index = state.items.findIndex(item => item.q === q && item.r === r);
     if (index < 0) return null;
     const [item] = state.items.splice(index, 1);
@@ -452,7 +516,9 @@ export function createLevelOne(options = {}) {
     }
     else if (item.type === 'shield') { state.oneHitShield = true; label = '护盾就绪'; }
     else if (item.type === 'lucky_wheel' || item.type === 'doom_wheel') spinWheel(item.type === 'lucky_wheel' ? 'lucky' : 'doom');
-    emit('pickup', { q, r, itemType: item.type, amount, label, duration: 0.8 });
+    if (!options.suppressPresentation) {
+      emit('pickup', { q, r, itemType: item.type, amount, label, duration: 0.8 });
+    }
     return { ...item, amount, label };
   }
 
@@ -561,11 +627,13 @@ export function createLevelOne(options = {}) {
     return movements;
   }
 
-  function handleDeath(enemy, source, hits, fromChain = false) {
+  function handleDeath(enemy, source, hits, fromChain = false, suppressPresentation = false) {
     state.kills += 1;
     const overflow = state.kills - state.killTarget;
     state.gold += enemy.isBoss ? enemy.gold : overflow > 5 ? 1 : enemy.gold + Math.floor(enemy.gold * state.goldBonus / 100);
-    emit('death', { q: enemy.q, r: enemy.r, enemyId: enemy.id, enemyType: enemy.type, duration: 0.7 });
+    if (!suppressPresentation) {
+      emit('death', { q: enemy.q, r: enemy.r, enemyId: enemy.id, enemyType: enemy.type, duration: 0.7 });
+    }
     if (skillLevel('vampiric_jump') >= 3) {
       state.comboAtkBonus = Math.min(30, state.comboAtkBonus + 5);
       state.hero.hp = Math.min(state.hero.maxHp, state.hero.hp + 12);
@@ -619,7 +687,15 @@ export function createLevelOne(options = {}) {
     }
     enemy.hp = Math.max(0, enemy.hp - actual); state.totalDamage += actual;
     const hit = { enemyId: enemy.id, q: enemy.q, r: enemy.r, damage: actual, killed: enemy.hp === 0, source };
-    hits.push(hit); emit('damage', { ...hit, combo: source === 'jump' ? state.combo : 0, duration: 0.5 });
+    hits.push(hit);
+    if (!options.suppressPresentation && actual > 0) {
+      emit('damage', {
+        ...hit,
+        combo: source === 'jump' ? state.combo : 0,
+        suppressNumber: Boolean(options.suppressNumber),
+        duration: 0.5,
+      });
+    }
     if (!options.skipModifiers && enemy.marked && skillLevel('hunter_mark') >= 3) {
       state.hero.hp = Math.min(state.hero.maxHp, state.hero.hp + 5);
       emit('heal', { q: state.hero.q, r: state.hero.r, amount: 5, label: '+5 印记', duration: 0.45 });
@@ -629,7 +705,7 @@ export function createLevelOne(options = {}) {
       announce('海妖狂暴', '攻击提升，技能冷却缩短', '#ff5d8f', 1.35);
       emit('boss_enrage', { q: enemy.q, r: enemy.r, duration: 1.2 });
     }
-    if (enemy.hp === 0) handleDeath(enemy, source, hits, options.fromChain);
+    if (enemy.hp === 0) handleDeath(enemy, source, hits, options.fromChain, options.suppressDeathPresentation);
     return actual;
   }
 
@@ -817,7 +893,9 @@ export function createLevelOne(options = {}) {
       state.hero.shield = Math.min(10 + shield * 10, state.hero.shield + amount);
       emit('shield', { q: to.q, r: to.r, amount, duration: 0.55 });
     }
-    if (jumpedEnemy?.jumpRetaliation && jumpedEnemy.hp > 0) applyHeroDamage(jumpedEnemy.jumpRetaliation, '电水母反伤');
+    if (jumpedEnemy?.jumpRetaliation && jumpedEnemy.hp > 0) {
+      resolveReflectedHeroAttack(jumpedEnemy, jumpedEnemy.jumpRetaliation, '电水母反伤');
+    }
     if (hasCombo('hunter_mark', 'collector')) {
       [...livingEnemies()].filter(enemy => !enemy.isBoss && enemy.hp / enemy.maxHp <= 0.2).forEach(enemy => {
         damageEnemy(enemy, enemy.hp, 'hunter_instinct', hits, {
@@ -835,11 +913,20 @@ export function createLevelOne(options = {}) {
 
   function executeComboReward(hits) {
     if (state.combo < 2) return null;
-    const threshold = Math.min(state.combo, 8);
+    // Nine-combo and above has its own reserved reward route. Until the
+    // special skill-choice system is rebuilt it deliberately does not fall
+    // back to the eight-combo reflect reward.
+    const threshold = Math.min(state.combo, 9);
     const definition = COMBO_REWARDS[threshold];
-    const reward = { threshold, ...definition, hits: [] };
+    const reward = { threshold, ...definition, hits: [], presentation: { threshold, targets: [] } };
     if (!state.tutorialFlags.comboTutorialSeen) {
-      state.tutorialOverlay = { id: 'combo', title: '连击奖励', desc: '一回合内连续跳跃会累积 Combo；2 至 8 连分别触发飞镖、稻草人、冲击波等奖励。' };
+      state.tutorialOverlay = {
+        id: 'combo', stepLabel: state.tutorialPhase < 4 ? '5 / 5' : '连击教学',
+        title: `${threshold} 连击奖励`,
+        desc: `${definition.name} 已触发。连续跳跃会累积连击，并在整条路线执行完成后统一结算奖励。`,
+        hint: '点击继续战斗', accent: definition.color,
+        interaction: 'continue', focusCells: [copyCell(state.hero)],
+      };
     }
     announce(`${threshold} 连击`, definition.name, definition.color, definition.duration);
     emit('combo_burst', { threshold, q: state.hero.q, r: state.hero.r, color: definition.color, duration: definition.duration });
@@ -854,66 +941,132 @@ export function createLevelOne(options = {}) {
         const targetInfo = targets[index % targets.length];
         const target = targetInfo.object;
         const damage = Math.floor((30 + dartLv * 5) * Math.max(0.4, 1 - index * 0.12));
-        emit('projectile', {
-          from: copyCell(state.hero), to: copyCell(targetInfo), color: '#ffb64c',
-          projectileType: 'tracking_dart', duration: 0.5 + index * 0.08,
-        });
-        if (targetInfo.kind === 'item') pickupItemAt(target.q, target.r);
-        else if (target.hp > 0) {
-          damageEnemy(target, damage, 'dart', reward.hits, {
+        let impact = { kind: targetInfo.kind, targetId: target.id, q: target.q, r: target.r };
+        if (targetInfo.kind === 'item') {
+          pickupItemAt(target.q, target.r, { suppressPresentation: true });
+          impact = { ...impact, label: '自动拾取' };
+        } else if (target.hp > 0) {
+          const actualDamage = damageEnemy(target, damage, 'dart', reward.hits, {
             ignoreDefense: true, skipModifiers: true, fromChain: true,
+            suppressPresentation: true, suppressDeathPresentation: true,
           });
+          impact = { ...impact, damage: actualDamage, killed: target.hp <= 0 };
           if (dartLv >= 5 && target.hp > 0) { target.burnTurns = 2; target.burnDamage = 6; }
         }
+        emit('projectile', {
+          from: copyCell(state.hero), to: copyCell(targetInfo), color: '#ffb64c', impact,
+          projectileType: 'tracking_dart', duration: 0.6 + index * 0.12,
+        });
       }
-      if (!targets.length) state.hero.hp = Math.min(state.hero.maxHp, state.hero.hp + 15 + dartLv * 5);
+      if (!targets.length) {
+        const heal = 15 + dartLv * 5;
+        state.hero.hp = Math.min(state.hero.maxHp, state.hero.hp + heal);
+        emit('projectile', {
+          from: copyCell(state.hero), to: copyCell(state.hero), color: '#6effc6',
+          projectileType: 'tracking_dart', duration: 0.6,
+          impact: { kind: 'heal', amount: heal, q: state.hero.q, r: state.hero.r },
+        });
+      }
     } else if (threshold === 3) {
       const occupied = occupiedByEnemy(livingEnemies());
       const candidates = allCells(BOARD_RADIUS).filter(cell => !isHeroAt(cell.q, cell.r) && !occupied.has(cellKey(cell.q, cell.r))).sort((a, b) => hexDistance(a, state.hero) - hexDistance(b, state.hero));
       if (candidates.length) {
         const position = candidates[Math.floor(rng() * Math.min(4, candidates.length))];
-        state.scarecrow = { ...position, hp: state.hero.maxHp, maxHp: state.hero.maxHp, defense: state.hero.defense, turnsLeft: 2 };
+        state.scarecrow = {
+          ...position,
+          hp: state.scarecrowMaxHp,
+          maxHp: state.scarecrowMaxHp,
+          defense: state.hero.defense,
+        };
+        reward.presentation.scarecrow = { ...position, hp: state.scarecrow.hp, maxHp: state.scarecrow.maxHp };
         emit('scarecrow', { ...position, duration: 0.9 });
         if (!state.tutorialFlags.scarecrowTutorialSeen) {
-          const tutorial = { id: 'scarecrow', title: '稻草人', desc: '稻草人持续两个敌人回合，复制企鹅防御并吸引所有敌人的攻击。' };
+          const tutorial = {
+            id: 'scarecrow', stepLabel: '连击教学', title: '稻草人友军',
+            desc: '稻草人拥有独立生命值并吸引所有敌人攻击；生命耗尽时才会消散。',
+            hint: '点击继续战斗', accent: '#e2b86f', interaction: 'continue',
+            focusCells: [copyCell(state.scarecrow)],
+          };
           if (state.tutorialOverlay) state.tutorialQueue.push(tutorial); else state.tutorialOverlay = tutorial;
         }
       }
     } else if (threshold === 4) {
-      emit('hex_rays', { q: state.hero.q, r: state.hero.r, duration: 1.25 });
       [...livingEnemies()].forEach(enemy => {
         const dq = enemy.q - state.hero.q; const dr = enemy.r - state.hero.r;
         const onRay = dq === 0 || dr === 0 || dq + dr === 0;
-        if (onRay && enemy.isBoss) damageEnemy(enemy, 60, 'hex_blast', reward.hits, { ignoreDefense: true, skipModifiers: true, fromChain: true });
-        else if (onRay) damageEnemy(enemy, enemy.hp, 'hex_blast', reward.hits, { ignoreDefense: true, skipModifiers: true, fromChain: true });
+        if (!onRay) return;
+        const damage = damageEnemy(enemy, enemy.isBoss ? 60 : enemy.hp, 'hex_blast', reward.hits, {
+          ignoreDefense: true, skipModifiers: true, fromChain: true,
+          suppressPresentation: true, suppressDeathPresentation: true,
+        });
+        reward.presentation.targets.push({
+          enemyId: enemy.id, q: enemy.q, r: enemy.r, kind: enemy.isBoss ? 'boss' : 'minion',
+          damage, killed: enemy.hp <= 0,
+        });
       });
     } else if (threshold === 5) {
       let totalDrain = 0;
+      const heroHpBefore = state.hero.hp;
+      const shieldBefore = state.drainShield;
       [...livingEnemies()].forEach(enemy => {
-        emit('drain', { from: copyCell(enemy), to: copyCell(state.hero), duration: 0.8 });
-        totalDrain += damageEnemy(enemy, enemy.isBoss ? 30 : Math.max(5, Math.floor(enemy.hp * 0.2)), 'life_drain', reward.hits, {
+        const hpBefore = enemy.hp;
+        const damage = damageEnemy(enemy, enemy.isBoss ? 30 : Math.max(5, Math.floor(enemy.hp * 0.2)), 'life_drain', reward.hits, {
           ignoreDefense: true, skipModifiers: true, fromChain: true,
+          suppressPresentation: true, suppressDeathPresentation: true,
+        });
+        totalDrain += damage;
+        reward.presentation.targets.push({
+          enemyId: enemy.id, q: enemy.q, r: enemy.r, kind: enemy.isBoss ? 'boss' : 'minion',
+          hp: hpBefore, damage, killed: enemy.hp <= 0,
         });
       });
       const healing = Math.min(totalDrain, state.hero.maxHp - state.hero.hp);
       state.hero.hp += healing; state.drainShield = Math.min(60, state.drainShield + totalDrain - healing);
-      emit('heal', { q: state.hero.q, r: state.hero.r, amount: healing, duration: 0.85 });
+      reward.presentation.outcome = {
+        totalDrain, heroHpBefore, heal: healing, overflow: Math.max(0, totalDrain - healing),
+        shieldBefore, shieldAdded: state.drainShield - shieldBefore,
+        shieldTotal: state.drainShield, shieldFull: state.drainShield >= 60,
+      };
     } else if (threshold === 6) {
-      [...livingEnemies()].forEach(enemy => {
-        emit('meteor', { q: enemy.q, r: enemy.r, duration: 1.15 });
-        const distance = hexDistance(enemy, state.hero);
-        if (distance <= 4 && enemy.isBoss) damageEnemy(enemy, 240, 'meteor', reward.hits, { ignoreDefense: true, skipModifiers: true, fromChain: true });
-        else if (distance <= 4) damageEnemy(enemy, enemy.hp, 'meteor', reward.hits, { ignoreDefense: true, skipModifiers: true, fromChain: true });
-        else if (!enemy.isBoss) enemy.stunnedTurns = Math.max(enemy.stunnedTurns, 1);
-      });
-    } else if (threshold >= 7) {
-      emit('doomsday', { q: state.hero.q, r: state.hero.r, rebirth: threshold === 8, duration: definition.duration });
-      [...livingEnemies()].forEach(enemy => damageEnemy(enemy, enemy.isBoss ? 150 : enemy.hp, 'doomsday', reward.hits, {
-        ignoreDefense: true, skipModifiers: true, fromChain: true,
+      state.timeStopTurns = 2;
+      reward.presentation.turns = 2;
+      reward.presentation.targets = livingEnemies().map(enemy => ({
+        enemyId: enemy.id, q: enemy.q, r: enemy.r, kind: enemy.isBoss ? 'boss' : 'minion',
       }));
-      if (threshold === 8) { state.hero.hp = state.hero.maxHp; state.hero.pendingComboShield = true; emit('rebirth', { q: state.hero.q, r: state.hero.r, duration: 1.5 }); }
+    } else if (threshold === 7) {
+      [...livingEnemies()].forEach(enemy => {
+        const damage = damageEnemy(enemy, enemy.isBoss ? 120 : 180, 'meteor_aoe', reward.hits, {
+          ignoreDefense: true, skipModifiers: true, fromChain: true,
+          suppressPresentation: true, suppressDeathPresentation: true,
+        });
+        reward.presentation.targets.push({
+          enemyId: enemy.id, q: enemy.q, r: enemy.r, kind: enemy.isBoss ? 'boss' : 'minion',
+          damage, killed: enemy.hp <= 0,
+        });
+      });
+    } else if (threshold === 8) {
+      state.absoluteReflectTurns = 4;
+      reward.presentation.turns = 4;
+    } else if (threshold === 9) {
+      reward.presentation.deferredSkillChoice = true;
     }
+    emit('combo_reward', reward.presentation);
     state.lastReward = reward; hits.push(...reward.hits); return reward;
+  }
+
+  function resolveReflectedHeroAttack(attacker, damage, label, options = {}) {
+    if (state.absoluteReflectTurns <= 0 || !attacker || attacker.hp <= 0) {
+      return { damage: applyHeroDamage(damage, label, options), reflected: 0 };
+    }
+    const reflected = damageEnemy(attacker, Math.max(1, damage), 'absolute_reflect', [], {
+      ignoreDefense: true, skipModifiers: true, fromChain: true,
+      suppressPresentation: true, suppressDeathPresentation: true,
+    });
+    emit('absolute_reflect_hit', {
+      enemyId: attacker.id, from: copyCell(attacker), to: copyCell(state.hero),
+      damage: reflected, killed: attacker.hp <= 0, duration: 0.72,
+    });
+    return { damage: 0, reflected };
   }
 
   function chooseStep(enemy, target, away = false) {
@@ -928,9 +1081,10 @@ export function createLevelOne(options = {}) {
     const target = state.scarecrow?.hp > 0 ? state.scarecrow : state.hero;
     const from = copyCell(boss); const targetAt = copyCell(target);
     let damage = resistanceDamage(boss.attack, target.defense || 0);
-    if (target === state.hero) damage = applyHeroDamage(damage, boss.name);
+    let reflected = 0;
+    if (target === state.hero) ({ damage, reflected } = resolveReflectedHeroAttack(boss, damage, boss.name));
     else target.hp -= damage;
-    actions.push({ type: 'attack', enemyId: boss.id, damage, from, targetAt, target: target === state.hero ? 'hero' : 'scarecrow' });
+    actions.push({ type: 'attack', enemyId: boss.id, damage, reflected, from, targetAt, target: target === state.hero ? 'hero' : 'scarecrow' });
     state.bossIntent = { id: 'basic', name: '深渊重击', desc: `${damage} 伤害` };
   }
 
@@ -976,10 +1130,10 @@ export function createLevelOne(options = {}) {
 
     if (boss.clawCooldown <= 0 && distance <= 2) {
       const damage = Math.floor(boss.attack * (boss.enraged ? 2.8 : 2.2));
-      applyHeroDamage(damage, '深渊巨爪', { raw: true });
+      const result = resolveReflectedHeroAttack(boss, damage, '深渊巨爪', { raw: true });
       boss.clawCooldown = boss.enraged ? 3 : 4; boss.skillCooldown = 1;
       state.bossIntent = { id: 'claw', name: '深渊巨爪', desc: `${damage} 伤害` };
-      actions.push({ type: 'boss_claw', enemyId: boss.id, damage, from: copyCell(boss), targetAt: copyCell(state.hero), target: 'hero' });
+      actions.push({ type: 'boss_claw', enemyId: boss.id, damage: result.damage, reflected: result.reflected, from: copyCell(boss), targetAt: copyCell(state.hero), target: 'hero' });
       emit('boss_claw', { from: copyCell(boss), to: copyCell(state.hero), duration: 0.9 });
       if (!state.bossCasting) announce('深渊巨爪', '海妖挥下致命重击', '#ff729b', 0.9);
       state.bossCasting = null; return;
@@ -987,10 +1141,10 @@ export function createLevelOne(options = {}) {
     if (boss.tentacleCooldown <= 0) {
       const tentacles = placeBossTentacles(boss, boss.enraged ? 5 : 4);
       const damage = Math.floor(boss.attack * (boss.enraged ? 0.5 : 0.4));
-      applyHeroDamage(damage, '触手丛生', { raw: true });
+      const result = resolveReflectedHeroAttack(boss, damage, '触手丛生', { raw: true });
       boss.tentacleCooldown = boss.enraged ? 3 : 5; boss.skillCooldown = 1;
       state.bossIntent = { id: 'tentacle', name: '触手丛生', desc: `${tentacles.length} 条触手封锁棋盘` };
-      actions.push({ type: 'boss_tentacle', enemyId: boss.id, damage, tentacles: tentacles.map(copyCell), targetAt: copyCell(state.hero) });
+      actions.push({ type: 'boss_tentacle', enemyId: boss.id, damage: result.damage, reflected: result.reflected, tentacles: tentacles.map(copyCell), targetAt: copyCell(state.hero) });
       if (!state.bossCasting) announce('触手丛生', '触手可作为跳板，但跳过会受伤', '#c88cff', 1.05);
       state.bossCasting = null; return;
     }
@@ -1001,10 +1155,10 @@ export function createLevelOne(options = {}) {
       const from = copyCell(state.hero);
       if (destination) Object.assign(state.hero, destination);
       const damage = boss.enraged ? 10 : 5;
-      applyHeroDamage(damage, '深渊漩涡', { raw: true });
+      const result = resolveReflectedHeroAttack(boss, damage, '深渊漩涡', { raw: true });
       boss.whirlpoolCooldown = boss.enraged ? 4 : 7; boss.skillCooldown = 1;
       state.bossIntent = { id: 'whirlpool', name: '深渊漩涡', desc: `拉近并造成 ${damage} 伤害` };
-      actions.push({ type: 'boss_whirlpool', enemyId: boss.id, damage, from, to: copyCell(state.hero), targetAt: copyCell(state.hero) });
+      actions.push({ type: 'boss_whirlpool', enemyId: boss.id, damage: result.damage, reflected: result.reflected, from, to: copyCell(state.hero), targetAt: copyCell(state.hero) });
       emit('boss_whirlpool', { from: copyCell(boss), to: copyCell(state.hero), duration: 1 });
       if (!state.bossCasting) announce('深渊漩涡', '企鹅被拖向海妖', '#6fb7ff', 1);
       state.bossCasting = null; return;
@@ -1043,8 +1197,11 @@ export function createLevelOne(options = {}) {
   function resolveEnemyAttack(enemy, target, actions) {
     const from = copyCell(enemy); const targetAt = copyCell(target);
     let damage = resistanceDamage(enemy.attack, target.defense || 0);
+    let reflected = 0;
     if (target === state.hero) {
-      damage = applyHeroDamage(damage, enemy.name);
+      const reflectedResult = resolveReflectedHeroAttack(enemy, damage, enemy.name);
+      damage = reflectedResult.damage;
+      reflected = reflectedResult.reflected;
       const thorns = skillLevel('thorns');
       if (thorns) {
         const bloodThorns = hasCombo('vampiric_jump', 'thorns');
@@ -1068,11 +1225,21 @@ export function createLevelOne(options = {}) {
         q: target.q, r: target.r, radius: 1, color: '#9deaff', duration: 0.5,
       });
     }
-    actions.push({ type: 'attack', enemyId: enemy.id, damage, from, targetAt, target: target === state.hero ? 'hero' : 'scarecrow' });
+    actions.push({
+      type: 'attack', enemyId: enemy.id, damage,
+      reflected,
+      from, targetAt, target: target === state.hero ? 'hero' : 'scarecrow',
+    });
   }
 
   function enemyTurn() {
     const actions = [];
+    if (state.timeStopTurns > 0) {
+      const turnsLeft = --state.timeStopTurns;
+      livingEnemies().forEach(enemy => actions.push({ type: 'time_stopped', enemyId: enemy.id }));
+      emit('time_stop_turn', { turnsLeft, duration: 0.7 });
+      return actions;
+    }
     state.obstacles.forEach(obstacle => { if (obstacle.turnsLeft != null) obstacle.turnsLeft -= 1; });
     state.obstacles = state.obstacles.filter(obstacle => obstacle.turnsLeft == null || obstacle.turnsLeft > 0);
     livingEnemies().filter(enemy => enemy.type === 'hermit_crab').forEach(enemy => {
@@ -1170,7 +1337,7 @@ export function createLevelOne(options = {}) {
         emit('shield_reflect', { q: state.hero.q, r: state.hero.r, damage: reflected, duration: 0.6 });
       }
     }
-    if (state.scarecrow) { if (state.scarecrow.hp <= 0 || --state.scarecrow.turnsLeft <= 0) state.scarecrow = null; }
+    if (state.scarecrow?.hp <= 0) state.scarecrow = null;
     state.traps.forEach(trap => { trap.turnsLeft -= 1; }); state.traps = state.traps.filter(trap => trap.turnsLeft > 0);
     state.enemies = livingEnemies(); return actions;
   }
@@ -1235,7 +1402,10 @@ export function createLevelOne(options = {}) {
   function processEnemyTurn() {
     if (state.result || state.phase !== 'ENEMY_TURN') return { kind: 'invalid', actions: [] };
     const actions = enemyTurn(); state.lastReward = null; state.turn += 1;
-    if (state.hero.pendingComboShield && state.combo >= 8) { state.hero.pendingComboShield = false; state.hero.shield += 30 + (state.combo - 8) * 15; }
+    if (state.absoluteReflectTurns > 0) {
+      state.absoluteReflectTurns -= 1;
+      emit('absolute_reflect_turn', { turnsLeft: state.absoluteReflectTurns, duration: 0.7 });
+    }
     state.combo = 0; state.comboAtkBonus = 0;
     const won = state.isBossStage ? Boolean(state.boss && state.boss.hp <= 0) : state.kills >= state.killTarget;
     if (won) { if (state.hero.hp <= 0) state.hero.hp = 1; showResult('win'); return { kind: 'enemy_turn', actions, result: 'win' }; }
@@ -1332,7 +1502,12 @@ export function createLevelOne(options = {}) {
           emit('crit', { q: enemy.q, r: enemy.r, damage: jumpDamage, duration: 0.65 });
         }
         dealtJumpDamage = jumpDamage;
-        damageEnemy(enemy, jumpDamage, 'jump', execution.hits, { ignoreDefense: step.isKingmaker && skillLevel('kingmaker') >= 5 });
+        damageEnemy(enemy, jumpDamage, 'jump', execution.hits, {
+          ignoreDefense: step.isKingmaker && skillLevel('kingmaker') >= 5,
+          // 暴击事件已经负责显示合并后的“暴击 + 伤害”浮字；保留 damage
+          // 事件用于受击动作和命中特效，但不能再生成第二张数字。
+          suppressNumber: isCrit,
+        });
         hit = execution.hits[before] || null; applyFrostMark(enemy);
         const vamp = skillLevel('vampiric_jump');
         if (vamp && hit) state.hero.hp = Math.min(state.hero.maxHp, state.hero.hp + Math.floor(hit.damage * (5 + vamp * 3) / 100));
@@ -1422,6 +1597,15 @@ export function createLevelOne(options = {}) {
       detectNewEnemyTypes();
     }
     spawnItem(); refreshHunterMarks(); computeThreats(state.hero);
+    if (state.tutorialPhase < 4) {
+      const firstMove = adjacentMoves(state.hero, blockingUnits(), state.obstacles)[0];
+      if (firstMove) state.tutorialOverlay = actionTutorial({
+        id: 'board', stepLabel: '1 / 5', title: '移动企鹅',
+        desc: '点击相邻空格移动。你完成一次行动后，敌人才会开始它们的回合。',
+        hint: '点击绿色落点', accent: '#79f1cf', action: firstMove,
+        focusCells: [state.hero, firstMove],
+      });
+    }
   }
   state.presentationQueue.length = 0;
 

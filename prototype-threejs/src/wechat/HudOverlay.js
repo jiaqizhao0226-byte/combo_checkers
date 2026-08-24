@@ -18,7 +18,7 @@ const BATTLE_GUIDE_PAGES = [
     title: '道具与连击', icon: '🎁', entries: [
       '小血瓶 +40HP · 大血瓶回满', '金币袋 +10 · 护盾使下次受击减半',
       '2连追踪飞镖 · 3连稻草人', '4连六芒冲击 · 5连生命虹吸',
-      '6连天罚陨石 · 7连末日炸弹', '幸运与厄运轮盘会改变本局状态',
+      '6连时间静止 · 7连流星火雨', '8连绝对反射 · 9连特殊三选一',
     ],
   },
   {
@@ -34,6 +34,59 @@ const BATTLE_GUIDE_PAGES = [
     ],
   },
 ];
+
+const SKILL_CARD_META = Object.freeze({
+  quake_land: { glyph: '震', category: '范围打击' },
+  chain_lightning: { glyph: '雷', category: '连锁伤害' },
+  vampiric_jump: { glyph: '吸', category: '生命续航' },
+  thorns: { glyph: '荆', category: '反伤防御' },
+  spike_trap: { glyph: '刺', category: '路径陷阱' },
+  blood_rage: { glyph: '怒', category: '低血爆发' },
+  gravity_stomp: { glyph: '重', category: '连跳强化' },
+  split_shot: { glyph: '裂', category: '弹射伤害' },
+  hunter_mark: { glyph: '猎', category: '单体猎杀' },
+  combo_shield: { glyph: '盾', category: '护盾防御' },
+  glass_cannon: { glyph: '砲', category: '高风险增伤' },
+  dawn_herald: { glyph: '曙', category: '致命保命' },
+  step_strike: { glyph: '踏', category: '移动攻击' },
+  collector: { glyph: '收', category: '残血收割' },
+  frost_mark: { glyph: '霜', category: '冻结控制' },
+  kingmaker: { glyph: '棋', category: '全图机动' },
+  dart_storm: { glyph: '镖', category: '连击投射' },
+  damage_amp: { glyph: '战', category: '全局增幅' },
+  silence_path: { glyph: '寂', category: '沉默控制' },
+});
+
+function hexToRgba(color, alpha) {
+  const hex = String(color || '#79f1cf').replace('#', '');
+  const value = Number.parseInt(hex.length === 3 ? hex.split('').map(char => char + char).join('') : hex, 16);
+  const red = Number.isFinite(value) ? value >> 16 & 255 : 121;
+  const green = Number.isFinite(value) ? value >> 8 & 255 : 241;
+  const blue = Number.isFinite(value) ? value & 255 : 207;
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function splitSkillDescription(text, maxUnits = 25, maxLines = 2) {
+  const chars = [...String(text || '')];
+  const lines = [];
+  let line = '';
+  let units = 0;
+  for (const char of chars) {
+    const weight = /[\x00-\xff]/.test(char) ? 0.55 : 1;
+    if (line && units + weight > maxUnits) {
+      lines.push(line);
+      line = '';
+      units = 0;
+      if (lines.length >= maxLines) break;
+    }
+    line += char;
+    units += weight;
+  }
+  if (lines.length < maxLines && line) lines.push(line);
+  const consumed = lines.join('').length;
+  if (consumed < chars.length && lines.length) lines[lines.length - 1] = `${lines[lines.length - 1].replace(/[；，、。]?$/, '')}…`;
+  return lines;
+}
 
 function roundedRect(context, x, y, width, height, radius) {
   const r = Math.min(radius, width * 0.5, height * 0.5);
@@ -216,6 +269,7 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
   const adventureButtonWidth = Math.min(320, viewportWidth * 0.75);
   const adventureButtonHeight = 72;
   const adventureButtonBottomGap = 80;
+  const battleFooterY = viewportHeight - 124;
   const vfxTestWidth = Math.min(126, Math.max(96, viewportWidth - 220));
   const vfxPanelWidth = Math.min(364, viewportWidth - 28);
   const vfxPanelHeight = 520;
@@ -223,6 +277,14 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
   const vfxPanelY = Math.max(safeTop + 18, (viewportHeight - vfxPanelHeight) * 0.5);
   const vfxButtonGap = 10;
   const vfxButtonWidth = (vfxPanelWidth - 46 - vfxButtonGap) * 0.5;
+  const skillCardWidth = Math.min(382, viewportWidth - 32);
+  const skillCardHeight = 128;
+  const skillCardGap = 12;
+  const skillCardsHeight = skillCardHeight * 3 + skillCardGap * 2;
+  const skillChoiceStartY = Math.max(
+    safeTop + 168,
+    Math.min(viewportHeight - skillCardsHeight - 96, Math.round(viewportHeight * 0.25))
+  );
   const controls = {
     start: {
       x: (viewportWidth - adventureButtonWidth) * 0.5,
@@ -235,10 +297,10 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
     tutorialClose: { x: (viewportWidth - 190) * 0.5, y: viewportHeight * 0.5 + 92, width: 190, height: 48 },
     enemyIntroClose: { x: (viewportWidth - 190) * 0.5, y: viewportHeight - 98, width: 190, height: 48 },
     skills: [0, 1, 2].map(index => ({
-      x: 34,
-      y: viewportHeight * 0.5 - 104 + index * 92,
-      width: viewportWidth - 68,
-      height: 78,
+      x: (viewportWidth - skillCardWidth) * 0.5,
+      y: skillChoiceStartY + index * (skillCardHeight + skillCardGap),
+      width: skillCardWidth,
+      height: skillCardHeight,
     })),
     tabs: ['shop', 'equip', 'adventure', 'talent', 'guild'].map((id, index) => ({
       id, x: viewportWidth / 5 * index, y: menuTabY,
@@ -289,21 +351,22 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
     })),
     battleSettings: { x: 18, y: safeTop + 64, width: 44, height: 40 },
     battleExit: { x: viewportWidth - 62, y: safeTop + 64, width: 44, height: 40 },
-    battleGuide: { x: 18, y: viewportHeight - 188, width: 92, height: 42 },
-    battleSkills: { x: viewportWidth - 110, y: viewportHeight - 188, width: 92, height: 42 },
-    battleVfxTestOpen: { x: (viewportWidth - vfxTestWidth) * 0.5, y: viewportHeight - 188, width: vfxTestWidth, height: 42 },
+    battleGuide: { x: 18, y: battleFooterY, width: 92, height: 42 },
+    battleSkills: { x: viewportWidth - 110, y: battleFooterY, width: 92, height: 42 },
+    battleVfxTestOpen: { x: (viewportWidth - vfxTestWidth) * 0.5, y: battleFooterY, width: vfxTestWidth, height: 42 },
     battleVfxTestClose: { x: vfxPanelX + vfxPanelWidth - 50, y: vfxPanelY + 16, width: 34, height: 34 },
     battleVfxTestClear: { x: vfxPanelX + 20, y: vfxPanelY + vfxPanelHeight - 58, width: vfxPanelWidth - 40, height: 38 },
     battleVfxTests: VFX_TEST_PRESETS.map((preset, index) => ({
       id: preset.id,
       x: vfxPanelX + 18 + (index % 2) * (vfxButtonWidth + vfxButtonGap),
-      y: vfxPanelY + 126 + Math.floor(index / 2) * 82,
+      y: vfxPanelY + 82 + Math.floor(index / 2) * 56,
       width: vfxButtonWidth,
-      height: 48,
+      height: 44,
     })),
     guidePrev: { x: 30, y: viewportHeight - 104, width: 54, height: 42 },
     guideNext: { x: viewportWidth - 84, y: viewportHeight - 104, width: 54, height: 42 },
     guideClose: { x: (viewportWidth - 150) * 0.5, y: viewportHeight - 104, width: 150, height: 42 },
+    guideReplayTutorial: { x: (viewportWidth - 220) * 0.5, y: viewportHeight - 164, width: 220, height: 42 },
     skillsPrev: { x: 30, y: viewportHeight - 104, width: 54, height: 42 },
     skillsNext: { x: viewportWidth - 84, y: viewportHeight - 104, width: 54, height: 42 },
     skillsClose: { x: (viewportWidth - 150) * 0.5, y: viewportHeight - 104, width: 150, height: 42 },
@@ -702,9 +765,125 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
       context.textAlign = 'left'; context.fillStyle = '#7fc5ea'; context.font = '900 14px sans-serif'; context.fillText(`${index + 1}`, 54, y + 27);
       context.fillStyle = '#d6e9ed'; context.font = '650 12px sans-serif'; context.fillText(entry, 82, y + 27);
     });
+    if (pageIndex === 0 && state.battleUi?.vfxTestEnabled) {
+      button(context, controls.guideReplayTutorial, '重播开场聚光引导', true, true);
+    }
     button(context, controls.guidePrev, '‹', false, pageIndex > 0);
     button(context, controls.guideClose, '关闭教程', true, true);
     button(context, controls.guideNext, '›', false, pageIndex < BATTLE_GUIDE_PAGES.length - 1);
+  }
+
+  function drawTutorialSpotlight(state) {
+    const tutorial = state.tutorialOverlay;
+    if (!tutorial) return;
+    const spotlight = state.tutorialSpotlight || {};
+    const points = Array.isArray(spotlight.points) && spotlight.points.length
+      ? spotlight.points
+      : [{ x: viewportWidth * 0.5, y: viewportHeight * 0.5 }];
+    const target = spotlight.target || points[points.length - 1];
+    const radius = Math.max(32, spotlight.radius || 42);
+    const time = Number(state.tutorialTime) || 0;
+    const pulse = 1 + Math.sin(time * 5.2) * 0.08;
+    const accent = tutorial.accent || '#79f1cf';
+
+    context.save();
+    context.fillStyle = 'rgba(1, 7, 12, .78)';
+    context.fillRect(0, 0, viewportWidth, viewportHeight);
+    context.globalCompositeOperation = 'destination-out';
+    if (points.length > 1) {
+      context.beginPath();
+      context.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach(point => context.lineTo(point.x, point.y));
+      context.lineWidth = radius * 1.72;
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.strokeStyle = '#000';
+      context.stroke();
+    }
+    for (const point of points) {
+      context.beginPath();
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fillStyle = '#000';
+      context.fill();
+    }
+    context.restore();
+
+    if (points.length > 1) {
+      context.save();
+      context.beginPath();
+      context.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach(point => context.lineTo(point.x, point.y));
+      context.lineWidth = 3;
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.strokeStyle = hexToRgba(accent, 0.72);
+      context.shadowColor = accent;
+      context.shadowBlur = 14;
+      context.stroke();
+      context.restore();
+    }
+
+    points.forEach(point => {
+      const isTarget = Math.hypot(point.x - target.x, point.y - target.y) < 2;
+      context.save();
+      context.beginPath();
+      context.arc(point.x, point.y, radius * (isTarget ? pulse : 0.82), 0, Math.PI * 2);
+      context.strokeStyle = hexToRgba(accent, isTarget ? 0.96 : 0.48);
+      context.lineWidth = isTarget ? 4 : 2;
+      context.shadowColor = accent;
+      context.shadowBlur = isTarget ? 18 : 8;
+      context.stroke();
+      context.restore();
+    });
+
+    if (spotlight.future) {
+      context.save();
+      context.setLineDash?.([5, 6]);
+      context.beginPath();
+      context.arc(spotlight.future.x, spotlight.future.y, radius * 0.82, 0, Math.PI * 2);
+      context.strokeStyle = hexToRgba('#61ddff', 0.62);
+      context.lineWidth = 2;
+      context.stroke();
+      context.restore();
+    }
+
+    const width = Math.min(334, viewportWidth - 36);
+    const isAction = tutorial.interaction === 'board';
+    const height = isAction ? 158 : 190;
+    const x = (viewportWidth - width) * 0.5;
+    const pathMinY = Math.min(...points.map(point => point.y));
+    const pathMaxY = Math.max(...points.map(point => point.y));
+    const minBubbleY = safeTop + 70;
+    const maxBubbleY = viewportHeight - height - 146;
+    const belowY = pathMaxY + radius + 22;
+    const aboveY = pathMinY - radius - height - 22;
+    let y;
+    if (belowY <= maxBubbleY) y = Math.max(minBubbleY, belowY);
+    else if (aboveY >= minBubbleY) y = Math.min(maxBubbleY, aboveY);
+    else y = (pathMinY + pathMaxY) * 0.5 > viewportHeight * 0.5 ? minBubbleY : maxBubbleY;
+    panel(context, x, y, width, height, 'rgba(8, 25, 35, .97)', hexToRgba(accent, 0.72));
+
+    context.textAlign = 'center'; context.textBaseline = 'middle';
+    const chipWidth = 76;
+    roundedRect(context, viewportWidth * 0.5 - chipWidth * 0.5, y + 13, chipWidth, 24, 12);
+    context.fillStyle = hexToRgba(accent, 0.15); context.fill();
+    context.fillStyle = accent; context.font = '800 11px sans-serif';
+    context.fillText(tutorial.stepLabel || '新手引导', viewportWidth * 0.5, y + 25);
+    context.fillStyle = '#f4fbf9'; context.font = '900 22px sans-serif';
+    context.fillText(tutorial.title || '新手引导', viewportWidth * 0.5, y + 55);
+    context.fillStyle = '#bdd4d3'; context.font = '600 12px sans-serif';
+    const lines = splitSkillDescription(tutorial.desc || '', 27, 2);
+    lines.forEach((line, index) => context.fillText(line, viewportWidth * 0.5, y + 83 + index * 19));
+
+    if (isAction) {
+      context.fillStyle = accent; context.font = '900 14px sans-serif';
+      context.fillText(`⌄  ${tutorial.hint || '点击高亮落点'}`, viewportWidth * 0.5, y + height - 22);
+    } else {
+      Object.assign(controls.tutorialClose, {
+        x: (viewportWidth - 190) * 0.5, y: y + height - 55, width: 190, height: 40,
+      });
+      button(context, controls.tutorialClose, tutorial.hint || '继续战斗', true, true);
+    }
   }
 
   function drawBattleSkills(state) {
@@ -776,19 +955,16 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
 
     button(context, controls.battleVfxTestClose, '×', false, true);
 
-    ['攻击反馈', '连击反馈', '技能特效', '战斗物件'].forEach((group, row) => {
-      const labelY = vfxPanelY + 103 + row * 82;
-      context.textAlign = 'left';
-      context.fillStyle = row === 0 ? '#ffb67a' : row === 1 ? '#ffd66f' : row === 2 ? '#9fd9ff' : '#a9e3bd';
-      context.font = '850 11px sans-serif';
-      context.fillText(group, vfxPanelX + 20, labelY);
-      context.fillStyle = 'rgba(255,255,255,.08)';
-      context.fillRect(vfxPanelX + 82, labelY - 0.5, vfxPanelWidth - 104, 1);
-    });
-
     VFX_TEST_PRESETS.forEach((preset, index) => {
       const bounds = controls.battleVfxTests[index];
       const active = state.battleUi?.vfxTestLastId === preset.id;
+      const groupColors = {
+        '攻击反馈': '#ffb67a',
+        '技能特效': '#9fd9ff',
+        '战斗物件': '#a9e3bd',
+        '连击奖励': '#ffd66f',
+        '界面测试': '#e7b7ff',
+      };
       panel(
         context,
         bounds.x,
@@ -801,20 +977,122 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = active ? '#fff3c9' : '#eaf5ff';
-      context.font = preset.icon.length > 1 ? '900 13px sans-serif' : '18px sans-serif';
-      context.fillText(preset.icon, bounds.x + 25, bounds.y + bounds.height * 0.5);
+      context.font = preset.icon.length > 1 ? '900 11px sans-serif' : '16px sans-serif';
+      context.fillText(preset.icon, bounds.x + 21, bounds.y + bounds.height * 0.5);
       context.textAlign = 'left';
-      context.font = '800 12px sans-serif';
-      context.fillText(preset.label, bounds.x + 45, bounds.y + bounds.height * 0.5);
+      context.fillStyle = groupColors[preset.group] || '#9c8eb5';
+      context.font = '750 8px sans-serif';
+      context.fillText(preset.group, bounds.x + 38, bounds.y + 12);
+      context.fillStyle = active ? '#fff3c9' : '#eaf5ff';
+      context.font = '800 10px sans-serif';
+      context.fillText(preset.label, bounds.x + 38, bounds.y + 30);
     });
 
     if (state.battleUi?.vfxTestLast) {
       context.textAlign = 'center';
       context.fillStyle = '#cbb9dc';
       context.font = '700 10px sans-serif';
-      context.fillText(`最近触发：${state.battleUi.vfxTestLast}`, viewportWidth * 0.5, vfxPanelY + 365);
+      context.fillText(`最近触发：${state.battleUi.vfxTestLast}`, viewportWidth * 0.5, vfxPanelY + 430);
     }
     button(context, controls.battleVfxTestClear, '清空当前特效', false, true);
+  }
+
+  function drawSkillChoiceOverlay(options) {
+    const choices = options.choices || [];
+    const accent = options.accent || '#79f1cf';
+    context.fillStyle = 'rgba(1, 8, 14, .84)';
+    context.fillRect(0, 0, viewportWidth, viewportHeight);
+
+    const headerY = skillChoiceStartY - 92;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = accent;
+    context.font = '850 11px sans-serif';
+    context.fillText(options.eyebrow || '关卡奖励', viewportWidth * 0.5, headerY);
+    context.fillStyle = '#f4fff9';
+    context.font = '900 31px sans-serif';
+    context.fillText(options.title || '选择一项能力', viewportWidth * 0.5, headerY + 31);
+    context.fillStyle = '#91aaa6';
+    context.font = '650 12px sans-serif';
+    context.fillText(options.subtitle || '三选一 · 本次冒险持续生效', viewportWidth * 0.5, headerY + 59);
+
+    context.fillStyle = hexToRgba(accent, 0.78);
+    context.fillRect(viewportWidth * 0.5 - 28, headerY + 76, 56, 2);
+
+    choices.slice(0, 3).forEach((skill, index) => {
+      const bounds = controls.skills[index];
+      const color = skill.color || accent;
+      const meta = SKILL_CARD_META[skill.id] || { glyph: skill.name?.slice(0, 1) || '?', category: '战斗能力' };
+      const level = Math.max(1, Number(skill.level) || 1);
+
+      context.save();
+      context.shadowColor = 'rgba(0, 0, 0, .36)';
+      context.shadowBlur = 14;
+      context.shadowOffsetY = 7;
+      panel(context, bounds.x, bounds.y, bounds.width, bounds.height, 'rgba(8, 26, 36, .975)', hexToRgba(color, 0.62));
+      context.restore();
+
+      roundedRect(context, bounds.x, bounds.y + 12, 5, bounds.height - 24, 3);
+      context.fillStyle = color;
+      context.fill();
+
+      const iconX = bounds.x + 53;
+      const iconY = bounds.y + bounds.height * 0.5;
+      context.beginPath();
+      context.arc(iconX, iconY, 31, 0, Math.PI * 2);
+      context.fillStyle = hexToRgba(color, 0.13);
+      context.fill();
+      context.lineWidth = 2;
+      context.strokeStyle = hexToRgba(color, 0.68);
+      context.stroke();
+      context.beginPath();
+      context.arc(iconX, iconY, 23, 0, Math.PI * 2);
+      context.fillStyle = hexToRgba(color, 0.2);
+      context.fill();
+      context.textAlign = 'center';
+      context.fillStyle = color;
+      context.font = '900 24px sans-serif';
+      context.fillText(meta.glyph, iconX, iconY + 1);
+
+      const textX = bounds.x + 98;
+      context.textAlign = 'left';
+      context.fillStyle = hexToRgba(color, 0.9);
+      context.font = '800 10px sans-serif';
+      context.fillText(meta.category, textX, bounds.y + 22);
+      context.fillStyle = '#f5fff9';
+      context.font = '900 19px sans-serif';
+      context.fillText(skill.name || '未知技能', textX, bounds.y + 47);
+
+      const levelLabel = level <= 1 ? '新技能' : `Lv.${level - 1} → ${level}`;
+      const levelWidth = level <= 1 ? 54 : 72;
+      const levelX = bounds.x + bounds.width - levelWidth - 15;
+      roundedRect(context, levelX, bounds.y + 14, levelWidth, 24, 12);
+      context.fillStyle = hexToRgba(color, 0.16);
+      context.fill();
+      context.lineWidth = 1;
+      context.strokeStyle = hexToRgba(color, 0.42);
+      context.stroke();
+      context.textAlign = 'center';
+      context.fillStyle = color;
+      context.font = '800 10px sans-serif';
+      context.fillText(levelLabel, levelX + levelWidth * 0.5, bounds.y + 26);
+
+      const lines = splitSkillDescription(skill.desc, viewportWidth >= 420 ? 27 : 23, 2);
+      context.textAlign = 'left';
+      context.fillStyle = '#a9c0bc';
+      context.font = '650 11px sans-serif';
+      lines.forEach((line, lineIndex) => context.fillText(line, textX, bounds.y + 76 + lineIndex * 19));
+
+      context.textAlign = 'right';
+      context.fillStyle = hexToRgba(color, 0.82);
+      context.font = '900 18px sans-serif';
+      context.fillText('›', bounds.x + bounds.width - 18, bounds.y + bounds.height - 18);
+    });
+
+    context.textAlign = 'center';
+    context.fillStyle = '#77918c';
+    context.font = '650 11px sans-serif';
+    context.fillText(options.footer || '点击卡片选择 · 效果立即生效', viewportWidth * 0.5, skillChoiceStartY + skillCardsHeight + 34);
   }
 
   function drawBattle(state) {
@@ -886,37 +1164,22 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
       }
     }
 
-    if (state.result === 'win') {
-      context.fillStyle = 'rgba(3, 13, 18, .68)';
-      context.fillRect(0, 0, viewportWidth, viewportHeight);
-      const width = Math.min(342, viewportWidth - 36);
-      const height = 420;
-      const x = (viewportWidth - width) * 0.5;
-      const y = (viewportHeight - height) * 0.5;
-      panel(context, x, y, width, height, 'rgba(11, 36, 42, .97)', 'rgba(125, 245, 218, .5)');
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.fillStyle = '#79f1cf';
-      context.font = '900 30px sans-serif';
-      context.fillText('选择一项技能', viewportWidth * 0.5, y + 48);
-      context.fillStyle = '#d7eee8';
-      context.font = '600 12px sans-serif';
-      context.fillText(state.isBossStage ? '深渊海妖已被击败' : `1-${state.stage} ${state.stageName}完成 · ${state.kills}/${state.killTarget} 击杀`, viewportWidth * 0.5, y + 72);
-      (state.skillChoices || []).forEach((skill, index) => {
-        const bounds = controls.skills[index];
-        panel(context, bounds.x, bounds.y, bounds.width, bounds.height, 'rgba(22, 58, 65, .96)', 'rgba(111, 224, 199, .34)');
-        context.textAlign = 'left';
-        context.fillStyle = skill.color || '#f0fff6';
-        context.font = '800 16px sans-serif';
-        context.fillText(`${skill.name}  Lv.${skill.level}`, bounds.x + 18, bounds.y + 29);
-        context.fillStyle = '#91bdb4';
-        context.font = '600 11px sans-serif';
-        context.fillText(skill.desc, bounds.x + 18, bounds.y + 54);
+    if (state.battleUi?.skillChoicePreview?.length) {
+      drawSkillChoiceOverlay({
+        choices: state.battleUi.skillChoicePreview,
+        eyebrow: '界面测试 · 关卡奖励',
+        title: '选择一项能力',
+        subtitle: '比较三张技能卡的层级、文字和点击区域',
+        footer: '测试模式 · 点击任意卡片返回战场',
       });
-      context.textAlign = 'center';
-      context.fillStyle = '#7ca79e';
-      context.font = '500 11px sans-serif';
-      context.fillText(state.stage >= 10 ? '选择后完成第一章' : '选择后立即进入下一关 · 技能持续生效', viewportWidth * 0.5, y + height - 24);
+    } else if (state.result === 'win') {
+      drawSkillChoiceOverlay({
+        choices: state.skillChoices,
+        eyebrow: state.isBossStage ? '首领击破 · 最终奖励' : `1-${state.stage} 关卡完成`,
+        title: '选择一项能力',
+        subtitle: state.isBossStage ? '深渊海妖已被击败' : `${state.stageName} · ${state.kills}/${state.killTarget} 击杀`,
+        footer: state.stage >= 10 ? '点击卡片选择 · 选择后完成第一章' : '点击卡片选择 · 本章持续生效',
+      });
     } else if (state.result === 'lose') {
       context.fillStyle = 'rgba(3, 13, 18, .68)';
       context.fillRect(0, 0, viewportWidth, viewportHeight);
@@ -989,33 +1252,16 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
       context.fillStyle = '#c7d8d5'; context.font = '600 12px sans-serif'; context.fillText(state.wheelResult.outcome.desc, cx, y + 336);
       button(context, controls.wheelClose, state.wheelResult.outcome.id === 'extra_skill' ? '选择技能' : '继续战斗', lucky, true);
     } else if (state.wheelSkillChoices?.length) {
-      context.fillStyle = 'rgba(3, 13, 18, .72)'; context.fillRect(0, 0, viewportWidth, viewportHeight);
-      const width = Math.min(342, viewportWidth - 36); const height = 420;
-      const x = (viewportWidth - width) * 0.5; const y = (viewportHeight - height) * 0.5;
-      panel(context, x, y, width, height, 'rgba(25, 38, 58, .98)', 'rgba(255, 220, 100, .48)');
-      context.textAlign = 'center'; context.fillStyle = '#ffe58b'; context.font = '900 27px sans-serif'; context.fillText('天赋觉醒', viewportWidth * 0.5, y + 48);
-      context.fillStyle = '#a9bdb9'; context.font = '600 11px sans-serif'; context.fillText('幸运轮盘额外技能三选一', viewportWidth * 0.5, y + 72);
-      state.wheelSkillChoices.forEach((skill, index) => {
-        const bounds = controls.skills[index]; panel(context, bounds.x, bounds.y, bounds.width, bounds.height, 'rgba(22, 58, 65, .96)', 'rgba(255, 220, 100, .3)');
-        context.textAlign = 'left'; context.fillStyle = skill.color || '#f0fff6'; context.font = '800 16px sans-serif'; context.fillText(`${skill.name}  Lv.${skill.level}`, bounds.x + 18, bounds.y + 29);
-        context.fillStyle = '#91bdb4'; context.font = '600 11px sans-serif'; context.fillText(skill.desc, bounds.x + 18, bounds.y + 54);
+      drawSkillChoiceOverlay({
+        choices: state.wheelSkillChoices,
+        accent: '#ffe58b',
+        eyebrow: '幸运轮盘 · 额外奖励',
+        title: '天赋觉醒',
+        subtitle: '额外选择一项能力 · 不消耗本回合',
+        footer: '点击卡片选择 · 效果立即生效',
       });
     }
-    if (state.tutorialOverlay) {
-      context.fillStyle = 'rgba(2, 9, 14, .76)'; context.fillRect(0, 0, viewportWidth, viewportHeight);
-      const width = Math.min(332, viewportWidth - 42); const height = 250;
-      const x = (viewportWidth - width) * 0.5; const y = (viewportHeight - height) * 0.5;
-      panel(context, x, y, width, height, 'rgba(12, 35, 43, .98)', 'rgba(121, 241, 207, .56)');
-      context.textAlign = 'center'; context.textBaseline = 'middle';
-      context.fillStyle = '#79f1cf'; context.font = '900 27px sans-serif';
-      context.fillText(state.tutorialOverlay.title, viewportWidth * 0.5, y + 52);
-      context.fillStyle = '#d7eee8'; context.font = '600 13px sans-serif';
-      const text = state.tutorialOverlay.desc || '';
-      const midpoint = Math.min(text.length, Math.max(16, Math.ceil(text.length * 0.5)));
-      context.fillText(text.slice(0, midpoint), viewportWidth * 0.5, y + 102);
-      context.fillText(text.slice(midpoint), viewportWidth * 0.5, y + 126);
-      button(context, controls.tutorialClose, '我知道了', true, true);
-    }
+    if (state.tutorialOverlay) drawTutorialSpotlight(state);
     if (state.enemyIntro?.length) {
       context.fillStyle = 'rgba(2, 9, 14, .8)'; context.fillRect(0, 0, viewportWidth, viewportHeight);
       const width = Math.min(348, viewportWidth - 34);
@@ -1132,8 +1378,20 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
       return null;
     }
     if (lastState?.enemyIntro?.length) return contains(controls.enemyIntroClose, x, y) ? 'enemy_intro_close' : null;
-    if (lastState?.tutorialOverlay) return contains(controls.tutorialClose, x, y) ? 'tutorial_close' : null;
+    if (lastState?.tutorialOverlay) {
+      if (lastState.tutorialOverlay.interaction !== 'board') {
+        return contains(controls.tutorialClose, x, y) ? 'tutorial_close' : 'tutorial_block';
+      }
+      const targetBounds = lastState.tutorialSpotlight?.actionBounds;
+      return targetBounds && contains(targetBounds, x, y) ? 'tutorial_action' : 'tutorial_block';
+    }
     if (lastState?.wheelResult) return contains(controls.wheelClose, x, y) ? 'wheel_close' : null;
+    if (lastState?.battleUi?.skillChoicePreview?.length) {
+      for (let index = 0; index < controls.skills.length; index += 1) {
+        if (contains(controls.skills[index], x, y)) return `battle_skill_preview_${index}`;
+      }
+      return 'battle_skill_preview_block';
+    }
     if (lastState?.wheelSkillChoices?.length) {
       for (let index = 0; index < controls.skills.length; index += 1) {
         if (contains(controls.skills[index], x, y)) return `wheel_skill_${index}`;
@@ -1160,6 +1418,8 @@ export function createHudOverlay(renderer, viewportWidth, viewportHeight, pixelR
       return null;
     }
     if (lastState?.battleUi?.guideOpen) {
+      if (lastState.battleUi.guidePage === 0 && lastState.battleUi.vfxTestEnabled
+        && contains(controls.guideReplayTutorial, x, y)) return 'guide_replay_tutorial';
       if (contains(controls.guidePrev, x, y)) return 'guide_prev';
       if (contains(controls.guideNext, x, y)) return 'guide_next';
       return contains(controls.guideClose, x, y) ? 'guide_close' : null;

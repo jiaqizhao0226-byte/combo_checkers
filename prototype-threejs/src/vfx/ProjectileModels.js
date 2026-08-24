@@ -36,25 +36,31 @@ export function createTrackingDart(color = 0xffb64c) {
 
   const energyColor = new THREE.Color(color || 0xffb64c);
   const bladeMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xd0dade,
-    metalness: 1,
-    roughness: 0.2,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.12,
+    color: 0xdbe4e6,
+    metalness: 0.46,
+    roughness: 0.24,
+    clearcoat: 0.56,
+    clearcoatRoughness: 0.16,
+    emissive: 0x26373c,
+    emissiveIntensity: 0.5,
     flatShading: true,
   });
   const polishedMetal = new THREE.MeshPhysicalMaterial({
     color: 0xf0f7f6,
-    metalness: 0.96,
-    roughness: 0.08,
-    clearcoat: 0.8,
-    clearcoatRoughness: 0.05,
+    metalness: 0.52,
+    roughness: 0.13,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.08,
+    emissive: 0x334044,
+    emissiveIntensity: 0.4,
   });
   const hubMaterial = new THREE.MeshPhysicalMaterial({
     color: 0x263c46,
-    metalness: 0.92,
+    metalness: 0.74,
     roughness: 0.3,
     clearcoat: 0.35,
+    emissive: 0x071014,
+    emissiveIntensity: 0.22,
   });
   const energyMaterial = new THREE.MeshBasicMaterial({
     color: energyColor.clone().multiplyScalar(1.25),

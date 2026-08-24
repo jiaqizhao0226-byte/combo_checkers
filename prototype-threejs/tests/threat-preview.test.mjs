@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { buildThreatLinks } from '../src/game/ThreatPreview.js';
+import { buildThreatLinks, threatLineStyle } from '../src/game/ThreatPreview.js';
 
 const state = {
   phase: 'PLAYER_PLAN',
@@ -40,5 +40,12 @@ assert.deepEqual(
   ],
   'a living scarecrow redirects every living enemy intent line during every phase'
 );
+
+const everydayImmediateStyle = threatLineStyle({ target: 'hero', pending: false, distance: 1 });
+const scarecrowStyle = threatLineStyle({ target: 'scarecrow', pending: false, distance: null });
+assert.deepEqual(scarecrowStyle, everydayImmediateStyle,
+  '稻草人攻击预警必须完全复用普通即时伤害线样式');
+assert(everydayImmediateStyle.radius < 0.05,
+  '统一后的日常伤害线应比旧版更细');
 
 console.log('threat preview tests passed');

@@ -1,6 +1,6 @@
 import * as THREE from '../vendor/three.module.js';
-import { createPenguin } from '../src/game/Units.js';
-import { createPenguinCandidate } from './PenguinCandidate.js?v=20260820j';
+import { createLegacyPenguin } from '../src/game/Units.js';
+import { createPenguinCandidate } from './PenguinCandidate.js?v=20260821d';
 
 const canvas = document.getElementById('review-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -65,7 +65,7 @@ oldMount.position.set(-1.22, 0.14, 0);
 newMount.position.set(1.22, 0.14, 0);
 scene.add(oldMount, newMount);
 
-const oldHero = createPenguin();
+const oldHero = createLegacyPenguin();
 oldHero.userData.healthBar.visible = false;
 oldHero.scale.multiplyScalar(0.87);
 const newHero = createPenguinCandidate();

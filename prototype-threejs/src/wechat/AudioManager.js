@@ -1,30 +1,21 @@
-const BGM_PATHS = {
-  menu: 'assets/audio/bgm_menu.ogg',
-  battle_calm: 'assets/audio/bgm_battle_calm.ogg',
-  battle: 'assets/audio/bgm_battle.ogg',
-  boss_abyss: 'assets/audio/bgm_boss_abyss.ogg',
-};
-
-const SFX_PATHS = {
-  ui_click: 'assets/audio/sfx/ui_click.ogg',
-  hero_jump: 'assets/audio/sfx/sfx_hero_jump.ogg',
-  attack_hit: 'assets/audio/sfx/sfx_attack_hit.ogg',
-  enemy_death: 'assets/audio/sfx/sfx_enemy_death.ogg',
-  victory: 'assets/audio/sfx/sfx_victory.ogg',
-  defeat: 'assets/audio/sfx/sfx_defeat.ogg',
-};
+import { WECHAT_BUILD_PROFILE } from './BuildProfile.js';
 
 const clampVolume = value => Math.max(0, Math.min(1, Math.round((Number(value) || 0) * 20) / 20));
 
-export function createAudioManager(wxApi, stored = {}) {
+export function createAudioManager(wxApi, stored = {}, buildProfile = WECHAT_BUILD_PROFILE) {
+  const bgmPaths = buildProfile?.bgmPaths || WECHAT_BUILD_PROFILE.bgmPaths;
+  const sfxPaths = buildProfile?.sfxPaths || WECHAT_BUILD_PROFILE.sfxPaths;
+  const bgmPackages = buildProfile?.bgmPackages || {};
+  const sfxPackages = buildProfile?.sfxPackages || {};
   const state = {
     bgmVolume: clampVolume(stored.bgmVolume ?? 0.5),
     sfxVolume: clampVolume(stored.sfxVolume ?? 0.8),
     comboSoundStyle: stored.comboSoundStyle === 'classic' ? 'classic' : 'scale',
-    currentBgm: stored.currentBgm && BGM_PATHS[stored.currentBgm] ? stored.currentBgm : 'menu',
+    currentBgm: stored.currentBgm && bgmPaths[stored.currentBgm] ? stored.currentBgm : 'menu',
   };
   let bgm = null;
   let started = false;
+  const packageLoads = new Map();
 
   function persist() {
     if (typeof wxApi.setStorageSync === 'function') wxApi.setStorageSync('combo-checkers-audio-settings', { ...state });
@@ -36,17 +27,44 @@ export function createAudioManager(wxApi, stored = {}) {
     bgm.loop = true;
     bgm.obeyMuteSwitch = true;
     bgm.volume = state.bgmVolume * 0.5;
-    bgm.src = BGM_PATHS[state.currentBgm];
+    bgm.src = bgmPaths[state.currentBgm];
     if (typeof bgm.onError === 'function') bgm.onError(error => console.warn('[combo-checkers] BGM error', error?.errMsg || error));
     return bgm;
   }
 
-  function playBgm(key = state.currentBgm) {
-    if (!BGM_PATHS[key]) return;
+  function ensurePackage(name) {
+    if (!name || typeof wxApi.loadSubpackage !== 'function') return null;
+    if (packageLoads.has(name)) return packageLoads.get(name);
+    const load = new Promise((resolve, reject) => {
+      wxApi.loadSubpackage({
+        name,
+        success: resolve,
+        fail: reject,
+      });
+    });
+    packageLoads.set(name, load);
+    return load;
+  }
+
+  function afterPackage(name, onReady) {
+    const load = ensurePackage(name);
+    if (!load) {
+      onReady();
+      return null;
+    }
+    load.then(onReady).catch(error => {
+      console.warn('[combo-checkers] audio package unavailable', name, error?.errMsg || error?.message || error);
+    });
+    return load;
+  }
+
+  function startBgm(key) {
+    // A slower package request must not restart an obsolete track after the
+    // player has already entered another screen.
+    if (state.currentBgm !== key) return;
     const context = ensureBgm();
-    state.currentBgm = key;
     if (!context) { persist(); return; }
-    const nextSrc = BGM_PATHS[key];
+    const nextSrc = bgmPaths[key];
     if (context.src !== nextSrc) {
       try { context.stop(); } catch {}
       context.src = nextSrc;
@@ -60,20 +78,33 @@ export function createAudioManager(wxApi, stored = {}) {
     persist();
   }
 
+  function playBgm(key = state.currentBgm) {
+    if (!bgmPaths[key]) return;
+    state.currentBgm = key;
+    persist();
+    return afterPackage(bgmPackages[key], () => startBgm(key));
+  }
+
   function unlock() {
     if (!started) playBgm(state.currentBgm);
   }
 
   function playSfx(key) {
-    if (!SFX_PATHS[key] || state.sfxVolume <= 0 || typeof wxApi.createInnerAudioContext !== 'function') return;
-    const context = wxApi.createInnerAudioContext();
-    context.obeyMuteSwitch = true;
-    context.volume = state.sfxVolume;
-    context.src = SFX_PATHS[key];
-    const destroy = () => { try { context.destroy(); } catch {} };
-    if (typeof context.onEnded === 'function') context.onEnded(destroy);
-    if (typeof context.onError === 'function') context.onError(destroy);
-    try { context.play(); } catch { destroy(); }
+    if (!sfxPaths[key] || state.sfxVolume <= 0 || typeof wxApi.createInnerAudioContext !== 'function') return null;
+    return afterPackage(sfxPackages[key], () => {
+      const context = wxApi.createInnerAudioContext();
+      context.obeyMuteSwitch = true;
+      context.volume = state.sfxVolume;
+      context.src = sfxPaths[key];
+      const destroy = () => { try { context.destroy(); } catch {} };
+      if (typeof context.onEnded === 'function') context.onEnded(destroy);
+      if (typeof context.onError === 'function') context.onError(destroy);
+      try { context.play(); } catch { destroy(); }
+    });
+  }
+
+  function preloadBattleAudio() {
+    return ensurePackage(bgmPackages.battle_calm || bgmPackages.battle || bgmPackages.boss_abyss);
   }
 
   function setBgmVolume(value) {
@@ -87,5 +118,8 @@ export function createAudioManager(wxApi, stored = {}) {
   function setSfxVolume(value) { state.sfxVolume = clampVolume(value); persist(); }
   function setComboSoundStyle(value) { state.comboSoundStyle = value === 'classic' ? 'classic' : 'scale'; persist(); }
 
-  return { state, unlock, playBgm, playSfx, setBgmVolume, setSfxVolume, setComboSoundStyle };
+  return {
+    state, unlock, playBgm, playSfx, preloadBattleAudio,
+    setBgmVolume, setSfxVolume, setComboSoundStyle,
+  };
 }

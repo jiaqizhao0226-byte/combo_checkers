@@ -16,6 +16,25 @@ assert.equal(slime.getObjectByName('SlimeCandidateUnderside'), undefined,
 assert(slime.getObjectByName('SlimeCandidateEyeLeft'), 'candidate slime must keep a readable face');
 assert.equal(slime.getObjectByName('SlimeCandidateMouth'), undefined,
   'candidate slime must not have a mouth');
+assert.equal(slime.getObjectByName('SlimeCandidateHighlightLarge'), undefined,
+  'body highlights must come from the gel material instead of a pasted mesh');
+assert.equal(slime.getObjectByName('SlimeCandidateHighlightSmall'), undefined,
+  'slime surface must stay visually continuous without a second highlight blob');
+assert.equal(slime.getObjectByName('SlimeCandidateCrown'), undefined,
+  'slime crown must be formed by the primary body instead of a glued sphere');
+let highestBodyPoint = -Infinity;
+const bodyPositions = body.geometry.getAttribute('position');
+for (let index = 0; index < bodyPositions.count; index += 1) {
+  highestBodyPoint = Math.max(highestBodyPoint, bodyPositions.getY(index));
+}
+assert.ok(highestBodyPoint > 1.1, 'continuous primary body must retain a readable crown silhouette');
+assert.ok(body.material.clearcoat > 0 && body.material.roughness < 0.4,
+  'continuous gel material must still produce a readable light response');
+assert.ok(body.material.color.b > body.material.color.g
+  && body.material.color.g > body.material.color.r,
+  'chapter-one slime must use a light ocean-blue gel palette');
+assert.ok(body.material.emissive.b > body.material.emissive.g,
+  'slime subsurface tint must stay blue instead of reverting to green');
 
 slime.userData.animate(0);
 slime.userData.playAction('hit', 0.4);

@@ -2,9 +2,10 @@ import * as THREE from './vendor/three.module.js';
 import { createEnvironment } from './src/game/Environment.js';
 import { createHexBoard, axialToWorld } from './src/game/HexBoard.js';
 import { BattleCameraController } from './src/game/BattleCameraController.js';
-import { buildThreatLinks } from './src/game/ThreatPreview.js';
+import { buildThreatLinks, threatLineStyle } from './src/game/ThreatPreview.js';
 import { createBattleObstacle, createChapterOneEnemy, createPenguin, createScarecrow } from './src/game/Units.js';
 import { createLevelOne } from './src/core/LevelOne.js';
+import { skillChoiceView } from './src/core/ChapterOneData.js';
 import { hexDistance } from './src/core/HexRules.js';
 import {
   SETS, createMetaProgress, decomposeInventoryItems, equipInventoryItem, getCritRate,
@@ -13,12 +14,20 @@ import {
 import { createHudOverlay } from './src/wechat/HudOverlay.js';
 import { createAudioManager } from './src/wechat/AudioManager.js';
 import { VfxDirector } from './src/vfx/VfxDirector.js';
+import { ComboRewardDirector } from './src/vfx/ComboRewardDirector.js';
+import { createDamageNumberLaneAllocator } from './src/vfx/DamageNumberLayout.js';
 import { VFX_TEST_MODE, VFX_TEST_PRESETS, isBattleVfxApproved } from './src/vfx/VfxTestConfig.js';
 import { createTrackingDart, faceProjectileAlongScreen } from './src/vfx/ProjectileModels.js';
 
 // Native WeChat Mini Game entry. There is intentionally no DOM, HTML, CSS or
 // React here: Three.js renders to the wx canvas and the HUD uses an offscreen
 // canvas texture. The browser prototype continues to use index.html.
+
+const CHAPTER_ONE_THEME = 'abyss_trench';
+// Keep the hub near the enemy shell while allowing the visible blades to enter
+// the body silhouette. The dart disappears on the contact frame, so this reads
+// as a committed hit without leaving the projectile embedded in the model.
+const TRACKING_DART_ENEMY_CONTACT_OFFSET = 0.62;
 
 const system = wx.getSystemInfoSync();
 const canvas = wx.createCanvas();
@@ -41,12 +50,12 @@ renderer.setSize(viewportWidth, viewportHeight, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
+renderer.toneMappingExposure = 1.3;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x102832);
-scene.fog = new THREE.Fog(0x102832, 21, 37);
+scene.background = new THREE.Color(0x0b4053);
+scene.fog = new THREE.Fog(0x0b4053, 23, 42);
 
 const aspect = viewportWidth / viewportHeight;
 const viewWidth = 12.3;
@@ -106,32 +115,32 @@ function setBattleZoom(nextZoom) {
 
 applyCameraProfile('menu');
 
-scene.add(new THREE.HemisphereLight(0x9bc4ea, 0x354832, 0.92));
+scene.add(new THREE.HemisphereLight(0xa1d9dc, 0x174c5d, 1.3));
+scene.add(new THREE.AmbientLight(0x5799a4, 0.68));
 
-const keyLight = new THREE.DirectionalLight(0xffcf87, 2.35);
+const keyLight = new THREE.DirectionalLight(0xd0ece7, 2.72);
 keyLight.position.set(14, 14, 9);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
 keyLight.shadow.camera.near = 1;
 keyLight.shadow.camera.far = 48;
-// The foreground trees reach roughly 14 world units from the clearing. The
-// previous ±10 shadow box clipped the lower-left crown, so PCF sampling toggled
-// at its edge as the battle camera zoomed.
+// Both forest and abyss themes keep their largest silhouettes within roughly
+// 14 world units, so the shadow box remains stable while the camera zooms.
 Object.assign(keyLight.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15 });
 keyLight.shadow.bias = -0.001;
 keyLight.shadow.normalBias = 0.075;
 scene.add(keyLight, keyLight.target);
 
-const fillLight = new THREE.DirectionalLight(0x5f91d0, 0.38);
+const fillLight = new THREE.DirectionalLight(0x70b7c4, 0.78);
 fillLight.position.set(-10, 7, -9);
 scene.add(fillLight);
 
-const rimLight = new THREE.DirectionalLight(0x78b9e8, 0.72);
+const rimLight = new THREE.DirectionalLight(0x62d5c9, 0.92);
 rimLight.position.set(-8, 10, -12);
 scene.add(rimLight);
 
-const environment = createEnvironment(scene);
-const board = createHexBoard(scene);
+const environment = createEnvironment(scene, { theme: CHAPTER_ONE_THEME });
+const board = createHexBoard(scene, { theme: CHAPTER_ONE_THEME });
 const boardBounds = board.cells.reduce((bounds, cell) => ({
   minX: Math.min(bounds.minX, cell.mesh.position.x - 0.72),
   maxX: Math.max(bounds.maxX, cell.mesh.position.x + 0.72),
@@ -178,6 +187,7 @@ const battleUi = {
   settingsOpen: false, guideOpen: false, guidePage: 0,
   skillsOpen: false, skillsPage: 0, exitConfirmOpen: false,
   vfxTestEnabled: VFX_TEST_MODE, vfxTestOpen: false, vfxTestLast: '', vfxTestLastId: '',
+  skillChoicePreview: null, tutorialPreview: false,
   audioState: audio.state,
 };
 let settledResult = null;
@@ -287,14 +297,89 @@ const vfxDirector = new VfxDirector(scene, {
     vfxShakeRemaining = Math.max(vfxShakeRemaining, duration || 0);
   },
 });
+const comboRewardDirector = new ComboRewardDirector(scene, camera, {
+  board,
+  hero,
+  getEnemyActor: enemyId => enemyActors.get(enemyId),
+  holdActor(actor, seconds) {
+    actor.userData.projectileHoldUntil = Math.max(
+      actor.userData.projectileHoldUntil || 0,
+      renderTime + seconds
+    );
+  },
+  onActorsReleased() {
+    syncEnemyActors(false);
+  },
+  createPreviewActor(position, index) {
+    const previewTypes = ['slime', 'archerfish', 'iron_turtle', 'jellyfish'];
+    const actor = createChapterOneEnemy(previewTypes[index % previewTypes.length]);
+    actor.scale.multiplyScalar(BATTLE_UNIT_SCALE);
+    actor.position.copy(position);
+    actor.position.y = 0.18;
+    actor.userData.baseY = 0.18;
+    scene.add(actor);
+    return actor;
+  },
+  releasePreviewActor(actor) {
+    scene.remove(actor);
+    actor.traverse?.(child => {
+      child.geometry?.dispose?.();
+      if (Array.isArray(child.material)) child.material.forEach(material => material?.dispose?.());
+      else child.material?.dispose?.();
+    });
+  },
+});
 let announcementTime = 0;
 let renderTime = 0;
+const damageNumberLanes = createDamageNumberLaneAllocator();
+
+function combatTextTargetKey(event, q, r) {
+  if (event.target === 'hero' || event.type === 'hero_hit' || event.type === 'heal') return 'hero';
+  return event.enemyId ? `enemy:${event.enemyId}` : `cell:${q}:${r}`;
+}
+
+function reserveCombatTextOffset(event, q, r) {
+  return damageNumberLanes.reserve(combatTextTargetKey(event, q, r), renderTime);
+}
 let shieldVisualActive = false;
 let shieldBreakAt = 0;
 
 function cellPosition(q, r, y = 0.18) {
   const position = axialToWorld(q, r);
   return new THREE.Vector3(position.x, y, position.z);
+}
+
+function projectWorldToHud(position) {
+  const projected = position.clone().project(camera);
+  return {
+    x: (projected.x * 0.5 + 0.5) * viewportWidth,
+    y: (-projected.y * 0.5 + 0.5) * viewportHeight,
+  };
+}
+
+function buildTutorialSpotlight() {
+  const tutorial = level.state.tutorialOverlay;
+  if (!tutorial) return null;
+  const cells = Array.isArray(tutorial.focusCells) ? tutorial.focusCells : [];
+  const points = cells.map(cell => projectWorldToHud(cellPosition(cell.q, cell.r, 0.42)));
+  const target = tutorial.targetCell
+    ? projectWorldToHud(cellPosition(tutorial.targetCell.q, tutorial.targetCell.r, 0.42))
+    : (points[points.length - 1] || projectWorldToHud(hero.position.clone().add(new THREE.Vector3(0, 0.7, 0))));
+  const worldCenter = tutorial.targetCell
+    ? cellPosition(tutorial.targetCell.q, tutorial.targetCell.r, 0.42)
+    : hero.position.clone();
+  const edge = projectWorldToHud(worldCenter.clone().add(new THREE.Vector3(0.7, 0, 0)));
+  const radius = THREE.MathUtils.clamp(Math.hypot(edge.x - target.x, edge.y - target.y), 34, 49);
+  const future = tutorial.futureCell
+    ? projectWorldToHud(cellPosition(tutorial.futureCell.q, tutorial.futureCell.r, 0.42))
+    : null;
+  return {
+    points: points.length ? points : [target], target, future, radius,
+    actionBounds: {
+      x: target.x - radius * 0.92, y: target.y - radius * 0.92,
+      width: radius * 1.84, height: radius * 1.84,
+    },
+  };
 }
 
 function runVfxTest(testId) {
@@ -350,11 +435,31 @@ function runVfxTest(testId) {
     vfxDirector.quake({ position: heroGround });
   } else if (test.effect === 'dart') {
     hero.userData.playAction?.('cast', 0.58);
-    launchTrackingDart(heroCenter, targetPoints[0], 0.72, 0xffb64c);
+    // Keep the in-game VFX test on the same timing as the real combo reward
+    // and the original Lua implementation: 0.6s total, target reached in the
+    // first 80% of the effect.
+    launchTrackingDart(heroCenter, targetPoints[0], 0.6, 0xffb64c, { kind: 'enemy', damage: 30 });
   } else if (test.effect === 'scarecrow') {
     hero.userData.playAction?.('cast', 0.62);
     const previewPosition = heroGround.clone().add(new THREE.Vector3(-1.45, 0, -0.45));
     previewScarecrowModel(previewPosition);
+  } else if (test.effect === 'combo_reward') {
+    const actions = {
+      4: ['hex_blast_cast', 0.9],
+      5: ['life_drain_cast', 1.08],
+      6: ['time_stop_cast', 1.05],
+      7: ['meteor_cast', 1.78],
+      8: ['absolute_reflect_cast', 1.1],
+    };
+    const [actionName, duration] = actions[test.combo] || ['cast', 0.72];
+    hero.userData.playAction?.(actionName, duration);
+    comboRewardDirector.preview(test.combo, level.state);
+  } else if (test.effect === 'skill_choice_ui') {
+    battleUi.skillChoicePreview = [
+      skillChoiceView('quake_land', 0),
+      skillChoiceView('combo_shield', 1),
+      skillChoiceView('frost_mark', 2),
+    ];
   }
 
   battleUi.vfxTestLast = test.label;
@@ -425,6 +530,16 @@ function placeActor(actor, q, r, y = 0.18) {
     actor.userData.healthBarAnchor ??= new THREE.Vector3();
     actor.userData.healthBarAnchor.copy(actor.position);
   }
+}
+
+function syncHealthBarValue(actor, hp, maxHp) {
+  const fill = actor?.userData.healthBar?.userData.fill;
+  if (!fill || !Number.isFinite(maxHp) || maxHp <= 0) return;
+  fill.userData.fullScaleX ??= fill.scale.x;
+  fill.userData.fullPositionX ??= fill.position.x;
+  const ratio = THREE.MathUtils.clamp((hp || 0) / maxHp, 0, 1);
+  fill.scale.x = fill.userData.fullScaleX * ratio;
+  fill.position.x = fill.userData.fullPositionX - (1 - ratio) * 0.34;
 }
 
 function faceHeroToward(from, to, instant = false) {
@@ -623,7 +738,7 @@ function syncActorStatuses(time) {
     const enemy = level.state.enemies.find(entry => entry.id === id);
     const visible = appMode === 'battle' && Boolean(enemy) && !actor.userData.dying;
     if (!rig) return;
-    rig.freeze.visible = visible && (enemy.frozenTurns || 0) > 0;
+    rig.freeze.visible = visible && ((enemy.frozenTurns || 0) > 0 || level.state.timeStopTurns > 0);
     rig.silence.visible = visible && (enemy.silencedTurns || 0) > 0;
     rig.poison.visible = visible && ((enemy.poisonTurns || 0) > 0);
     rig.mark.visible = visible && Boolean(enemy.marked);
@@ -654,26 +769,137 @@ function effectColor(value, fallback = 0x79f1cf) {
   try { return new THREE.Color(value || fallback); } catch (_) { return new THREE.Color(fallback); }
 }
 
-function addBattleEffect(object, duration, update) {
+function addBattleEffect(object, duration, update, onComplete = null) {
   effectGroup.add(object);
-  battleEffects.push({ object, duration: Math.max(0.2, duration || 0.65), elapsed: 0, update });
+  battleEffects.push({ object, duration: Math.max(0.2, duration || 0.65), elapsed: 0, update, onComplete });
 }
 
-function launchTrackingDart(from, to, duration = 0.58, color = 0xffb64c) {
+function trackingDartImpactFeedback(position, incomingDirection, impact = {}, heldActor = null, labelPosition = position) {
+  const root = new THREE.Group();
+  root.name = 'ApprovedTrackingDartImpact';
+  root.position.copy(position);
+  const color = impact.kind === 'heal' ? 0x6effc6 : impact.kind === 'item' ? 0xffdd72 : 0xffa43c;
+  const flashMaterial = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 1, depthWrite: false, depthTest: false,
+    blending: THREE.AdditiveBlending, toneMapped: false,
+  });
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), flashMaterial);
+  flash.name = 'ApprovedTrackingDartContactFlash';
+  root.add(flash);
+  const light = new THREE.PointLight(color, impact.kind === 'enemy' ? 3.2 : 2.2, 2.6, 2);
+  light.name = 'ApprovedTrackingDartContactLight';
+  light.position.set(0, 0.08, 0.16);
+  root.add(light);
+
+  const incoming = incomingDirection.clone().setY(0).normalize();
+  if (incoming.lengthSq() < 0.001) incoming.set(1, 0, 0);
+  const lateral = new THREE.Vector3(-incoming.z, 0, incoming.x);
+  const sparks = new THREE.Group();
+  sparks.name = 'ApprovedTrackingDartDirectionalSparks';
+  const sparkCount = impact.kind === 'enemy' ? 11 : 7;
+  for (let index = 0; index < sparkCount; index += 1) {
+    const material = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 1, depthWrite: false, depthTest: false,
+      blending: THREE.AdditiveBlending, toneMapped: false,
+    });
+    const spark = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.025), material);
+    spark.userData.direction = incoming.clone().multiplyScalar(-0.42 - (index % 3) * 0.09)
+      .addScaledVector(lateral, (index - (sparkCount - 1) * 0.5) * 0.16)
+      .add(new THREE.Vector3(0, 0.08 + (index % 4) * 0.08, 0)).normalize();
+    spark.userData.speed = 0.5 + (index % 3) * 0.14;
+    spark.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), spark.userData.direction);
+    sparks.add(spark);
+  }
+  root.add(sparks);
+
+  const label = impact.kind === 'enemy'
+    ? approvedEnemyDamageSprite(impact.damage || 0)
+    : combatTextSprite(impact.kind === 'heal' ? `+${impact.amount || 0}` : '自动拾取', '', impact.kind === 'heal' ? '#81ffd0' : '#ffe58a');
+  label.position.copy(labelPosition).sub(position);
+  label.position.y += impact.kind === 'item' ? 0.92 : 1.2;
+  root.add(label);
+  heldActor?.userData.playAction?.('hit', 0.46);
+
+  addBattleEffect(root, 0.76, progress => {
+    const flashPop = 1 - Math.pow(1 - Math.min(1, progress * 5), 3);
+    flash.scale.setScalar(0.28 + flashPop * 0.9);
+    flashMaterial.opacity = Math.max(0, 1 - progress * 4.3);
+    light.intensity = Math.max(0, (impact.kind === 'enemy' ? 3.2 : 2.2) * (1 - progress * 5.4));
+    sparks.children.forEach((spark, index) => {
+      spark.position.copy(spark.userData.direction).multiplyScalar((1 - Math.pow(1 - progress, 3)) * spark.userData.speed);
+      spark.position.y -= progress * progress * 0.12;
+      spark.rotateY((index + 1) * 0.07);
+      spark.material.opacity = Math.max(0, 1 - progress * 1.18);
+      const scale = Math.max(0.03, 1 - progress) * (0.75 + (index % 3) * 0.11);
+      spark.scale.set(scale * 0.8, scale * 1.25, scale * 0.8);
+    });
+    const labelPop = 1 - Math.pow(1 - Math.min(1, progress * 4.8), 3);
+    label.scale.set(1.22 * labelPop, 0.61 * labelPop, 1);
+    label.position.y += 0.006;
+    label.material.opacity = progress < 0.72 ? 1 : Math.max(0, (1 - progress) / 0.28);
+  });
+}
+
+function launchTrackingDart(from, to, duration = 0.6, color = 0xffb64c, impact = {}) {
+  const launchDirection = to.clone().sub(from).setY(0);
+  if (launchDirection.lengthSq() < 0.001) launchDirection.set(1, 0, 0);
+  launchDirection.normalize();
+  const start = from.clone().addScaledVector(launchDirection, 0.86).add(new THREE.Vector3(0, 0.28, 0));
+  const targetCenter = to.clone();
+  const target = impact.kind === 'heal'
+    ? start.clone()
+    : impact.kind === 'enemy'
+      ? targetCenter.clone().addScaledVector(launchDirection, -TRACKING_DART_ENEMY_CONTACT_OFFSET)
+      : targetCenter.clone();
   const dart = createTrackingDart(color);
-  dart.position.copy(from);
-  faceProjectileAlongScreen(dart, to.clone().sub(from), camera);
-  dart.scale.setScalar(1.34);
+  dart.position.copy(start);
+  faceProjectileAlongScreen(dart, target.clone().sub(start), camera);
+  dart.scale.setScalar(0.94);
   const rotor = dart.userData.rotor;
   const trailMaterial = dart.userData.trailMaterial;
-  addBattleEffect(dart, duration, progress => {
-    const flight = 1 - Math.pow(1 - progress, 2);
-    dart.position.lerpVectors(from, to, flight);
-    dart.position.y += Math.sin(progress * Math.PI) * 0.58;
-    rotor.rotation.z = progress * Math.PI * 6;
-    const pulse = 1.34 + Math.sin(progress * Math.PI) * 0.1;
-    dart.scale.setScalar(pulse);
-    trailMaterial.opacity = Math.max(0, 0.72 * (1 - progress * 0.82));
+  const heldActor = impact.kind === 'enemy'
+    ? enemyActors.get(impact.targetId)
+    : impact.kind === 'item' ? itemActors.get(impact.targetId) : null;
+  if (heldActor) heldActor.userData.projectileHoldUntil = renderTime + duration + 0.8;
+  addBattleEffect(dart, duration, (progress, delta) => {
+    const travel = 1 - Math.pow(1 - Math.min(1, progress / 0.8), 2);
+    if (impact.kind === 'heal') {
+      const oneMinus = 1 - travel;
+      const outward = start.clone().add(new THREE.Vector3(1.55, 1, -0.38));
+      const returnArc = start.clone().add(new THREE.Vector3(-1.15, 0.78, -0.62));
+      dart.position.copy(start).multiplyScalar(oneMinus * oneMinus * oneMinus)
+        .add(outward.multiplyScalar(3 * oneMinus * oneMinus * travel))
+        .add(returnArc.multiplyScalar(3 * oneMinus * travel * travel))
+        .add(start.clone().multiplyScalar(travel * travel * travel));
+    } else {
+      const midpoint = start.clone().lerp(target, 0.5);
+      const lateral = new THREE.Vector3(-launchDirection.z, 0, launchDirection.x);
+      const control = midpoint.addScaledVector(lateral, 0.38).add(new THREE.Vector3(0, 1.08, 0));
+      const oneMinus = 1 - travel;
+      dart.position.copy(start).multiplyScalar(oneMinus * oneMinus)
+        .add(control.multiplyScalar(2 * oneMinus * travel))
+        .add(target.clone().multiplyScalar(travel * travel));
+    }
+    rotor.rotation.z += delta * 8.5;
+    dart.scale.setScalar(0.94 + Math.sin(travel * Math.PI) * 0.08);
+    const fade = progress < 0.85 ? 1 : Math.max(0, (1 - progress) / 0.15);
+    trailMaterial.opacity = 0.72 * Math.min(1, travel * 6) * fade;
+  }, () => {
+    const labelPosition = impact.kind === 'enemy' ? targetCenter : target;
+    trackingDartImpactFeedback(target, target.clone().sub(start), impact, heldActor, labelPosition);
+    if (impact.kind === 'enemy' && impact.killed && heldActor) {
+      heldActor.userData.projectileHoldUntil = 0;
+      heldActor.userData.dying = {
+        startedAt: renderTime + 0.12,
+        duration: 0.55,
+        baseScale: heldActor.scale.clone(),
+        baseRotationZ: heldActor.rotation.z,
+      };
+    } else if (impact.kind === 'item' && heldActor) {
+      heldActor.userData.projectileHoldUntil = 0;
+      itemActors.delete(impact.targetId);
+      scene.remove(heldActor);
+    }
   });
   return dart;
 }
@@ -721,6 +947,46 @@ function combatTextSprite(primary, secondary = '', color = '#fff0a8') {
   const sprite = new THREE.Sprite(material);
   sprite.renderOrder = 40;
   sprite.scale.set(1.55, 0.78, 1);
+  return sprite;
+}
+
+function approvedEnemyDamageSprite(value) {
+  const textCanvas = typeof wx.createOffscreenCanvas === 'function'
+    ? wx.createOffscreenCanvas({ type: '2d', width: 384, height: 192 })
+    : wx.createCanvas();
+  textCanvas.width = 384;
+  textCanvas.height = 192;
+  const context = textCanvas.getContext('2d');
+  context.clearRect(0, 0, 384, 192);
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '900 98px sans-serif';
+  context.shadowColor = 'rgba(67, 27, 10, .55)';
+  context.shadowBlur = 10;
+  context.shadowOffsetY = 5;
+  const gradient = context.createLinearGradient(0, 38, 0, 144);
+  gradient.addColorStop(0, '#fff1a8');
+  gradient.addColorStop(0.45, '#ffc85b');
+  gradient.addColorStop(1, '#ed7c2e');
+  context.fillStyle = gradient;
+  context.fillText(`-${Math.max(0, Math.round(value || 0))}`, 192, 88);
+
+  const texture = new THREE.CanvasTexture(textCanvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.name = 'ApprovedEnemyDamageNumber';
+  sprite.center.set(0.5, 0.3);
+  sprite.renderOrder = 55;
   return sprite;
 }
 
@@ -841,6 +1107,51 @@ function spawnPresentationEvent(event) {
     announcementTime = Math.max(announcementTime, event.duration || 1.2);
     return;
   }
+  if (event.type === 'combo_reward') {
+    const approvalIds = {
+      3: 'scarecrow_reward',
+      4: 'hex_blast',
+      5: 'life_drain',
+      6: 'time_stop',
+      7: 'meteor_aoe',
+      8: 'absolute_reflect',
+    };
+    const actionByCombo = {
+      3: ['cast', 0.62],
+      4: ['hex_blast_cast', 0.9],
+      5: ['life_drain_cast', 1.08],
+      6: ['time_stop_cast', 1.05],
+      7: ['meteor_cast', 1.78],
+      8: ['absolute_reflect_cast', 1.1],
+    };
+    const approvalId = approvalIds[event.threshold];
+    if (!approvalId || !isBattleVfxApproved(approvalId)) return;
+    const [actionName, duration] = actionByCombo[event.threshold] || ['cast', 0.64];
+    hero.userData.playAction?.(actionName, duration);
+    if (event.threshold >= 4) comboRewardDirector.play(event, level.state);
+    return;
+  }
+  if (event.type === 'absolute_reflect_turn') {
+    comboRewardDirector.handleEvent(event);
+    return;
+  }
+  if (event.type === 'absolute_reflect_hit') {
+    comboRewardDirector.handleEvent(event);
+    const actor = enemyActors.get(event.enemyId);
+    actor?.userData.playAction?.('hit', 0.46);
+    if (actor && (event.damage || 0) > 0) {
+      const position = actor.position.clone().add(new THREE.Vector3(0, 1.42, 0));
+      const sprite = approvedEnemyDamageSprite(event.damage);
+      sprite.position.copy(position);
+      addBattleEffect(sprite, 0.72, progress => {
+        const pop = 0.62 + Math.sin(Math.min(1, progress * 2.4) * Math.PI * 0.5) * 0.58;
+        sprite.scale.set(1.45 * pop, 0.725 * pop, 1);
+        sprite.position.y = position.y + progress * 0.48;
+        sprite.material.opacity = progress < 0.64 ? 1 : (1 - progress) / 0.36;
+      });
+    }
+    return;
+  }
   const color = effectColor(event.color, event.type === 'hero_hit' ? 0xff5d62 : 0x79f1cf);
   const heroCastTypes = new Set(['hex_rays', 'doomsday', 'rebirth', 'electric_discharge', 'shield']);
   const projectileFromHero = event.type === 'projectile' && event.from
@@ -896,6 +1207,9 @@ function spawnPresentationEvent(event) {
       '', isBreak ? '#ccefff' : '#73dfff'
     );
     const position = cellPosition(q, r, event.target === 'hero' ? 1.72 : 1.38);
+    const laneOffset = reserveCombatTextOffset(event, q, r);
+    position.x += laneOffset.x;
+    position.y += laneOffset.y;
     sprite.position.copy(position);
     const startY = position.y;
     addBattleEffect(sprite, isBreak ? 0.78 : 0.58, progress => {
@@ -961,36 +1275,57 @@ function spawnPresentationEvent(event) {
     const isHeal = event.type === 'heal';
     const isCrit = event.type === 'crit';
     const actor = isHeroHit ? hero : enemyActors.get(event.enemyId);
-    if (!(isHeroHit && (event.damage || 0) <= 0)) actor?.userData.playAction?.('hit', isHeroHit ? 0.48 : 0.4);
+    if (!(isHeroHit && (event.damage || 0) <= 0)) {
+      if (isHeroHit && isBattleVfxApproved('hero_hit_reaction')) {
+        if (actor?.userData.action?.name !== 'approved_hit') actor?.userData.playAction?.('approved_hit', 0.58);
+      } else actor?.userData.playAction?.('hit', isHeroHit ? 0.48 : 0.4);
+    }
     const q = event.q ?? level.state.hero.q;
     const r = event.r ?? level.state.hero.r;
-    const position = cellPosition(q, r, isHeroHit ? 1.7 : 1.35);
-    const label = isCrit ? 'CRIT!' : isHeal ? (event.label || `+${event.amount || 0}`) : `-${event.damage || 0}`;
-    const secondary = isCrit ? '' : event.combo > 1 ? `${event.combo} COMBO` : event.label || '';
-    const sprite = combatTextSprite(label, secondary, isHeal ? '#7dffd0' : isCrit ? '#fff16e' : isHeroHit ? '#ff7d75' : '#ffc45d');
-    sprite.position.copy(position);
-    const startY = position.y;
-    addBattleEffect(sprite, isCrit ? 0.82 : 0.68, progress => {
-      sprite.position.y = startY + progress * 0.72;
-      const pop = 0.82 + Math.sin(Math.min(1, progress * 2) * Math.PI * 0.5) * 0.28;
-      sprite.scale.set(1.55 * pop, 0.78 * pop, 1);
-      sprite.material.opacity = progress < 0.62 ? 1 : (1 - progress) / 0.38;
-    });
-    if (!isHeal && isBattleVfxApproved('attack_impact') && event.type === 'damage' && event.source === 'jump') {
+    const showDamageNumber = !event.suppressNumber;
+    const laneOffset = showDamageNumber ? reserveCombatTextOffset(event, q, r) : { x: 0, y: 0 };
+    const useApprovedDamageNumber = showDamageNumber && event.type === 'damage' && isBattleVfxApproved('enemy_damage_number');
+    if (useApprovedDamageNumber) {
+      const position = cellPosition(q, r, 1.42);
+      position.x += 0.12 + laneOffset.x;
+      position.y += laneOffset.y;
+      const sprite = approvedEnemyDamageSprite(event.damage || 0);
+      sprite.position.copy(position);
+      addBattleEffect(sprite, 0.72, progress => {
+        const popTime = Math.min(1, progress * 4.6);
+        const popOffset = popTime - 1;
+        const pop = 1 + 2.70158 * popOffset * popOffset * popOffset + 1.70158 * popOffset * popOffset;
+        const settle = THREE.MathUtils.clamp((progress - 0.22) / 0.38, 0, 1);
+        const scale = (0.56 + pop * 0.62) * (1 - settle * 0.12);
+        sprite.scale.set(1.45 * scale, 0.725 * scale, 1);
+        sprite.position.x = position.x + (1 - Math.pow(1 - progress, 3)) * 0.08;
+        sprite.position.y = position.y + (1 - Math.pow(1 - progress, 3)) * 0.52;
+        sprite.material.opacity = progress < 0.64 ? 1 : (1 - progress) / 0.36;
+      });
+    } else if (showDamageNumber) {
+      const position = cellPosition(q, r, isHeroHit ? 1.7 : 1.35);
+      position.x += laneOffset.x;
+      position.y += laneOffset.y;
+      const label = isCrit ? `暴击 −${event.damage || 0}` : isHeal ? (event.label || `+${event.amount || 0}`) : `-${event.damage || 0}`;
+      const secondary = isCrit ? '' : event.combo > 1 ? `${event.combo} COMBO` : event.label || '';
+      const sprite = combatTextSprite(label, secondary, isHeal ? '#7dffd0' : isCrit ? '#fff16e' : isHeroHit ? '#ff7d75' : '#ffc45d');
+      sprite.position.copy(position);
+      const startY = position.y;
+      addBattleEffect(sprite, isCrit ? 0.82 : 0.68, progress => {
+        sprite.position.y = startY + progress * 0.72;
+        const pop = 0.82 + Math.sin(Math.min(1, progress * 2) * Math.PI * 0.5) * 0.28;
+        sprite.scale.set(1.55 * pop, 0.78 * pop, 1);
+        sprite.material.opacity = progress < 0.62 ? 1 : (1 - progress) / 0.38;
+      });
+    }
+    if (!isHeal && isBattleVfxApproved('hero_melee_impact') && event.type === 'damage' && event.source === 'jump') {
       const hitPosition = cellPosition(q, r, 0.82);
-      const travelDirection = hero.position.clone().sub(hitPosition).setY(0);
+      const travelDirection = hitPosition.clone().sub(hero.position).setY(0);
       vfxDirector.impact({
         position: hitPosition,
         direction: travelDirection,
         camera,
-        strong: isCrit || event.combo >= 3,
       });
-    } else if (!isHeal && isBattleVfxApproved('attack_impact')) {
-      impactBurst(
-        cellPosition(q, r, isHeroHit ? 0.95 : 0.72),
-        isCrit ? 0xffef68 : isHeroHit ? 0xff5d62 : 0xffa63d,
-        isCrit || event.combo >= 3
-      );
     }
     return;
   }
@@ -999,7 +1334,7 @@ function spawnPresentationEvent(event) {
     const to = cellPosition(event.to.q, event.to.r, 0.72);
     if (event.projectileType === 'tracking_dart') {
       if (!isBattleVfxApproved('tracking_shuriken')) return;
-      launchTrackingDart(from, to, event.duration, event.color || 0xffb64c);
+      launchTrackingDart(from, to, event.duration, event.color || 0xffb64c, event.impact || {});
       return;
     }
     if (!isBattleVfxApproved('skill_projectiles')) return;
@@ -1094,6 +1429,7 @@ function updateBattleEffects(delta) {
     const progress = Math.min(1, effect.elapsed / effect.duration);
     effect.update?.(progress, delta);
     if (progress < 1) continue;
+    effect.onComplete?.();
     effectGroup.remove(effect.object);
     effect.object.traverse?.(child => {
       child.geometry?.dispose?.();
@@ -1109,6 +1445,7 @@ function clearBattleEffects() {
     const effect = battleEffects.pop();
     effectGroup.remove(effect.object);
   }
+  comboRewardDirector.clear();
   announcementTime = 0;
 }
 
@@ -1118,7 +1455,7 @@ function syncEnemyActors(preserveMissing = false) {
   const livingIds = new Set(level.state.enemies.map(enemy => enemy.id));
   enemyActors.forEach((actor, id) => {
     if (livingIds.has(id)) return;
-    if (preserveMissing || actor.userData.dying) return;
+    if (preserveMissing || actor.userData.dying || (actor.userData.projectileHoldUntil || 0) > renderTime) return;
     enemyActors.delete(id);
     const index = actors.indexOf(actor);
     if (index >= 0) actors.splice(index, 1);
@@ -1146,6 +1483,7 @@ function syncEnemyActors(preserveMissing = false) {
       if (actor.userData.healthBar) actor.userData.healthBar.visible = true;
     }
     placeActor(actor, enemy.q, enemy.r, actor.userData.baseY);
+    syncHealthBarValue(actor, enemy.hp, enemy.maxHp);
     // Establish a spawned enemy's initial pose once. Existing enemies keep
     // their locked facing while the player moves and only turn when their own
     // action is presented in beginEnemyAnimation().
@@ -1179,6 +1517,7 @@ function syncEnemyActors(preserveMissing = false) {
   const liveItemIds = new Set(level.state.items.map(item => item.id));
   itemActors.forEach((actor, id) => {
     if (liveItemIds.has(id)) return;
+    if ((actor.userData.projectileHoldUntil || 0) > renderTime) return;
     itemActors.delete(id);
     scene.remove(actor);
   });
@@ -1203,6 +1542,7 @@ function syncEnemyActors(preserveMissing = false) {
       scene.add(scarecrowActor);
     }
     placeActor(scarecrowActor, level.state.scarecrow.q, level.state.scarecrow.r, 0.17);
+    syncHealthBarValue(scarecrowActor, level.state.scarecrow.hp, level.state.scarecrow.maxHp);
     scarecrowActor.visible = appMode === 'battle';
     if (shouldPlaySpawn && scarecrowActor.visible) scarecrowActor.userData.playAction?.('spawn', 0.62);
   } else if (scarecrowActor) scarecrowActor.visible = false;
@@ -1291,10 +1631,7 @@ function addThreatStroke(start, end, color, opacity, radius, outlineScale = 1.9,
 }
 
 function addThreatLink(link) {
-  const isTaunt = link.target === 'scarecrow';
-  const isImmediateMelee = !link.pending && (link.distance == null || link.distance <= 1);
-  const color = isTaunt ? 0xf05b67 : isImmediateMelee ? 0xff3048 : link.pending ? 0xffd23f : 0xff8b24;
-  const opacity = isTaunt ? 0.58 : link.pending ? 0.86 : 0.92;
+  const style = threatLineStyle(link);
   const start = cellPosition(link.from.q, link.from.r, 0.56);
   const end = cellPosition(link.to.q, link.to.r, 0.56);
   const fullDirection = end.clone().sub(start);
@@ -1304,46 +1641,37 @@ function addThreatLink(link) {
   start.addScaledVector(unit, 0.34);
   end.addScaledVector(unit, -0.34);
   const usableLength = start.distanceTo(end);
-  const dashed = !isTaunt && (link.pending || !isImmediateMelee);
 
-  if (dashed) {
-    const dashLength = isTaunt ? 0.22 : 0.34;
-    const gapLength = isTaunt ? 0.19 : 0.13;
-    const count = Math.max(1, Math.ceil(usableLength / (dashLength + gapLength)));
+  if (style.dashed) {
+    const count = Math.max(1, Math.ceil(usableLength / (style.dashLength + style.gapLength)));
     for (let index = 0; index < count; index += 1) {
-      const distanceStart = index * (dashLength + gapLength);
+      const distanceStart = index * (style.dashLength + style.gapLength);
       if (distanceStart >= usableLength) break;
-      const distanceEnd = Math.min(usableLength, distanceStart + dashLength);
+      const distanceEnd = Math.min(usableLength, distanceStart + style.dashLength);
       addThreatStroke(
         start.clone().addScaledVector(unit, distanceStart),
         start.clone().addScaledVector(unit, distanceEnd),
-        color, opacity,
-        isTaunt ? 0.022 : link.pending ? 0.038 : 0.042,
-        isTaunt ? 1.42 : 1.9,
-        isTaunt ? 0.2 : null
+        style.color, style.opacity, style.radius,
+        style.outlineScale, style.outlineOpacity
       );
     }
   } else {
     addThreatStroke(
-      start, end, color, opacity,
-      isTaunt ? 0.027 : 0.054,
-      isTaunt ? 1.45 : 1.9,
-      isTaunt ? 0.22 : null
+      start, end, style.color, style.opacity, style.radius,
+      style.outlineScale, style.outlineOpacity
     );
   }
 
-  const arrowPosition = start.clone().lerp(end, isTaunt ? 0.58 : 0.68);
+  const arrowPosition = start.clone().lerp(end, style.arrowAt);
   arrowPosition.y += 0.03;
-  const arrowRadius = isTaunt ? 0.105 : 0.145;
-  const arrowHeight = isTaunt ? 0.24 : 0.32;
   [
     {
-      radius: arrowRadius * (isTaunt ? 1.3 : 1.48), height: arrowHeight * 1.13,
-      arrowColor: 0x071018, arrowOpacity: isTaunt ? 0.32 : 0.86, order: 16,
+      radius: style.arrowRadius * style.arrowOutlineScale, height: style.arrowHeight * 1.13,
+      arrowColor: 0x071018, arrowOpacity: 0.76, order: 16,
     },
     {
-      radius: arrowRadius, height: arrowHeight, arrowColor: color,
-      arrowOpacity: isTaunt ? 0.66 : 0.98, order: 17,
+      radius: style.arrowRadius, height: style.arrowHeight, arrowColor: style.color,
+      arrowOpacity: 0.94, order: 17,
     },
   ].forEach(style => {
     const arrow = new THREE.Mesh(
@@ -1361,7 +1689,7 @@ function addThreatLink(link) {
     threatGroup.add(arrow);
   });
 
-  if (!isTaunt && !link.pending && link.damage != null) {
+  if (!link.pending && link.damage != null) {
     const label = combatTextSprite(`-${link.damage}`, '', '#ff7f73');
     label.position.copy(start).lerp(end, 0.5);
     label.position.y = 0.92;
@@ -1452,10 +1780,12 @@ const makeHudCanvas = () => {
 const hud = createHudOverlay(renderer, viewportWidth, viewportHeight, pixelRatio, makeHudCanvas, { safeAreaTop });
 
 function refresh(options = {}) {
-  if (level.state.tutorialJustCompleted && !meta.tutorialSpawnSeen) {
-    meta.tutorialSpawnSeen = true;
+  if (level.state.tutorialJustCompleted) {
+    if (!battleUi.tutorialPreview && !meta.tutorialSpawnSeen) {
+      meta.tutorialSpawnSeen = true;
+      saveMeta();
+    }
     level.state.tutorialJustCompleted = false;
-    saveMeta();
   }
   const resultKey = level.state.result ? `${level.state.result}-${level.state.stage}` : null;
   if (appMode === 'battle' && resultKey && settledResult !== resultKey) {
@@ -1472,7 +1802,10 @@ function refresh(options = {}) {
   syncEnemyActors(options.consumeEvents === false);
   if (appMode === 'battle') rebuildBoardState();
   else clearRoute();
-  hud.draw({ ...level.state, mode: appMode, meta, menuState, battleUi, cameraZoom: battleZoom });
+  hud.draw({
+    ...level.state, mode: appMode, meta, menuState, battleUi, cameraZoom: battleZoom,
+    tutorialSpotlight: buildTutorialSpotlight(), tutorialTime: renderTime,
+  });
 }
 
 function settleRunRewards() {
@@ -1504,7 +1837,7 @@ function enterMenu() {
   vfxShakeRemaining = 0;
   Object.assign(battleUi, {
     settingsOpen: false, guideOpen: false, skillsOpen: false,
-    exitConfirmOpen: false, vfxTestOpen: false,
+    exitConfirmOpen: false, vfxTestOpen: false, skillChoicePreview: null, tutorialPreview: false,
   });
   board.group.visible = false;
   routeGroup.visible = false;
@@ -1517,6 +1850,9 @@ function enterMenu() {
   hero.scale.copy(hero.userData.menuScale);
   placeActor(hero, 0, 0, 0.18);
   faceHeroTowardAudience();
+  // Release builds load only the compact menu-audio package at startup.
+  // The larger battle-audio package is requested by enterBattle(), avoiding a
+  // 9 MiB background download while the first screen is becoming interactive.
   audio.playBgm('menu');
   refresh();
 }
@@ -1554,7 +1890,8 @@ function enterBattle() {
   Object.assign(battleUi, {
     settingsOpen: false, guideOpen: false, guidePage: 0, skillsOpen: false, skillsPage: 0,
     exitConfirmOpen: false, vfxTestEnabled: VFX_TEST_MODE,
-    vfxTestOpen: false, vfxTestLast: '', vfxTestLastId: '',
+    vfxTestOpen: false, vfxTestLast: '', vfxTestLastId: '', skillChoicePreview: null,
+    tutorialPreview: false,
   });
   const initialHeroFocus = cellPosition(level.state.hero.q, level.state.hero.r, BATTLE_CAMERA_TARGET.y);
   initialHeroFocus.y = BATTLE_CAMERA_TARGET.y;
@@ -1569,6 +1906,43 @@ function enterBattle() {
   placeActor(hero, level.state.hero.q, level.state.hero.r);
   faceHeroTowardAudience();
   audio.playBgm('battle_calm');
+  refresh();
+}
+
+function replayOpeningTutorial() {
+  if (!VFX_TEST_MODE || appMode !== 'battle') return;
+  clearBattleEffects();
+  vfxDirector.clear();
+  level = createLevelOne({
+    tutorialSeen: false,
+    tutorialFlags: {},
+    hero: getHeroStats(meta),
+    critRate: getCritRate(meta),
+    goldBonus: getGoldBonus(meta),
+    setEffects: getSetEffects(meta),
+    seenEnemyTypes: meta.seenEnemyTypes,
+  });
+  settledResult = null;
+  movement = null;
+  turnSequence = null;
+  cameraActionShot = null;
+  queuedHeroAction = null;
+  shieldVisualActive = false;
+  shieldBreakAt = 0;
+  Object.assign(battleUi, {
+    settingsOpen: false, guideOpen: false, guidePage: 0,
+    skillsOpen: false, skillsPage: 0, exitConfirmOpen: false,
+    vfxTestOpen: false, vfxTestLast: '', vfxTestLastId: '',
+    skillChoicePreview: null, tutorialPreview: true,
+  });
+  const initialHeroFocus = cellPosition(level.state.hero.q, level.state.hero.r, BATTLE_CAMERA_TARGET.y);
+  initialHeroFocus.y = BATTLE_CAMERA_TARGET.y;
+  const cameraState = battleCameraController.reset(initialHeroFocus);
+  battleZoom = cameraState.zoom;
+  battleCameraFocus.copy(cameraState.focus);
+  applyCameraProfile('battle');
+  placeActor(hero, level.state.hero.q, level.state.hero.r);
+  faceHeroTowardAudience();
   refresh();
 }
 
@@ -1809,6 +2183,7 @@ function handleTouch(event) {
     if (key) { meta[key] = true; saveMeta(); }
     refresh(); return;
   }
+  if (control === 'tutorial_block') return;
   if (control === 'enemy_intro_close') {
     const outcome = level.dismissEnemyIntro();
     for (const enemyType of outcome.enemyTypes || []) meta.seenEnemyTypes[enemyType] = true;
@@ -1839,6 +2214,9 @@ function handleTouch(event) {
   }
   if (control === 'guide_close') {
     battleUi.guideOpen = false; refresh(); return;
+  }
+  if (control === 'guide_replay_tutorial') {
+    replayOpeningTutorial(); return;
   }
   if (control === 'guide_prev' || control === 'guide_next') {
     battleUi.guidePage = THREE.MathUtils.clamp(battleUi.guidePage + (control === 'guide_next' ? 1 : -1), 0, 3); refresh(); return;
@@ -1872,6 +2250,12 @@ function handleTouch(event) {
     runVfxTest(control.slice('battle_vfx_test_'.length)); return;
   }
   if (control === 'battle_vfx_test_block') {
+    return;
+  }
+  if (control === 'battle_skill_preview_block') return;
+  if (control?.startsWith('battle_skill_preview_')) {
+    battleUi.skillChoicePreview = null;
+    refresh({ consumeEvents: false });
     return;
   }
   if (control === 'battle_exit') {
@@ -2000,7 +2384,7 @@ function finishPlayerJump() {
   if (level.state.phase === 'COMBO_REWARD_WAIT') {
     turnSequence = {
       stage: 'COMBO_REWARD_WAIT',
-      remaining: summary.reward ? 1.2 : 0.5,
+      remaining: summary.reward ? Math.max(1.2, summary.reward.duration || 0) : 0.5,
       elapsed: 0,
       duration: 0,
       animations: [],
@@ -2093,6 +2477,7 @@ function beginEnemyAnimation() {
         type: 'attack', actor, from, target,
         targetType: action.target,
         damage: action.damage || 0,
+        reflected: action.reflected || 0,
       });
     } else if (action.targetAt) {
       // Boss skills can act without a move/lunge animation. They still turn
@@ -2189,6 +2574,20 @@ function updateTurnSequence(delta) {
     }
     if (!turnSequence.impactsPresented && progress >= 0.52) {
       turnSequence.impactsPresented = true;
+      const heroHits = turnSequence.animations.filter(animation => animation.targetType === 'hero' && animation.damage > 0);
+      if (heroHits.length && isBattleVfxApproved('hero_hit_reaction')) {
+        const strongestHit = heroHits.reduce((strongest, hit) =>
+          (hit.damage || 0) > (strongest.damage || 0) ? hit : strongest, heroHits[0]);
+        const worldRecoil = hero.position.clone().sub(strongestHit.from).setY(0);
+        if (worldRecoil.lengthSq() < 0.001) worldRecoil.set(0, 0, -1);
+        worldRecoil.normalize();
+        const localRecoil = worldRecoil.applyQuaternion(hero.quaternion.clone().invert()).setY(0).normalize();
+        hero.userData.playAction?.('approved_hit', 0.58, {
+          recoilX: localRecoil.x,
+          recoilZ: localRecoil.z,
+          staggerSign: localRecoil.x < 0 ? -1 : 1,
+        });
+      }
       const scarecrowHits = turnSequence.animations.filter(animation => animation.targetType === 'scarecrow');
       if (scarecrowHits.length && scarecrowActor?.visible) {
         scarecrowActor.userData.playAction?.('hit', 0.42);
@@ -2201,7 +2600,7 @@ function updateTurnSequence(delta) {
           sprite.position.y = position.y + local * 0.62;
           sprite.material.opacity = local < 0.62 ? 1 : (1 - local) / 0.38;
         });
-        if (isBattleVfxApproved('attack_impact')) {
+        if (isBattleVfxApproved('enemy_attack_impact')) {
           impactBurst(scarecrowActor.position.clone().add(new THREE.Vector3(0, 0.85, 0)), 0xffc45d, true);
         }
       }
@@ -2262,20 +2661,25 @@ function frame(timestamp = 0) {
       child.scale.setScalar(0.94 + threatPulse * 0.1);
     }
   });
+  const tutorialBlocksTimeline = level.state.tutorialOverlay
+    && level.state.tutorialOverlay.interaction !== 'board';
   if (!level.state.wheelResult && !level.state.wheelSkillChoices?.length
-    && !level.state.tutorialOverlay && !level.state.enemyIntro?.length
+    && !tutorialBlocksTimeline && !level.state.enemyIntro?.length
     && !battleUi.settingsOpen && !battleUi.guideOpen && !battleUi.skillsOpen
-    && !battleUi.vfxTestOpen && !battleUi.exitConfirmOpen) updateTurnSequence(delta);
+    && !battleUi.vfxTestOpen && !battleUi.skillChoicePreview && !battleUi.exitConfirmOpen) updateTurnSequence(delta);
   updateBattleEffects(delta);
   vfxDirector.update(delta);
   updateDynamicBattleCamera(delta);
-  applyVfxCameraShake(delta, time);
   updateHeroFacing(delta);
   updateEnemyFacings(delta);
-  keepHealthBarsFacingCamera();
   if (!movement) hero.position.y = hero.userData.baseY + Math.round(Math.sin(time * 3.2) * 2) * 0.018;
+  const globalTimeStopped = appMode === 'battle' && level.state.timeStopTurns > 0;
   actors.forEach((actor, index) => {
     if (actor === hero) return;
+    if (globalTimeStopped && actor.userData.enemyId) {
+      actor.position.y = actor.userData.baseY;
+      return;
+    }
     actor.position.y = actor.userData.baseY + Math.round(Math.sin(time * 2.4 + index) * 2) * 0.014;
   });
   actors.forEach(actor => {
@@ -2285,24 +2689,38 @@ function frame(timestamp = 0) {
     shadow.position.y = (0.012 - lift) / actor.scale.y;
     shadow.material.opacity = shadow.userData.baseOpacity * Math.max(0.18, 1 - lift * 0.72);
   });
-  actors.forEach(actor => actor.userData.animate?.(time, actor === hero && Boolean(movement)));
+  actors.forEach(actor => {
+    if (globalTimeStopped && actor.userData.enemyId) return;
+    actor.userData.animate?.(time, actor === hero && Boolean(movement));
+  });
   updateDyingActors(time);
   syncActorStatuses(time);
+  comboRewardDirector.update(delta, level.state);
+  comboRewardDirector.stabilizeHealthBars();
+  keepHealthBarsFacingCamera();
+  applyVfxCameraShake(delta, time);
   const logicalShield = Boolean(level.state.oneHitShield || level.state.hero.shield > 0 || level.state.drainShield > 0);
+  const approvedDrainShieldVisible = level.state.drainShield > 0 && Boolean(comboRewardDirector.lifeDrain.effect);
   if (logicalShield) shieldVisualActive = true;
   if (shieldBreakAt && time >= shieldBreakAt) {
     shieldVisualActive = logicalShield;
     shieldBreakAt = 0;
   }
-  heroShieldAura.visible = appMode === 'battle' && shieldVisualActive;
+  // The approved five-combo shell owns the persistent drain-shield visual.
+  // Keep the generic blue aura as a fallback only, avoiding two shields
+  // occupying the same silhouette after Life Drain resolves.
+  heroShieldAura.visible = appMode === 'battle' && shieldVisualActive && !approvedDrainShieldVisible;
   if (heroShieldAura.visible) {
     shieldShell.material.opacity = 0.1 + Math.sin(time * 4.2) * 0.035;
     shieldOrbit.rotation.z = time * 0.85;
     shieldOrbit.scale.setScalar(0.96 + Math.sin(time * 3.1) * 0.06);
   }
   environment.update(time);
-  if (appMode === 'menu' && menuState.shopResultOpen) {
-    hud.draw({ ...level.state, mode: appMode, meta, menuState, battleUi, cameraZoom: battleZoom });
+  if ((appMode === 'menu' && menuState.shopResultOpen) || (appMode === 'battle' && level.state.tutorialOverlay)) {
+    hud.draw({
+      ...level.state, mode: appMode, meta, menuState, battleUi, cameraZoom: battleZoom,
+      tutorialSpotlight: buildTutorialSpotlight(), tutorialTime: time,
+    });
   }
   renderer.render(scene, camera);
   hud.render();
@@ -2334,6 +2752,7 @@ console.log('[combo-checkers] WeChat chapter one campaign started', {
   stages: 10,
   skillCount: 19,
   comboPresentation: true,
+  sceneTheme: CHAPTER_ONE_THEME,
   architecture: 'TypeScript-ready JavaScript + Three.js + wx adapter',
 });
 frame();

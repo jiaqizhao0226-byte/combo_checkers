@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Combo Checkers · 特效本地验收台</title>
+  <link rel="stylesheet" href="./styles.css?v=20260821h">
+</head>
+<body>
+  <div class="review-shell">
+    <header>
+      <div>
+        <p class="eyebrow">COMBO CHECKERS · LOCAL VFX REVIEW</p>
+        <h1>战斗特效逐项验收</h1>
+      </div>
+      <div class="approval-state"><span></span>五连生命虹吸 · 本地机制验收</div>
+    </header>
+
+    <main>
+      <aside class="queue-panel">
+        <div class="panel-heading"><span>选择测试特效</span><small>10 READY</small></div>
+        <ol class="effect-queue">
+          <li class="approved" data-effect="impact"><button type="button"><b>V1</b><span><strong>攻击命中</strong><small>已验收并接入</small></span></button></li>
+          <li class="approved" data-effect="damage"><button type="button"><b>V2</b><span><strong>伤害数字</strong><small>已验收并接入</small></span></button></li>
+          <li class="approved" data-effect="hit"><button type="button"><b>V3</b><span><strong>主角受击</strong><small>已验收并接入</small></span></button></li>
+          <li class="approved" data-effect="dart"><button type="button"><b>02</b><span><strong>二连·追踪飞镖</strong><small>已验收并接入</small></span></button></li>
+          <li data-effect="scarecrow"><button type="button"><b>03</b><span><strong>三连·稻草人</strong><small>待最终确认</small></span></button></li>
+          <li data-effect="hexblast"><button type="button"><b>04</b><span><strong>四连·六芒冲击波</strong><small>待最终确认</small></span></button></li>
+          <li data-effect="lifedrain"><button type="button"><b>05</b><span><strong>五连·生命虹吸</strong><small>本轮视觉验收</small></span></button></li>
+          <li data-effect="timestop"><button type="button"><b>06</b><span><strong>六连·时间静止</strong><small>本轮视觉验收</small></span></button></li>
+          <li data-effect="meteor"><button type="button"><b>07</b><span><strong>七连·流星火雨</strong><small>本轮视觉验收</small></span></button></li>
+          <li data-effect="reflect"><button type="button"><b>08</b><span><strong>八连·绝对反射</strong><small>本轮视觉验收</small></span></button></li>
+          <li class="pending"><button type="button" disabled><b>09</b><span><strong>九连·传奇技能</strong><small>待制作</small></span></button></li>
+        </ol>
+      </aside>
+
+      <section class="stage-panel">
+        <canvas id="review-canvas"></canvas>
+        <label class="effect-picker" for="effect-select">
+          <span>选择特效</span>
+          <select id="effect-select">
+            <option value="impact">攻击命中</option>
+            <option value="damage">伤害数字</option>
+            <option value="hit">主角受击</option>
+            <option value="dart">二连·追踪飞镖</option>
+            <option value="scarecrow">三连·稻草人</option>
+            <option value="hexblast">四连·六芒冲击波</option>
+            <option value="lifedrain">五连·生命虹吸</option>
+            <option value="timestop">六连·时间静止</option>
+            <option value="meteor">七连·流星火雨</option>
+            <option value="reflect">八连·绝对反射</option>
+          </select>
+        </label>
+        <div class="combo-popup" id="combo-popup" aria-live="polite">
+          <small>5 连击奖励</small>
+          <strong>生命虹吸</strong>
+        </div>
+        <div class="stage-hint"><span>GAME CAMERA LOCKED</span> 五连完整落地后，从全场敌人抽取生命并汇聚到企鹅</div>
+        <div class="scenario-controls" aria-label="机制场景">
+          <button type="button" data-scenario="heal" class="active">生命治疗</button>
+          <button type="button" data-scenario="overflow">溢出护盾</button>
+          <button type="button" data-scenario="cap">护盾上限</button>
+        </div>
+        <div class="playback-controls" aria-label="播放控制">
+          <button type="button" id="play-once">▶ 重新播放</button>
+          <button type="button" data-speed="0.5">0.5×</button>
+          <button type="button" data-speed="1" class="active">1×</button>
+          <button type="button" id="toggle-loop" class="active">循环开启</button>
+        </div>
+      </section>
+
+      <aside class="criteria-panel">
+        <div class="panel-heading"><span>验收依据</span><small id="criteria-code">COMBO-05</small></div>
+        <h2 id="criteria-title">五连完成<br>全场虹吸</h2>
+        <p class="summary" id="criteria-summary">每个敌人都是生命能量的起点，生命流汇入企鹅后再转化为治疗或虹吸护盾。</p>
+        <ul class="criteria-list" id="criteria-list">
+          <li><i></i><span><strong>触发</strong>整条五连跳全部落地后才抽取</span></li>
+          <li><i></i><span><strong>范围</strong>无视距离处理全场存活敌人</span></li>
+          <li><i></i><span><strong>小怪</strong>当前生命 20%，最低 5 点</span></li>
+          <li><i></i><span><strong>Boss</strong>固定损失 30 点生命</span></li>
+          <li><i></i><span><strong>护盾</strong>溢出治疗转护盾，上限 60</span></li>
+        </ul>
+        <div class="timing-card">
+          <span>完整机制顺序</span>
+          <div class="timeline"><i></i><b></b></div>
+          <div class="timeline-labels" id="timeline-labels"><span>五连落地</span><span>全场抽取</span><span>治疗/护盾</span></div>
+        </div>
+        <p class="gate-note" id="gate-note">五连生命虹吸当前只在本地验收页。确认全场方向、数值规则和护盾反馈后，才会接入正式战斗。</p>
+      </aside>
+    </main>
+  </div>
+  <script type="module" src="./review-router.js?v=20260824i"></script>
+</body>
+</html>

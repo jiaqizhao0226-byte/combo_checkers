@@ -1,5 +1,6 @@
 import * as THREE from '../../vendor/three.module.js';
 import { RAMPS, toon, markMesh } from './materials.js';
+import { createAbyssTrenchEnvironment } from './AbyssTrenchEnvironment.js';
 
 const CLEARING_RADIUS = 6.05;
 const TAU = Math.PI * 2;
@@ -114,7 +115,7 @@ function createFallenLog(trunk, cut, moss) {
   return group;
 }
 
-export function createEnvironment(scene) {
+export function createForestEnvironment(scene) {
   const group = new THREE.Group();
   group.name = 'NaturalForestEnvironment';
   scene.add(group);
@@ -263,4 +264,13 @@ export function createEnvironment(scene) {
   }
 
   return { group, update };
+}
+
+export function createEnvironment(scene, options = {}) {
+  const theme = typeof options === 'string' ? options : options.theme || 'forest';
+  if (theme === 'abyss_trench') return createAbyssTrenchEnvironment(scene);
+  const forest = createForestEnvironment(scene);
+  forest.theme = 'forest';
+  forest.group.userData.theme = 'forest';
+  return forest;
 }

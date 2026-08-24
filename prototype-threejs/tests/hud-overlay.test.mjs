@@ -131,8 +131,8 @@ const baseBattle = {
 assert.doesNotThrow(() => hud.draw(baseBattle), '战斗内工具栏应可渲染');
 assert.equal(drawnText.includes('通关目标'), false, '战斗顶栏不应保留冗长目标说明');
 assert.equal(drawnText.includes('金币 0'), false, '战斗顶栏不应显示次要金币信息');
-assert.equal(hud.hitTest(40, viewportHeight - 170), 'guide_open');
-assert.equal(hud.hitTest(viewportWidth - 40, viewportHeight - 170), 'battle_skills_open');
+assert.equal(hud.hitTest(40, viewportHeight - 102), 'guide_open');
+assert.equal(hud.hitTest(viewportWidth - 40, viewportHeight - 102), 'battle_skills_open');
 assert.equal(hud.hitTest(30, 112), null, '战斗 HUD 不应保留缩放减号的隐藏热区');
 assert.equal(hud.hitTest(viewportWidth - 30, 112), null, '战斗 HUD 不应保留缩放加号的隐藏热区');
 assert.equal(hud.hitTest(40, viewportHeight - 40), null, '战斗 HUD 不应保留撤销按钮的隐藏热区');
@@ -140,6 +140,43 @@ assert.equal(hud.hitTest(viewportWidth - 40, viewportHeight - 40), null, '战斗
 for (const removedText of ['撤销', '确认跳跃', '选择落点']) {
   assert.equal(drawnText.includes(removedText), false, `战斗 HUD 不应显示“${removedText}”`);
 }
+
+drawnText.length = 0;
+const tutorialBattle = {
+  ...baseBattle,
+  tutorialOverlay: {
+    id: 'board', interaction: 'board', stepLabel: '1 / 5', title: '移动企鹅',
+    desc: '点击相邻空格移动。你完成一次行动后，敌人才会开始它们的回合。',
+    hint: '点击绿色落点', accent: '#79f1cf',
+  },
+  tutorialSpotlight: {
+    points: [{ x: 150, y: 470 }, { x: 220, y: 430 }], target: { x: 220, y: 430 }, radius: 40,
+    actionBounds: { x: 184, y: 394, width: 72, height: 72 },
+  },
+  tutorialTime: 0.4,
+};
+assert.doesNotThrow(() => hud.draw(tutorialBattle), '棋盘教学应渲染挖洞式聚光灯');
+for (const label of ['1 / 5', '移动企鹅', '点击绿色落点']) {
+  assert(drawnText.some(text => text.includes(label)), `聚光教程应显示“${label}”`);
+}
+assert.equal(hud.hitTest(220, 430), 'tutorial_action', '只有聚光灯目标区域应转交棋盘操作');
+assert.equal(hud.hitTest(40, 430), 'tutorial_block', '聚光灯外必须拦截误触');
+
+const comboTutorialBattle = {
+  ...baseBattle,
+  tutorialOverlay: {
+    id: 'combo', interaction: 'continue', stepLabel: '5 / 5', title: '2 连击奖励',
+    desc: '追踪飞镖已触发。整条路线执行完成后统一结算奖励。',
+    hint: '点击继续战斗', accent: '#ffb64c',
+  },
+  tutorialSpotlight: {
+    points: [{ x: 195, y: 430 }], target: { x: 195, y: 430 }, radius: 44,
+    actionBounds: { x: 155, y: 390, width: 80, height: 80 },
+  },
+};
+assert.doesNotThrow(() => hud.draw(comboTutorialBattle), '连击教学应保留聚光目标并提供继续按钮');
+assert.equal(hud.hitTest(viewportWidth * 0.5, 650), 'tutorial_close');
+assert.equal(hud.hitTest(12, 430), 'tutorial_block');
 
 const vfxBattle = {
   ...baseBattle,
@@ -149,26 +186,48 @@ const vfxBattle = {
   },
 };
 assert.doesNotThrow(() => hud.draw(vfxBattle), 'VFX 测试开关开启时应显示局内入口');
-assert.equal(hud.hitTest(viewportWidth * 0.5, viewportHeight - 170), 'battle_vfx_test_open');
+assert.equal(hud.hitTest(viewportWidth * 0.5, viewportHeight - 102), 'battle_vfx_test_open');
 const vfxPanelBattle = {
   ...vfxBattle,
   battleUi: { ...vfxBattle.battleUi, vfxTestOpen: true },
 };
 assert.doesNotThrow(() => hud.draw(vfxPanelBattle), 'VFX 测试入口应打开独立测试面板');
-for (const label of ['跳斩命中', '蓄力重斩', '3 连击收束', '5 连击收束', '连锁闪电', '震地落', '追踪飞镖', '稻草人模型']) {
+for (const label of [
+  '跳斩命中', '蓄力重斩', '连锁闪电', '震地落', '追踪飞镖', '稻草人模型',
+  '四连 · 六芒冲击波', '五连 · 生命虹吸', '六连 · 时间静止', '七连 · 流星火雨', '八连 · 绝对反射',
+  '技能三选一',
+]) {
   assert.equal(drawnText.includes(label), true, `VFX 测试面板应显示“${label}”按钮`);
 }
-assert.equal(hud.hitTest(105, 310), 'battle_vfx_test_impact_light');
+assert.equal(hud.hitTest(105, 265), 'battle_vfx_test_impact_light');
 assert.equal(hud.hitTest(viewportWidth - 46, 190), 'battle_vfx_test_close');
 assert.equal(hud.hitTest(viewportWidth * 0.5, 640), 'battle_vfx_test_clear');
 assert.equal(hud.hitTest(8, viewportHeight * 0.5), 'battle_vfx_test_block', '测试面板必须拦截底层棋盘点击');
+const skillPreviewBattle = {
+  ...vfxBattle,
+  battleUi: {
+    ...vfxBattle.battleUi,
+    skillChoicePreview: [
+      { id: 'quake_land', name: '震地落', color: '#dc8c28', level: 1, desc: '跳跃落地时对周围1圈敌人造成15伤害' },
+      { id: 'combo_shield', name: '连击护盾', color: '#3ca0dc', level: 2, desc: '每次跳跃增加护盾，吸收下一次伤害' },
+      { id: 'frost_mark', name: '冰霜印记', color: '#64c8ff', level: 3, desc: '攻击叠加冰霜印记，触发时冻结敌人' },
+    ],
+  },
+};
+assert.doesNotThrow(() => hud.draw(skillPreviewBattle), '微信测试台应能直接预览新版技能三选一界面');
+for (const label of ['界面测试 · 关卡奖励', '选择一项能力', '范围打击', '护盾防御', '冻结控制', '新技能', 'Lv.1 → 2']) {
+  assert.equal(drawnText.includes(label), true, `新版三选一应显示“${label}”`);
+}
+assert.equal(hud.hitTest(100, 250), 'battle_skill_preview_0');
+assert.equal(hud.hitTest(8, viewportHeight * 0.5), 'battle_skill_preview_block');
 assert.doesNotThrow(() => hud.draw({
   ...vfxBattle,
   battleUi: { ...vfxBattle.battleUi, vfxTestEnabled: false },
 }), 'VFX 测试开关关闭时应完全隐藏入口');
-assert.equal(hud.hitTest(viewportWidth * 0.5, viewportHeight - 170), null);
+assert.equal(hud.hitTest(viewportWidth * 0.5, viewportHeight - 102), null);
 
-assert.doesNotThrow(() => hud.draw({ ...baseBattle, battleUi: { ...baseBattle.battleUi, guideOpen: true } }));
+assert.doesNotThrow(() => hud.draw({ ...baseBattle, battleUi: { ...baseBattle.battleUi, guideOpen: true, vfxTestEnabled: true } }));
+assert.equal(hud.hitTest(viewportWidth * 0.5, viewportHeight - 143), 'guide_replay_tutorial');
 assert.equal(hud.hitTest(viewportWidth * 0.5, viewportHeight - 80), 'guide_close');
 assert.equal(hud.hitTest(viewportWidth - 50, viewportHeight - 80), 'guide_next');
 

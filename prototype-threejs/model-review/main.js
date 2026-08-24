@@ -1,8 +1,8 @@
 import * as THREE from '../vendor/three.module.js';
 import { createChapterOneEnemy, createPenguin } from '../src/game/Units.js';
 import { ENEMY_TEMPLATES } from '../src/core/ChapterOneData.js';
-import { createSlimeCandidate } from './SlimeCandidate.js?v=20260820e';
-import { createEnemyCandidate } from './EnemyCandidates.js?v=20260820h';
+import { createSlimeCandidate } from './SlimeCandidate.js?v=20260821d';
+import { createEnemyCandidate } from './EnemyCandidates.js?v=20260821q';
 
 const ENEMIES = [
   { id: 'slime', stage: '1-1', role: '近战基础单位', desc: '近距离移动并攻击企鹅。' },

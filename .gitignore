@@ -36,6 +36,8 @@ schemas/
 skills/
 templates/
 tools/
+!prototype-threejs/tools/
+!prototype-threejs/tools/build-wechat-release.mjs
 urhox-libs/
 AGENTS.md
 CLAUDE.md

@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
+
+import { createDamageNumberLaneAllocator } from '../src/vfx/DamageNumberLayout.js';
 import * as THREE from '../vendor/three.module.js';
 import { VfxDirector } from '../src/vfx/VfxDirector.js';
+
+const numberLanes = createDamageNumberLaneAllocator();
+assert.deepEqual(numberLanes.reserve('enemy:one', 1), { x: 0, y: 0, lane: 0 });
+assert.deepEqual(numberLanes.reserve('enemy:one', 1), { x: -0.24, y: 0.38, lane: 1 },
+  '同一敌人同帧的第二段伤害必须错层显示');
+assert.deepEqual(numberLanes.reserve('enemy:two', 1), { x: 0, y: 0, lane: 0 },
+  '不同敌人的伤害数字不能互相占用排布层');
+assert.deepEqual(numberLanes.reserve('enemy:one', 1.31), { x: 0, y: 0, lane: 0 },
+  '超过短时多段伤害窗口后应回到默认位置');
 
 const scene = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-5, 5, 8, -8, 0.1, 50);
@@ -26,10 +37,10 @@ director.lightningChain({
 director.quake({ position: new THREE.Vector3(0, 0.2, 0) });
 
 assert.equal(director.activeCount, 4, 'all four VFX test presets should be active');
-assert.equal(impulses.length, 4, 'each preset should request a camera impulse');
+assert.equal(impulses.length, 3, 'the approved melee hit stays camera-stable while the other prototypes may request impulses');
 assert.ok(director.root.children.length >= 4, 'effects should be attached to the VFX scene root');
-assert.ok(directionalImpact.getObjectByName('DirectionalBladeStreak'),
-  'ordinary attack feedback should contain a directional blade streak');
+assert.ok(directionalImpact.getObjectByName('DirectionalCut'),
+  'approved melee feedback should contain the reviewed directional cut');
 assert.equal(
   directionalImpact.children.some(child => child.geometry?.type === 'TorusGeometry'),
   false,

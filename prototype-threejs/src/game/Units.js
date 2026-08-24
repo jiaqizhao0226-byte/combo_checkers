@@ -1,5 +1,9 @@
 import * as THREE from '../../vendor/three.module.js';
 import { RAMPS, toon, markMesh } from './materials.js';
+import { createPenguinCandidate } from '../../hero-review/PenguinCandidate.js';
+import { createSlimeCandidate } from '../../model-review/SlimeCandidate.js';
+import { createEnemyCandidate } from '../../model-review/EnemyCandidates.js';
+import { createScarecrowModel } from './ScarecrowModel.js';
 
 function add(group, geometry, material, position, scale = [1, 1, 1]) {
   const mesh = markMesh(new THREE.Mesh(geometry, material));
@@ -92,10 +96,11 @@ function makeHealthBar(color) {
   fill.position.y = 0.015;
   group.add(track, fill);
   group.position.set(0, 0.08, 0.48);
+  group.userData.fill = fill;
   return group;
 }
 
-export function createPenguin() {
+export function createLegacyPenguin() {
   const group = new THREE.Group();
   group.name = 'PenguinHero';
   const visual = new THREE.Group();
@@ -324,7 +329,20 @@ export function createPenguin() {
   return group;
 }
 
-export function createScarecrow() {
+// The V2 model was approved in the isolated hero review page. Keep the old
+// constructor above only for side-by-side review; every game-facing import of
+// createPenguin now receives the approved jointed model.
+export function createPenguin() {
+  const group = createPenguinCandidate();
+  group.name = 'PenguinHero';
+  group.userData.modelVersion = 'v2';
+  const healthBar = makeHealthBar(0x42f1df);
+  group.add(healthBar);
+  group.userData.healthBar = healthBar;
+  return group;
+}
+
+function createLegacyScarecrow() {
   const group = new THREE.Group();
   group.name = 'ComboScarecrow';
   const visual = new THREE.Group();
@@ -449,7 +467,20 @@ export function createScarecrow() {
   return group;
 }
 
-export function createSlime() {
+export function createScarecrow() {
+  const group = createScarecrowModel();
+  const internalBar = group.userData.healthBar;
+  if (internalBar) group.remove(internalBar);
+  const healthBar = makeHealthBar(0x62e49f);
+  healthBar.name = 'ScarecrowFriendlyHealthBar';
+  healthBar.position.set(0, 2.36, 0.34);
+  group.add(healthBar);
+  group.userData.healthBar = healthBar;
+  group.userData.modelVersion = 'approved-straw-v2';
+  return group;
+}
+
+export function createLegacySlime() {
   const group = new THREE.Group();
   group.name = 'SlimeEnemy';
   const visual = new THREE.Group();
@@ -611,9 +642,9 @@ export function createBattleObstacle(type = 'reef') {
   return group;
 }
 
-export function createChapterOneEnemy(type = 'slime') {
+export function createLegacyChapterOneEnemy(type = 'slime') {
   if (type === 'abyss_kraken') return createAbyssKraken();
-  if (type === 'slime') return createSlime();
+  if (type === 'slime') return createLegacySlime();
   const group = new THREE.Group();
   group.name = `ChapterOneEnemy_${type}`;
   const palettes = {
@@ -688,6 +719,28 @@ export function createChapterOneEnemy(type = 'slime') {
   group.userData.healthBar = healthBar;
   group.scale.setScalar(type === 'iron_turtle' ? 0.88 : 0.94);
   return group;
+}
+
+function promoteApprovedEnemyModel(group, type) {
+  group.name = type === 'slime' ? 'SlimeEnemy' : `ChapterOneEnemy_${type}`;
+  group.userData.modelVersion = 'approved-chapter-one-v2';
+  group.userData.enemyType = type;
+  return group;
+}
+
+// The eight Chapter One models have passed the isolated model-review stage.
+// Keep their procedural source shared with the review page so later visual
+// refinements cannot silently diverge between the review board and the game.
+export function createSlime() {
+  return promoteApprovedEnemyModel(createSlimeCandidate(), 'slime');
+}
+
+export function createChapterOneEnemy(type = 'slime') {
+  if (type === 'abyss_kraken') return createAbyssKraken();
+  if (type === 'slime') return createSlime();
+  const approvedModel = createEnemyCandidate(type);
+  if (approvedModel) return promoteApprovedEnemyModel(approvedModel, type);
+  return createLegacyChapterOneEnemy(type);
 }
 
 export function createSkeleton() {

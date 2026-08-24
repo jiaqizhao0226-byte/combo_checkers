@@ -62,6 +62,117 @@ function addVertexColorVariation(geometry, color, strength = 0.06, seed = 0) {
   return geometry;
 }
 
+function addAxialBands(geometry, baseColor, bandColor, bandCenters, bandWidth = 0.075) {
+  const positions = geometry.getAttribute('position');
+  const colors = new Float32Array(positions.count * 3);
+  const base = new THREE.Color(baseColor);
+  const band = new THREE.Color(bandColor);
+  const sample = new THREE.Color();
+  for (let index = 0; index < positions.count; index += 1) {
+    const z = positions.getZ(index);
+    const distance = Math.min(...bandCenters.map(center => Math.abs(z - center)));
+    const blend = THREE.MathUtils.smoothstep(bandWidth - distance, 0, bandWidth);
+    const grain = 1 + Math.sin(index * 1.73 + z * 19) * 0.018;
+    sample.copy(base).lerp(band, blend * 0.82).multiplyScalar(grain);
+    colors[index * 3] = sample.r;
+    colors[index * 3 + 1] = sample.g;
+    colors[index * 3 + 2] = sample.b;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function addArcherfishPattern(geometry) {
+  const positions = geometry.getAttribute('position');
+  const normals = geometry.getAttribute('normal');
+  const colors = new Float32Array(positions.count * 3);
+  const silver = new THREE.Color(0xb9c8c0);
+  const pearl = new THREE.Color(0xe3ece3);
+  const olive = new THREE.Color(0x788878);
+  const band = new THREE.Color(0x263331);
+  const sample = new THREE.Color();
+  const bands = [
+    [-0.34, 0.078],
+    [-0.14, 0.065],
+    [0.075, 0.056],
+    [0.285, 0.048],
+  ];
+
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const y = positions.getY(index);
+    const z = positions.getZ(index);
+    const dorsal = THREE.MathUtils.smoothstep(y, 0.02, 0.4);
+    const belly = 1 - THREE.MathUtils.smoothstep(y, -0.34, -0.04);
+    const upperBody = THREE.MathUtils.smoothstep(y, -0.12, 0.08);
+    let bandMask = 0;
+    bands.forEach(([center, width]) => {
+      const distance = Math.abs(z - center);
+      bandMask = Math.max(
+        bandMask,
+        THREE.MathUtils.smoothstep(width - distance, 0, width)
+      );
+    });
+    const lateral = 0.18 + THREE.MathUtils.smoothstep(Math.abs(normals.getX(index)), 0.12, 0.72) * 0.82;
+    bandMask *= upperBody * lateral;
+    const scaleGrain = Math.sin(x * 19 + z * 23 + index * 0.41) * 0.012;
+    const sideLight = Math.max(0, normals.getZ(index)) * 0.05;
+    sample.copy(silver)
+      .lerp(olive, dorsal * 0.48)
+      .lerp(pearl, belly * 0.72)
+      .lerp(band, bandMask * 0.94)
+      .multiplyScalar(1 + scaleGrain + sideLight);
+    colors[index * 3] = sample.r;
+    colors[index * 3 + 1] = sample.g;
+    colors[index * 3 + 2] = sample.b;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function addDorsalVertexColors(geometry, baseColor, ridgeColor) {
+  const positions = geometry.getAttribute('position');
+  const normals = geometry.getAttribute('normal');
+  const colors = new Float32Array(positions.count * 3);
+  const base = new THREE.Color(baseColor);
+  const ridge = new THREE.Color(ridgeColor);
+  const sample = new THREE.Color();
+  for (let index = 0; index < positions.count; index += 1) {
+    const dorsal = THREE.MathUtils.smoothstep(normals.getY(index), 0.5, 0.94);
+    const grain = 1 + Math.sin(index * 2.07 + positions.getZ(index) * 13) * 0.016;
+    sample.copy(base).lerp(ridge, dorsal * 0.82).multiplyScalar(grain);
+    colors[index * 3] = sample.r;
+    colors[index * 3 + 1] = sample.g;
+    colors[index * 3 + 2] = sample.b;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function addGhostSharkSurfaceColors(geometry) {
+  const positions = geometry.getAttribute('position');
+  const normals = geometry.getAttribute('normal');
+  const colors = new Float32Array(positions.count * 3);
+  const shadow = new THREE.Color(0x4f7393);
+  const pearl = new THREE.Color(0xa7d4dc);
+  const spectral = new THREE.Color(0xd7f7ef);
+  const sample = new THREE.Color();
+  for (let index = 0; index < positions.count; index += 1) {
+    const front = THREE.MathUtils.smoothstep(positions.getZ(index), -0.34, 0.34);
+    const dorsal = THREE.MathUtils.smoothstep(normals.getY(index), 0.15, 0.9);
+    const grain = 1 + Math.sin(index * 1.81 + positions.getY(index) * 15.7) * 0.014;
+    sample.copy(shadow)
+      .lerp(pearl, front * 0.72)
+      .lerp(spectral, dorsal * 0.32)
+      .multiplyScalar(grain);
+    colors[index * 3] = sample.r;
+    colors[index * 3 + 1] = sample.g;
+    colors[index * 3 + 2] = sample.b;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
 function glow(color, intensity = 1.25) {
   return new THREE.MeshBasicMaterial({
     color: new THREE.Color(color).multiplyScalar(intensity),
@@ -116,6 +227,331 @@ function tube(points, radius, material, tubularSegments = 32, radialSegments = 1
     new THREE.TubeGeometry(curve, tubularSegments, radius, radialSegments, false),
     material
   );
+}
+
+function fanFinGeometry(side = 1, width = 0.28, length = 0.46, depth = 0.035) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.04);
+  shape.bezierCurveTo(
+    side * width * 0.48, -length * 0.08,
+    side * width, -length * 0.48,
+    side * width * 0.82, -length * 0.78
+  );
+  shape.bezierCurveTo(
+    side * width * 0.58, -length,
+    side * width * 0.18, -length * 0.92,
+    0, -length * 0.72
+  );
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: depth * 0.35,
+    bevelThickness: depth * 0.3,
+    curveSegments: 8,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  geometry.rotateX(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function archerfishBodyGeometry(longitudinalSegments = 36, radialSegments = 28) {
+  const profiles = [
+    { z: -0.58, y: 0.49, rx: 0.09, ry: 0.13 },
+    { z: -0.42, y: 0.5, rx: 0.2, ry: 0.25 },
+    { z: -0.12, y: 0.52, rx: 0.29, ry: 0.34 },
+    { z: 0.2, y: 0.54, rx: 0.27, ry: 0.31 },
+    { z: 0.45, y: 0.55, rx: 0.2, ry: 0.22 },
+    { z: 0.62, y: 0.565, rx: 0.075, ry: 0.095 },
+  ];
+  const positions = [];
+  const indices = [];
+
+  function profileAt(z) {
+    for (let index = 0; index < profiles.length - 1; index += 1) {
+      const current = profiles[index];
+      const next = profiles[index + 1];
+      if (z > next.z) continue;
+      const raw = (z - current.z) / (next.z - current.z);
+      const t = raw * raw * (3 - 2 * raw);
+      return {
+        y: THREE.MathUtils.lerp(current.y, next.y, t),
+        rx: THREE.MathUtils.lerp(current.rx, next.rx, t),
+        ry: THREE.MathUtils.lerp(current.ry, next.ry, t),
+      };
+    }
+    return profiles[profiles.length - 1];
+  }
+
+  for (let segment = 0; segment <= longitudinalSegments; segment += 1) {
+    const z = THREE.MathUtils.lerp(profiles[0].z, profiles[profiles.length - 1].z,
+      segment / longitudinalSegments);
+    const profile = profileAt(z);
+    for (let side = 0; side < radialSegments; side += 1) {
+      const angle = side / radialSegments * Math.PI * 2;
+      positions.push(
+        Math.cos(angle) * profile.rx,
+        profile.y + Math.sin(angle) * profile.ry,
+        z
+      );
+    }
+  }
+  for (let segment = 0; segment < longitudinalSegments; segment += 1) {
+    for (let side = 0; side < radialSegments; side += 1) {
+      const nextSide = (side + 1) % radialSegments;
+      const a = segment * radialSegments + side;
+      const b = (segment + 1) * radialSegments + side;
+      const c = (segment + 1) * radialSegments + nextSide;
+      const d = segment * radialSegments + nextSide;
+      indices.push(a, b, d, b, c, d);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function archerfishTailFinGeometry(depth = 0.07) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.08);
+  shape.bezierCurveTo(0.16, 0.18, 0.31, 0.31, 0.43, 0.32);
+  shape.bezierCurveTo(0.39, 0.17, 0.32, 0.06, 0.22, 0);
+  shape.bezierCurveTo(0.32, -0.06, 0.39, -0.17, 0.43, -0.3);
+  shape.bezierCurveTo(0.29, -0.28, 0.14, -0.16, 0, -0.08);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    bevelSize: 0.012,
+    bevelThickness: 0.01,
+    curveSegments: 16,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  geometry.rotateY(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function archerfishRearFinGeometry(depth = 0.055) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.22, 0);
+  shape.bezierCurveTo(-0.13, 0.12, -0.02, 0.25, 0.08, 0.29);
+  shape.bezierCurveTo(0.16, 0.19, 0.2, 0.08, 0.22, 0);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.01,
+    bevelThickness: 0.009,
+    curveSegments: 12,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  geometry.rotateY(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function rayWingGeometry(side = 1, depth = 0.045) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.34);
+  shape.bezierCurveTo(
+    side * 0.26, 0.34,
+    side * 0.62, 0.22,
+    side * 0.72, 0.02
+  );
+  shape.bezierCurveTo(
+    side * 0.62, -0.18,
+    side * 0.3, -0.26,
+    0, -0.18
+  );
+  shape.bezierCurveTo(side * 0.08, -0.02, side * 0.08, 0.18, 0, 0.34);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.014,
+    bevelThickness: 0.012,
+    curveSegments: 12,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  geometry.rotateX(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function sharkDorsalFinGeometry(depth = 0.075) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.14, 0);
+  shape.bezierCurveTo(-0.07, 0.15, -0.025, 0.34, 0.015, 0.42);
+  shape.bezierCurveTo(0.07, 0.31, 0.13, 0.13, 0.16, 0);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.012,
+    bevelThickness: 0.01,
+    curveSegments: 10,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  // Dorsal fin lies in the shark's depth/vertical plane; extrusion provides
+  // only a small amount of width so the side view reads as a fin, not a post.
+  geometry.rotateY(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function sharkTailFinGeometry(depth = 0.07) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.055);
+  shape.bezierCurveTo(0.14, 0.15, 0.27, 0.34, 0.35, 0.38);
+  shape.bezierCurveTo(0.32, 0.18, 0.27, 0.06, 0.21, 0);
+  shape.bezierCurveTo(0.27, -0.06, 0.32, -0.2, 0.35, -0.31);
+  shape.bezierCurveTo(0.22, -0.25, 0.09, -0.1, 0, -0.055);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.012,
+    bevelThickness: 0.01,
+    curveSegments: 12,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  // Shape x becomes model depth, shape y remains vertical, and extrusion
+  // thickness becomes model width: a real vertical shark caudal fin.
+  geometry.rotateY(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function ghostSharkBodyGeometry(longitudinalSegments = 40, radialSegments = 28) {
+  const profiles = [
+    { z: -0.58, y: 0.55, rx: 0.095, ry: 0.085 },
+    { z: -0.4, y: 0.55, rx: 0.25, ry: 0.18 },
+    { z: -0.08, y: 0.55, rx: 0.36, ry: 0.235 },
+    { z: 0.24, y: 0.54, rx: 0.32, ry: 0.215 },
+    { z: 0.48, y: 0.525, rx: 0.22, ry: 0.145 },
+    { z: 0.67, y: 0.5, rx: 0.055, ry: 0.05 },
+  ];
+  const positions = [];
+  const indices = [];
+
+  function profileAt(z) {
+    for (let index = 0; index < profiles.length - 1; index += 1) {
+      const current = profiles[index];
+      const next = profiles[index + 1];
+      if (z > next.z) continue;
+      const raw = (z - current.z) / (next.z - current.z);
+      const t = raw * raw * (3 - 2 * raw);
+      return {
+        y: THREE.MathUtils.lerp(current.y, next.y, t),
+        rx: THREE.MathUtils.lerp(current.rx, next.rx, t),
+        ry: THREE.MathUtils.lerp(current.ry, next.ry, t),
+      };
+    }
+    return profiles[profiles.length - 1];
+  }
+
+  for (let segment = 0; segment <= longitudinalSegments; segment += 1) {
+    const z = THREE.MathUtils.lerp(profiles[0].z, profiles[profiles.length - 1].z,
+      segment / longitudinalSegments);
+    const profile = profileAt(z);
+    for (let side = 0; side < radialSegments; side += 1) {
+      const angle = side / radialSegments * Math.PI * 2;
+      const vertical = Math.sin(angle);
+      positions.push(
+        Math.cos(angle) * profile.rx,
+        profile.y + vertical * profile.ry * (vertical < 0 ? 0.78 : 1),
+        z
+      );
+    }
+  }
+  for (let segment = 0; segment < longitudinalSegments; segment += 1) {
+    for (let side = 0; side < radialSegments; side += 1) {
+      const nextSide = (side + 1) % radialSegments;
+      const a = segment * radialSegments + side;
+      const b = (segment + 1) * radialSegments + side;
+      const c = (segment + 1) * radialSegments + nextSide;
+      const d = segment * radialSegments + nextSide;
+      indices.push(a, b, d, b, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function sharkPectoralFinGeometry(side = 1, depth = 0.045) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.075);
+  shape.bezierCurveTo(side * 0.14, 0.005, side * 0.4, -0.2, side * 0.58, -0.46);
+  shape.lineTo(side * 0.22, -0.27);
+  shape.bezierCurveTo(side * 0.13, -0.22, side * 0.06, -0.14, 0, -0.075);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    bevelSize: 0.006,
+    bevelThickness: 0.006,
+    curveSegments: 12,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  geometry.rotateX(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function seaTurtleFlipperGeometry(side = 1, depth = 0.055) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.14);
+  shape.bezierCurveTo(
+    side * 0.18, 0.18,
+    side * 0.48, 0.08,
+    side * 0.62, -0.08
+  );
+  shape.bezierCurveTo(
+    side * 0.65, -0.2,
+    side * 0.54, -0.31,
+    side * 0.38, -0.34
+  );
+  shape.bezierCurveTo(
+    side * 0.2, -0.28,
+    side * 0.08, -0.14,
+    0, -0.08
+  );
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.015,
+    bevelThickness: 0.012,
+    curveSegments: 12,
+    steps: 1,
+  });
+  geometry.translate(0, 0, -depth * 0.5);
+  geometry.rotateX(Math.PI / 2);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function taperedTube(points, startRadius, endRadius, material, tubularSegments = 56, radialSegments = 16) {
@@ -237,55 +673,154 @@ export function createJellyfishCandidate() {
   const bell = pivot(rig, 'JellyfishBell', [0, 0.68, 0]);
 
   const bellMaterial = physical(0x66cef0, {
-    roughness: 0.34,
-    clearcoat: 0.38,
-    clearcoatRoughness: 0.3,
-    transparent: true,
-    opacity: 0.84,
-    emissive: 0x123c64,
-    emissiveIntensity: 0.18,
+    roughness: 0.38,
+    clearcoat: 0.08,
+    clearcoatRoughness: 0.68,
+    transmission: 0.34,
+    thickness: 0.28,
+    ior: 1.18,
+    attenuationColor: 0x4abbd4,
+    attenuationDistance: 1.35,
+    transparent: false,
+    opacity: 1,
+    emissive: 0x164c67,
+    emissiveIntensity: 0.2,
+    depthWrite: true,
   });
   const rimMaterial = physical(0xb9f4ff, {
-    roughness: 0.4,
-    clearcoat: 0.24,
-    emissive: 0x2b6f84,
+    roughness: 0.46,
+    clearcoat: 0,
+    emissive: 0x3bd8e8,
+    emissiveIntensity: 0.62,
+  });
+  const tentacleMaterial = physical(0x72dce8, {
+    roughness: 0.72,
+    clearcoat: 0,
+    emissive: 0x1a5963,
     emissiveIntensity: 0.2,
   });
-  const tentacleMaterial = physical(0x79d7e8, {
-    roughness: 0.52,
-    clearcoat: 0.12,
+  const innerMaterial = physical(0x8ce6ef, {
+    roughness: 0.62,
+    clearcoat: 0,
+    transparent: true,
+    opacity: 0.38,
+    emissive: 0x276f7e,
+    emissiveIntensity: 0.42,
+    depthWrite: false,
+  });
+  const electricInternal = new THREE.MeshBasicMaterial({
+    color: 0xbaffff,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const electricCore = new THREE.MeshBasicMaterial({
+    color: 0x78f5ff,
+    transparent: false,
+    toneMapped: false,
   });
   const dark = standard(0x10252e, { roughness: 0.38 });
   const glint = glow(0xf1ffff, 1.35);
 
   add(bell, new THREE.SphereGeometry(0.48, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.6),
     bellMaterial, [0, 0, 0], [1, 0.9, 0.92], 'JellyfishCandidateDome');
+  add(bell, new THREE.SphereGeometry(0.415, 36, 22, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    innerMaterial, [0, -0.018, 0], [1, 0.78, 0.88], 'JellyfishCandidateInnerBell');
   const rim = add(bell, new THREE.TorusGeometry(0.39, 0.055, 14, 40),
     rimMaterial, [0, -0.025, 0], [1, 1, 0.92], 'JellyfishCandidateRim');
   rim.rotation.x = Math.PI / 2;
-  add(bell, new THREE.SphereGeometry(0.24, 28, 18), rimMaterial,
-    [0, -0.03, 0], [1, 0.28, 0.9], 'JellyfishCandidateCore');
+  const core = add(bell, new THREE.SphereGeometry(0.19, 28, 18), electricCore,
+    [0, -0.015, 0], [1, 0.24, 0.86], 'JellyfishCandidateCore');
+  [-0.095, 0, 0.095].forEach((x, index) => {
+    add(bell, new THREE.SphereGeometry(0.073, 20, 14), innerMaterial,
+      [x, 0.035 + Math.abs(x) * 0.25, 0.04], [0.78, 1.18, 0.72],
+      `JellyfishCandidatePulseLobe${index + 1}`);
+  });
+  for (let index = 0; index < 6; index += 1) {
+    const angle = index / 6 * Math.PI * 2;
+    const radialX = Math.sin(angle);
+    const radialZ = Math.cos(angle);
+    const tangentX = Math.cos(angle);
+    const tangentZ = -Math.sin(angle);
+    const direction = index % 2 === 0 ? 1 : -1;
+    const points = [0.16, 0.68, 1.16, 1.62].map((phi, pointIndex) => {
+      const radius = Math.sin(phi) * 0.49;
+      const tangentOffset = pointIndex === 1
+        ? direction * 0.028
+        : pointIndex === 2 ? direction * -0.02 : 0;
+      return [
+        radialX * radius + tangentX * tangentOffset,
+        Math.cos(phi) * 0.49 * 0.9,
+        radialZ * radius * 0.92 + tangentZ * tangentOffset,
+      ];
+    });
+    const vein = tube(points, 0.012, electricInternal, 28, 8);
+    vein.name = `JellyfishCandidateInnerVein${index + 1}`;
+    vein.castShadow = false;
+    vein.renderOrder = 3;
+    bell.add(vein);
+
+    const forkStart = points[2];
+    const fork = tube([
+      forkStart,
+      [forkStart[0] + tangentX * direction * 0.07, forkStart[1] - 0.045,
+        forkStart[2] + tangentZ * direction * 0.07],
+      [forkStart[0] + tangentX * direction * 0.13, forkStart[1] - 0.1,
+        forkStart[2] + tangentZ * direction * 0.13],
+    ], 0.008, electricInternal, 16, 7);
+    fork.name = `JellyfishCandidateElectricFork${index + 1}`;
+    fork.castShadow = false;
+    fork.renderOrder = 3;
+    bell.add(fork);
+  }
+  for (let index = 0; index < 8; index += 1) {
+    const angle = index / 8 * Math.PI * 2;
+    add(bell, new THREE.SphereGeometry(0.055, 16, 10), rimMaterial,
+      [Math.sin(angle) * 0.38, -0.035, Math.cos(angle) * 0.35],
+      [1, 0.65, 0.85], `JellyfishCandidateRimLobe${index + 1}`);
+  }
   addEye(bell, -0.14, 0.08, 0.405, 0.062, dark, glint, 'JellyfishCandidateLeft');
   addEye(bell, 0.14, 0.08, 0.405, 0.062, dark, glint, 'JellyfishCandidateRight');
 
   const tentacles = [];
-  [
-    [-0.27, 0.02, -0.05, -0.04],
-    [-0.1, 0.08, 0.04, 0.06],
-    [0.1, -0.05, 0.03, -0.04],
-    [0.27, 0.01, -0.04, 0.05],
-  ].forEach(([x, z, curlX, curlZ], index) => {
-    const tentacle = pivot(rig, `JellyfishTentacle${index + 1}`, [x, 0.62, z]);
-    const mesh = tube([
+  // Six tapered tentacles start inside the underside of the bell and arc
+  // radially outward. Their horizontal spread is intentional: a mostly
+  // vertical bundle disappears behind the bell in the elevated game camera.
+  for (let index = 0; index < 6; index += 1) {
+    const angle = index / 6 * Math.PI * 2 + Math.PI / 6;
+    const radialX = Math.sin(angle);
+    const radialZ = Math.cos(angle);
+    const tangentX = Math.cos(angle);
+    const tangentZ = -Math.sin(angle);
+    const sway = index % 2 === 0 ? 0.075 : -0.075;
+    const tentacle = pivot(rig, `JellyfishTentacle${index + 1}`, [
+      radialX * 0.3,
+      0.62,
+      radialZ * 0.27,
+    ]);
+    const mesh = taperedTube([
       [0, 0, 0],
-      [curlX, -0.18, curlZ],
-      [-curlX * 0.7, -0.39, -curlZ * 0.5],
-      [curlX * 0.8, -0.62 - (index % 2) * 0.08, curlZ * 0.8],
-    ], 0.044, tentacleMaterial, 30, 10);
+      [radialX * 0.1, -0.15, radialZ * 0.1],
+      [radialX * 0.21 + tangentX * sway, -0.36, radialZ * 0.21 + tangentZ * sway],
+      [radialX * 0.35 - tangentX * sway * 0.45, -0.62 - (index % 3) * 0.045,
+        radialZ * 0.35 - tangentZ * sway * 0.45],
+    ], 0.052, 0.024, tentacleMaterial, 38, 12);
     mesh.name = `JellyfishCandidateTentacleMesh${index + 1}`;
     mesh.castShadow = true;
+    mesh.receiveShadow = true;
     tentacle.add(mesh);
     tentacles.push(tentacle);
+  }
+  [-0.1, 0.1].forEach((x, index) => {
+    const oralArm = tube([
+      [x, 0.61, 0.02],
+      [x * 0.45, 0.39, index === 0 ? 0.08 : -0.08],
+      [-x * 0.35, 0.17, index === 0 ? -0.04 : 0.04],
+    ], 0.066, innerMaterial, 30, 12);
+    oralArm.name = `JellyfishCandidateOralArm${index + 1}`;
+    oralArm.castShadow = true;
+    rig.add(oralArm);
   });
 
   return finishCandidate({
@@ -297,8 +832,12 @@ export function createJellyfishCandidate() {
     nodes: [bell, ...tentacles],
     idle: time => {
       const pulse = Math.sin(time * 2.5);
+      const electricPulse = 0.5 + Math.sin(time * 5.6) * 0.5;
       rig.position.y = 0.1 + Math.sin(time * 1.7) * 0.045;
       bell.scale.set(1 + pulse * 0.035, 1 - pulse * 0.055, 1 + pulse * 0.035);
+      core.scale.set(1 + electricPulse * 0.08, 0.24 + electricPulse * 0.035, 0.86 + electricPulse * 0.06);
+      electricInternal.opacity = 0.66 + electricPulse * 0.3;
+      rimMaterial.emissiveIntensity = 0.48 + electricPulse * 0.32;
       tentacles.forEach((tentacle, index) => {
         tentacle.rotation.z = Math.sin(time * 2 + index * 0.9) * 0.11;
         tentacle.rotation.x = Math.cos(time * 1.6 + index) * 0.07;
@@ -315,7 +854,7 @@ export function createJellyfishCandidate() {
         bell.scale.set(1 + shock * 0.13, 1 - shock * 0.1, 1 + shock * 0.13);
         tentacles.forEach((tentacle, index) => {
           tentacle.rotation.x += shock * (index % 2 ? 0.38 : -0.38);
-          tentacle.rotation.z += shock * (index - 1.5) * 0.12;
+          tentacle.rotation.z += shock * (index - (tentacles.length - 1) * 0.5) * 0.08;
         });
       },
       hit: progress => {
@@ -335,18 +874,18 @@ export function createIronTurtleCandidate() {
   const head = pivot(rig, 'IronTurtleHead', [0, 0.43, 0.47]);
 
   const ironDark = physical(0x43575a, {
-    roughness: 0.74,
-    metalness: 0.36,
+    roughness: 0.7,
+    metalness: 0.52,
     clearcoat: 0,
   });
   const ironPlate = physical(0x91a1a0, {
-    roughness: 0.52,
-    metalness: 0.5,
+    roughness: 0.48,
+    metalness: 0.68,
     clearcoat: 0,
   });
   const ironPlatePaint = physical(0xffffff, {
-    roughness: 0.54,
-    metalness: 0.52,
+    roughness: 0.5,
+    metalness: 0.66,
     clearcoat: 0,
     vertexColors: true,
   });
@@ -366,78 +905,79 @@ export function createIronTurtleCandidate() {
   add(rig, bodyGeometry, bodyMaterial,
     [0, 0.34, 0.04], [1.12, 0.68, 1.08], 'IronTurtleCandidateBody');
 
-  // A thick outer lip and a recessed dome give the shell a readable profile
-  // at actual board scale. The dark inset stays visible between armor plates.
+  // The load-bearing shell stays deliberately low. It is only the dark base
+  // beneath the armor, not a tall smooth turtle dome competing with the steel
+  // plates for the silhouette.
   add(shell, new THREE.SphereGeometry(0.56, 44, 28), ironDark,
-    [0, 0.42, -0.05], [1.07, 0.38, 0.94], 'IronTurtleCandidateShellUnderlay');
+    [0, 0.39, -0.05], [1.1, 0.28, 0.97], 'IronTurtleCandidateShellUnderlay');
   const shellGeometry = addVertexColorVariation(
     new THREE.SphereGeometry(0.515, 48, 30), 0x667a7b, 0.06, 3
   );
   const shellMaterial = physical(0xffffff, {
-    roughness: 0.64,
-    metalness: 0.46,
+    roughness: 0.58,
+    metalness: 0.62,
     clearcoat: 0,
     vertexColors: true,
   });
   add(shell, shellGeometry, shellMaterial,
-    [0, 0.55, -0.05], [1.04, 0.67, 0.92], 'IronTurtleCandidateShell');
+    [0, 0.455, -0.05], [1.06, 0.44, 0.93], 'IronTurtleCandidateShell');
 
   const shellRim = add(shell, new THREE.TorusGeometry(0.49, 0.062, 14, 56), edge,
-    [0, 0.47, -0.05], [1.08, 1, 0.9], 'IronTurtleCandidateShellRim');
+    [0, 0.405, -0.05], [1.1, 1, 0.93], 'IronTurtleCandidateShellRim');
   shellRim.rotation.x = Math.PI / 2;
 
   const plateSpecs = [
-    [0, 0.875, -0.04, 0.205, 0],
-    [-0.26, 0.79, 0.01, 0.155, 1],
-    [0.26, 0.79, 0.01, 0.155, 2],
-    [0, 0.785, 0.245, 0.16, 3],
-    [0, 0.8, -0.325, 0.15, 4],
-    [-0.34, 0.69, -0.2, 0.125, 5],
-    [0.34, 0.69, -0.2, 0.125, 6],
+    [0, 0.685, -0.04, 0.235, 0],
+    [-0.255, 0.65, 0.02, 0.205, 1],
+    [0.255, 0.65, 0.02, 0.205, 2],
+    [0, 0.625, 0.265, 0.205, 3],
+    [0, 0.645, -0.31, 0.2, 4],
+    [-0.31, 0.615, -0.2, 0.17, 5],
+    [0.31, 0.615, -0.2, 0.17, 6],
   ];
   const shellUp = new THREE.Vector3(0, 1, 0);
   plateSpecs.forEach(([x, y, z, radius, seed], index) => {
     const plateMount = pivot(shell, `IronTurtleCandidatePlateMount${index + 1}`, [x, y, z]);
-    const normal = new THREE.Vector3(x * 0.75, 1, (z + 0.05) * 0.72).normalize();
+    const normal = new THREE.Vector3(x, 1, (z + 0.05) * 0.9).normalize();
     plateMount.quaternion.setFromUnitVectors(shellUp, normal);
-    add(plateMount, new THREE.CylinderGeometry(radius * 1.06, radius * 1.08, 0.028, 6), groove,
-      [0, 0, 0], [1, 1, 0.92], `IronTurtleCandidatePlateGroove${index + 1}`);
+    add(plateMount, new THREE.CylinderGeometry(radius * 1.06, radius * 1.1, 0.034, 6), groove,
+      [0, 0, 0], [1, 1, 0.94], `IronTurtleCandidatePlateGroove${index + 1}`);
     const plateGeometry = addVertexColorVariation(
-      new THREE.CylinderGeometry(radius, radius * 1.025, 0.046, 6, 2, false),
-      index === 0 ? 0x82979a : 0x73898a,
+      new THREE.CylinderGeometry(radius * 0.94, radius, 0.074, 6, 2, false),
+      index === 0 ? 0x98a5a5 : 0x7e8d8e,
       0.045,
       seed + 6
     );
     add(plateMount, plateGeometry, ironPlatePaint,
-      [0, 0.035, 0], [1, 1, 0.9], `IronTurtleCandidatePlate${index + 1}`);
+      [0, 0.046, 0], [1, 1, 0.94], `IronTurtleCandidatePlate${index + 1}`);
   });
 
-  // Six articulated rim guards break up the otherwise continuous dark band.
-  // Their face normals follow the shell ellipse and each carries one rivet.
-  [-1.2, -0.78, -0.38, 0.38, 0.78, 1.2].forEach((angle, index) => {
+  // Eight broad skirt plates overlap the dark rim, turning the shell edge
+  // into articulated armor instead of a continuous tire-like ring.
+  Array.from({ length: 8 }, (_, index) => index / 8 * Math.PI * 2).forEach((angle, index) => {
     const x = Math.sin(angle) * 0.49 * 1.12;
     const z = -0.05 + Math.cos(angle) * 0.49 * 1.02;
-    const guardMount = pivot(shell, `IronTurtleCandidateRimGuardMount${index + 1}`, [x, 0.5, z]);
-    const outward = new THREE.Vector3(Math.sin(angle), 0.28, Math.cos(angle)).normalize();
+    const guardMount = pivot(shell, `IronTurtleCandidateRimGuardMount${index + 1}`, [x, 0.415, z]);
+    const outward = new THREE.Vector3(Math.sin(angle), 0.34, Math.cos(angle)).normalize();
     guardMount.quaternion.setFromUnitVectors(shellUp, outward);
-    add(guardMount, new THREE.CylinderGeometry(0.07, 0.076, 0.036, 6), edge,
-      [0, 0.018, 0], [1, 1, 0.82], `IronTurtleCandidateRimGuard${index + 1}`);
-    add(guardMount, new THREE.SphereGeometry(0.021, 14, 10), ironPlate,
-      [0, 0.052, 0], [1, 0.7, 1], `IronTurtleCandidateRivet${index + 1}`);
+    add(guardMount, new THREE.CylinderGeometry(0.105, 0.118, 0.058, 6), edge,
+      [0, 0.028, 0], [1.06, 1, 0.8], `IronTurtleCandidateRimGuard${index + 1}`);
+    add(guardMount, new THREE.SphereGeometry(0.025, 14, 10), ironPlate,
+      [0, 0.066, 0], [1, 0.68, 1], `IronTurtleCandidateRivet${index + 1}`);
   });
 
   // Two shallow scratches and a rust bloom keep the armor from reading as a
   // perfectly molded toy. They are deliberately oversized for game view.
   const scratchOne = add(shell, new THREE.BoxGeometry(0.014, 0.018, 0.16), groove,
-    [-0.08, 0.925, -0.045], [1, 1, 1], 'IronTurtleCandidateScratch1');
+    [-0.08, 0.77, -0.045], [1, 1, 1], 'IronTurtleCandidateScratch1');
   scratchOne.rotation.y = -0.58;
   scratchOne.rotation.z = 0.08;
   const scratchTwo = add(shell, new THREE.BoxGeometry(0.011, 0.018, 0.11), groove,
-    [-0.015, 0.928, -0.02], [1, 1, 1], 'IronTurtleCandidateScratch2');
+    [-0.015, 0.773, -0.02], [1, 1, 1], 'IronTurtleCandidateScratch2');
   scratchTwo.rotation.y = -0.58;
   scratchTwo.rotation.z = 0.08;
   const rustPatch = add(shell, new THREE.SphereGeometry(0.07, 18, 12), rust,
-    [0.38, 0.735, -0.12], [1, 0.12, 0.58], 'IronTurtleCandidateRustPatch');
+    [0.37, 0.65, -0.1], [1, 0.12, 0.58], 'IronTurtleCandidateRustPatch');
   rustPatch.rotation.x = -0.34;
 
   add(rig, new THREE.SphereGeometry(0.2, 30, 20), skinShade,
@@ -529,62 +1069,70 @@ export function createArcherfishCandidate() {
   group.name = 'ArcherfishCandidate';
   const rig = pivot(group, 'ArcherfishCandidateRig');
   const body = pivot(rig, 'ArcherfishBody');
-  const tail = pivot(rig, 'ArcherfishTail', [0, 0.5, -0.75]);
-  const leftFin = pivot(rig, 'ArcherfishFinLeft', [-0.34, 0.48, 0.02]);
-  const rightFin = pivot(rig, 'ArcherfishFinRight', [0.34, 0.48, 0.02]);
+  const tail = pivot(rig, 'ArcherfishTail', [0, 0.49, -0.56]);
+  const leftFin = pivot(rig, 'ArcherfishFinLeft', [-0.17, 0.5, 0.22]);
+  const rightFin = pivot(rig, 'ArcherfishFinRight', [0.17, 0.5, 0.22]);
 
-  const gold = standard(0xdca64b, { roughness: 0.62 });
-  const cream = standard(0xead292, { roughness: 0.76 });
-  const teal = standard(0x3b969e, { roughness: 0.7 });
-  const stripe = standard(0x53523d, { roughness: 0.8 });
+  const silver = standard(0xffffff, { roughness: 0.7, vertexColors: true });
+  const pale = standard(0xdce7df, { roughness: 0.76 });
+  const fin = standard(0x7d927f, { roughness: 0.82 });
+  const tailFinMaterial = standard(0x536d63, { roughness: 0.84 });
+  const stripe = standard(0x263331, { roughness: 0.84 });
   const dark = standard(0x142021, { roughness: 0.38 });
   const glint = glow(0xf8fff5, 1.3);
 
-  add(body, new THREE.SphereGeometry(0.48, 36, 24), gold,
-    [0, 0.5, 0], [0.84, 0.72, 1.22], 'ArcherfishCandidateBody');
-  add(body, new THREE.SphereGeometry(0.39, 30, 20), cream,
-    [0, 0.4, 0.25], [0.72, 0.42, 0.78], 'ArcherfishCandidateBelly');
+  const archerBodyGeometry = addArcherfishPattern(archerfishBodyGeometry());
+  add(body, archerBodyGeometry, silver,
+    [0, 0, 0], [1, 1, 1], 'ArcherfishCandidateBody');
 
-  [-0.26, 0, 0.25].forEach((z, index) => {
-    [-1, 1].forEach(side => {
-      add(body, new THREE.SphereGeometry(0.105 - index * 0.012, 20, 14), stripe,
-        [side * 0.345, 0.56, z], [0.18, 1.12, 0.54], `ArcherfishStripe${index + 1}${side < 0 ? 'L' : 'R'}`);
-    });
-  });
+  const mouthRing = add(body, new THREE.TorusGeometry(0.054, 0.012, 12, 30), pale,
+    [0, 0.565, 0.645], [0.86, 0.52, 0.8], 'ArcherfishCandidateMouthRing');
+  mouthRing.rotation.x = -0.18;
+  const mouthAperture = add(body, new THREE.CircleGeometry(0.038, 24), dark,
+    [0, 0.565, 0.66], [0.86, 0.5, 1], 'ArcherfishCandidateMouthAperture');
+  mouthAperture.rotation.x = -0.18;
+  addEye(body, -0.145, 0.645, 0.49, 0.056, dark, glint, 'ArcherfishCandidateLeft');
+  addEye(body, 0.145, 0.645, 0.49, 0.056, dark, glint, 'ArcherfishCandidateRight');
 
-  const nozzle = add(body, new THREE.CylinderGeometry(0.075, 0.105, 0.24, 24), teal,
-    [0, 0.43, 0.59], [1, 1, 1], 'ArcherfishCandidateNozzle');
-  nozzle.rotation.x = Math.PI / 2;
-  addEye(body, -0.19, 0.61, 0.43, 0.058, dark, glint, 'ArcherfishCandidateLeft');
-  addEye(body, 0.19, 0.61, 0.43, 0.058, dark, glint, 'ArcherfishCandidateRight');
+  add(body, archerfishRearFinGeometry(), fin,
+    [0, 0.785, -0.25], [1, 1, 1], 'ArcherfishCandidateDorsalFin');
+  add(body, archerfishRearFinGeometry(), fin,
+    [0, 0.285, -0.25], [1, -0.78, 0.9], 'ArcherfishCandidateAnalFin');
+  add(leftFin, fanFinGeometry(-1, 0.16, 0.23, 0.03), fin,
+    [0, 0, 0.04], [1, 1, 1], 'ArcherfishCandidateLeftFinMesh');
+  add(rightFin, fanFinGeometry(1, 0.16, 0.23, 0.03), fin,
+    [0, 0, 0.04], [1, 1, 1], 'ArcherfishCandidateRightFinMesh');
 
-  const dorsal = add(body, new THREE.ConeGeometry(0.16, 0.38, 20), teal,
-    [0, 0.91, -0.25], [1.1, 1, 0.5], 'ArcherfishCandidateDorsalFin');
-  dorsal.rotation.x = -0.12;
-  add(leftFin, new THREE.SphereGeometry(0.2, 24, 14), teal,
-    [-0.08, 0, 0], [1.15, 0.18, 0.72], 'ArcherfishCandidateLeftFinMesh').rotation.z = -0.3;
-  add(rightFin, new THREE.SphereGeometry(0.2, 24, 14), teal,
-    [0.08, 0, 0], [1.15, 0.18, 0.72], 'ArcherfishCandidateRightFinMesh').rotation.z = 0.3;
-
+  const tailStem = taperedTube([
+    [0, 0, 0.08],
+    [0, 0, -0.08],
+    [0, 0, -0.22],
+  ], 0.115, 0.075, fin, 28, 14);
+  tailStem.name = 'ArcherfishCandidateTailStem';
+  tail.add(tailStem);
+  add(tail, archerfishTailFinGeometry(0.12), tailFinMaterial,
+    [0, 0, -0.18], [1, 0.82, 0.82], 'ArcherfishCandidateTailFin');
   [-1, 1].forEach(side => {
-    const lobe = add(tail, new THREE.SphereGeometry(0.22, 24, 16), teal,
-      [side * 0.13, 0, -0.16], [0.9, 0.2, 1], `ArcherfishTailLobe${side < 0 ? 'L' : 'R'}`);
-    lobe.rotation.z = side * 0.34;
+    const gill = tube([
+      [side * 0.165, 0.62, 0.37],
+      [side * 0.18, 0.55, 0.39],
+      [side * 0.17, 0.47, 0.36],
+    ], 0.007, stripe, 18, 6);
+    gill.name = `ArcherfishCandidateGill${side < 0 ? 'Left' : 'Right'}`;
+    body.add(gill);
   });
-  const tailStem = add(tail, new THREE.CapsuleGeometry(0.085, 0.22, 8, 18), gold,
-    [0, 0, 0.1], [1, 1, 0.9], 'ArcherfishCandidateTailStem');
-  tailStem.rotation.x = Math.PI / 2;
-
   return finishCandidate({
     group,
     rig,
-    healthColor: 0xd9aa48,
-    scale: 0.94,
-    shadow: [0.49, 0.42, 0.22],
+    healthColor: 0x7f9f91,
+    scale: 0.92,
+    shadow: [0.42, 0.52, 0.2],
     nodes: [body, tail, leftFin, rightFin],
     idle: time => {
       rig.position.y = 0.04 + Math.sin(time * 1.9) * 0.025;
-      tail.rotation.y = Math.sin(time * 3.1) * 0.2;
+      // Hold the caudal fin in a slight swimming bend so its vertical plane
+      // remains legible from the elevated head-on game camera.
+      tail.rotation.y = 0.22 + Math.sin(time * 3.1) * 0.12;
       leftFin.rotation.z = -0.16 + Math.sin(time * 2.7) * 0.08;
       rightFin.rotation.z = 0.16 - Math.sin(time * 2.7) * 0.08;
     },
@@ -597,8 +1145,8 @@ export function createArcherfishCandidate() {
       },
       attack: progress => {
         const shot = Math.sin(progress * Math.PI);
-        body.position.z -= shot * 0.11;
-        nozzle.scale.set(1 + shot * 0.16, 1 + shot * 0.25, 1 + shot * 0.16);
+        body.position.z -= shot * 0.09;
+        mouthRing.scale.set(0.86 + shot * 0.1, 0.52 + shot * 0.08, 0.8 + shot * 0.06);
         tail.rotation.y += Math.sin(progress * Math.PI * 2) * 0.22;
       },
       hit: progress => {
@@ -618,55 +1166,80 @@ export function createVortexEelCandidate() {
   const head = pivot(rig, 'VortexEelHead', [0.08, 0.55, 0.5]);
   const tail = pivot(rig, 'VortexEelTail', [-0.06, 0.45, -0.92]);
 
-  const blue = physical(0x416bbb, { roughness: 0.52, clearcoat: 0.16, clearcoatRoughness: 0.64 });
+  const blue = physical(0x416bbb, { roughness: 0.68, clearcoat: 0.04, clearcoatRoughness: 0.82 });
   const cyan = physical(0x59c7ca, {
-    roughness: 0.46,
-    clearcoat: 0.18,
-    clearcoatRoughness: 0.58,
+    roughness: 0.64,
+    clearcoat: 0,
     emissive: 0x14545b,
-    emissiveIntensity: 0.18,
+    emissiveIntensity: 0.28,
   });
   const belly = standard(0x9cdadd, { roughness: 0.7 });
+  const eelBodyMaterial = physical(0xffffff, {
+    roughness: 0.68,
+    clearcoat: 0.04,
+    clearcoatRoughness: 0.82,
+    vertexColors: true,
+  });
   const dark = standard(0x101b2d, { roughness: 0.4 });
   const glint = glow(0xeaffff, 1.4);
+  const vortexGlow = new THREE.MeshBasicMaterial({
+    color: 0x75edf0,
+    transparent: true,
+    opacity: 0.58,
+    depthWrite: false,
+    toneMapped: false,
+  });
 
   const bodyMesh = taperedTube([
     [0.08, 0.55, 0.35],
-    [-0.12, 0.5, 0.05],
-    [0.12, 0.48, -0.28],
-    [-0.08, 0.46, -0.62],
+    [-0.22, 0.5, 0.08],
+    [0.2, 0.48, -0.28],
+    [-0.18, 0.46, -0.62],
     [-0.06, 0.45, -0.92],
-  ], 0.205, 0.075, blue, 56, 16);
+  ], 0.215, 0.07, blue, 64, 18);
+  addDorsalVertexColors(bodyMesh.geometry, 0x416bbb, 0x59c7ca);
+  bodyMesh.material = eelBodyMaterial;
   bodyMesh.name = 'VortexEelCandidateBodyMesh';
   bodyMesh.castShadow = true;
   body.add(bodyMesh);
 
   add(head, new THREE.SphereGeometry(0.28, 32, 22), blue,
-    [0, 0, 0], [0.94, 0.78, 1.08], 'VortexEelCandidateHeadMesh');
+    [0, 0, 0], [0.9, 0.72, 1.18], 'VortexEelCandidateHeadMesh');
   add(head, new THREE.SphereGeometry(0.2, 26, 18), belly,
     [0, -0.06, 0.18], [0.78, 0.5, 0.32], 'VortexEelCandidateMuzzle');
   addEye(head, -0.1, 0.06, 0.23, 0.052, dark, glint, 'VortexEelCandidateLeft');
   addEye(head, 0.1, 0.06, 0.23, 0.052, dark, glint, 'VortexEelCandidateRight');
-
-  [
-    [-0.17, 0.54, 0.15], [0.18, 0.49, -0.09],
-    [-0.14, 0.48, -0.37], [0.1, 0.46, -0.62],
-  ].forEach(([x, y, z], index) => {
-    add(body, new THREE.SphereGeometry(0.07, 20, 14), cyan,
-      [x, y, z], [0.55, 1, 0.32], `VortexEelCandidateGlowMark${index + 1}`);
+  const eelMouth = tube([
+    [-0.085, -0.1, 0.275], [0, -0.12, 0.294], [0.085, -0.1, 0.275],
+  ], 0.008, dark, 18, 6);
+  eelMouth.name = 'VortexEelCandidateMouth';
+  head.add(eelMouth);
+  [-1, 1].forEach(side => {
+    for (let index = 0; index < 2; index += 1) {
+      const gill = add(head, new THREE.BoxGeometry(0.008, 0.07, 0.012), dark,
+        [side * (0.19 + index * 0.018), -0.02 - index * 0.045, 0.17],
+        [1, 1, 1], `VortexEelCandidateGill${side < 0 ? 'L' : 'R'}${index + 1}`);
+      gill.rotation.z = side * -0.16;
+    }
   });
 
   [-1, 1].forEach(side => {
-    const fin = add(tail, new THREE.SphereGeometry(0.18, 24, 16), cyan,
-      [side * 0.11, 0, -0.12], [0.75, 0.18, 1], `VortexEelTailFin${side < 0 ? 'L' : 'R'}`);
-    fin.rotation.z = side * 0.38;
+    add(tail, fanFinGeometry(side, 0.19, 0.34, 0.03), cyan,
+      [0, 0, -0.04], [1, 1, 1], `VortexEelTailFin${side < 0 ? 'L' : 'R'}`);
   });
-  const dorsal = tube([
-    [0, 0, 0], [0, 0.03, -0.25], [0, 0.02, -0.52], [0, 0, -0.75],
-  ], 0.028, cyan, 24, 8);
-  dorsal.name = 'VortexEelCandidateDorsalGlow';
-  dorsal.position.set(0, 0.69, 0.18);
-  body.add(dorsal);
+  [
+    [0.02, 0.73, 0.2], [-0.12, 0.68, -0.02], [0.13, 0.66, -0.27],
+    [-0.1, 0.62, -0.5], [0, 0.58, -0.72],
+  ].forEach(([x, y, z], index) => {
+    const spine = add(body, new THREE.ConeGeometry(0.04, 0.16, 10), cyan,
+      [x, y, z], [1, 1, 0.72], `VortexEelCandidateDorsalSpine${index + 1}`);
+    spine.rotation.x = -0.12;
+  });
+  [0.12, 0.19].forEach((radius, index) => {
+    const ring = add(tail, new THREE.TorusGeometry(radius, 0.018, 8, 32), vortexGlow,
+      [0, 0, -0.2 - index * 0.09], [1, 0.72, 1], `VortexEelCandidateVortexRing${index + 1}`);
+    ring.rotation.z = index === 0 ? 0.22 : -0.18;
+  });
 
   return finishCandidate({
     group,
@@ -711,18 +1284,27 @@ export function createElectricRayCandidate() {
   const body = pivot(rig, 'ElectricRayBody', [0, 0.5, 0.02]);
   const leftWing = pivot(rig, 'ElectricRayWingLeft', [-0.16, 0.5, 0]);
   const rightWing = pivot(rig, 'ElectricRayWingRight', [0.16, 0.5, 0]);
-  const tail = pivot(rig, 'ElectricRayTail', [0, 0.49, -0.56]);
+  // The tail joint sits inside the rear edge of the body. Rotating around a
+  // pivot outside the torso previously opened a visible gap between both
+  // forms, making the tail look like a floating accessory.
+  const tail = pivot(rig, 'ElectricRayTail', [0, 0.49, -0.4]);
 
   const purple = physical(0x7258b8, {
-    roughness: 0.76,
+    roughness: 0.86,
     clearcoat: 0,
-    sheen: 0.18,
+    sheen: 0.28,
     sheenColor: 0xa998cc,
-    sheenRoughness: 0.86,
+    sheenRoughness: 0.92,
   });
   const purpleDark = standard(0x493b72, { roughness: 0.86 });
   const underside = standard(0xcbbfd6, { roughness: 0.9 });
   const electric = glow(0xffe96a, 1.45);
+  const electricLine = new THREE.LineBasicMaterial({
+    color: new THREE.Color(0xffe96a).multiplyScalar(1.35),
+    transparent: true,
+    opacity: 0.9,
+    toneMapped: false,
+  });
   const dark = standard(0x17152a, { roughness: 0.38 });
   const glint = glow(0xfaffdf, 1.35);
 
@@ -731,33 +1313,58 @@ export function createElectricRayCandidate() {
   add(body, new THREE.SphereGeometry(0.35, 30, 20), underside,
     [0, -0.1, 0.1], [0.72, 0.18, 0.88], 'ElectricRayCandidateUnderside');
 
-  const leftWingMesh = add(leftWing, new THREE.SphereGeometry(0.46, 34, 22), purple,
-    [-0.28, 0, 0], [1.1, 0.18, 0.9], 'ElectricRayCandidateLeftWingMesh');
-  leftWingMesh.rotation.y = 0.16;
-  leftWingMesh.rotation.z = -0.09;
-  const rightWingMesh = add(rightWing, new THREE.SphereGeometry(0.46, 34, 22), purple,
-    [0.28, 0, 0], [1.1, 0.18, 0.9], 'ElectricRayCandidateRightWingMesh');
-  rightWingMesh.rotation.y = -0.16;
-  rightWingMesh.rotation.z = 0.09;
+  add(leftWing, rayWingGeometry(-1), purple,
+    [0.02, 0, 0], [1, 1, 1], 'ElectricRayCandidateLeftWingMesh');
+  add(rightWing, rayWingGeometry(1), purple,
+    [-0.02, 0, 0], [1, 1, 1], 'ElectricRayCandidateRightWingMesh');
 
   addEye(body, -0.14, 0.105, 0.34, 0.044, dark, glint, 'ElectricRayCandidateLeft');
   addEye(body, 0.14, 0.105, 0.34, 0.044, dark, glint, 'ElectricRayCandidateRight');
-  [
-    [-0.44, 0.09, 0.07], [-0.31, 0.1, 0.23],
-    [0.44, 0.09, 0.07], [0.31, 0.1, 0.23],
-  ].forEach(([x, y, z], index) => {
-    const parent = x < 0 ? leftWing : rightWing;
-    const localX = x - parent.position.x;
-    add(parent, new THREE.SphereGeometry(index % 2 ? 0.045 : 0.06, 18, 12), electric,
-      [localX, y - parent.position.y, z], [1, 0.45, 1], `ElectricRayGlowSpot${index + 1}`);
+  [-1, 1].forEach(side => {
+    const parent = side < 0 ? leftWing : rightWing;
+    const branches = [
+      [[0, 0.045, 0.22], [side * 0.22, 0.052, 0.14], [side * 0.47, 0.045, 0.02], [side * 0.62, 0.038, -0.08]],
+      [[side * 0.17, 0.047, 0.12], [side * 0.3, 0.052, 0.24], [side * 0.45, 0.045, 0.28]],
+      [[side * 0.31, 0.047, 0.04], [side * 0.42, 0.052, -0.08], [side * 0.52, 0.043, -0.17]],
+    ];
+    branches.forEach((points, index) => {
+      const geometry = new THREE.BufferGeometry().setFromPoints(
+        points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+      );
+      const vein = new THREE.Line(geometry, electricLine);
+      vein.name = `ElectricRayCandidateElectricVein${side < 0 ? 'L' : 'R'}${index + 1}`;
+      parent.add(vein);
+    });
+  });
+  [-1, 1].forEach(side => {
+    add(body, new THREE.SphereGeometry(0.024, 14, 10), dark,
+      [side * 0.11, 0.09, 0.02], [1, 0.38, 1.3], `ElectricRayCandidateSpiracle${side < 0 ? 'Left' : 'Right'}`);
+    for (let index = 0; index < 3; index += 1) {
+      const gill = add(body, new THREE.BoxGeometry(0.055, 0.008, 0.012), purpleDark,
+        [side * (0.09 + index * 0.045), -0.12, 0.18 - index * 0.04],
+        [1, 1, 1], `ElectricRayCandidateGill${side < 0 ? 'L' : 'R'}${index + 1}`);
+      gill.rotation.y = side * 0.18;
+    }
   });
 
-  const tailStem = add(tail, new THREE.CapsuleGeometry(0.045, 0.82, 8, 16), purpleDark,
-    [0, 0, -0.42], [1, 1, 1], 'ElectricRayCandidateTailStem');
-  tailStem.rotation.x = Math.PI / 2;
+  const tailStem = taperedTube([
+    [0, 0, 0.12],
+    [0, 0.004, -0.12],
+    [0.018, -0.008, -0.48],
+    [0, 0.004, -0.84],
+  ], 0.078, 0.026, purple, 52, 16);
+  tailStem.name = 'ElectricRayCandidateTailStem';
+  tailStem.castShadow = true;
+  tailStem.receiveShadow = true;
+  tail.add(tailStem);
   const barb = add(tail, new THREE.ConeGeometry(0.09, 0.24, 18), electric,
     [0, 0, -0.91], [0.72, 1, 0.34], 'ElectricRayCandidateTailBarb');
   barb.rotation.x = -Math.PI / 2;
+  [0.22, 0.44, 0.66].forEach((z, index) => {
+    const band = add(tail, new THREE.TorusGeometry(0.052 - index * 0.006, 0.012, 8, 22), electric,
+      [0, 0, -z], [1, 1, 0.72], `ElectricRayCandidateTailBand${index + 1}`);
+    band.rotation.x = Math.PI / 2;
+  });
 
   return finishCandidate({
     group,
@@ -809,34 +1416,71 @@ export function createHermitCrabCandidate() {
   const leftClaw = pivot(rig, 'HermitCrabClawLeft', [-0.39, 0.32, 0.3]);
   const rightClaw = pivot(rig, 'HermitCrabClawRight', [0.39, 0.32, 0.3]);
 
-  const shellMaterial = standard(0xd39a5c, { roughness: 0.88 });
+  const shellMaterial = standard(0xffffff, { roughness: 0.96, vertexColors: true });
   const shellDark = standard(0x875634, { roughness: 0.94 });
-  const orange = physical(0xc86137, { roughness: 0.62, clearcoat: 0.08, clearcoatRoughness: 0.72 });
-  const orangeLight = physical(0xe77f46, { roughness: 0.56, clearcoat: 0.12, clearcoatRoughness: 0.66 });
+  const orange = physical(0xc86137, { roughness: 0.74, clearcoat: 0.03, clearcoatRoughness: 0.84 });
+  const orangeLight = physical(0xe77f46, { roughness: 0.68, clearcoat: 0.04, clearcoatRoughness: 0.8 });
   const cream = standard(0xe4bd79, { roughness: 0.86 });
   const dark = standard(0x21130d, { roughness: 0.4 });
   const glint = glow(0xfffae9, 1.3);
 
-  add(shell, new THREE.SphereGeometry(0.48, 38, 26), shellMaterial,
+  const hermitShellGeometry = addVertexColorVariation(
+    new THREE.SphereGeometry(0.48, 44, 30), 0xc58b50, 0.1, 12
+  );
+  add(shell, hermitShellGeometry, shellMaterial,
     [0, 0.58, -0.2], [0.92, 1.02, 0.84], 'HermitCrabCandidateShell');
   add(shell, new THREE.SphereGeometry(0.39, 30, 20), shellDark,
     [0, 0.6, -0.24], [0.86, 0.9, 0.77], 'HermitCrabCandidateShellInset');
 
   const spiralPoints = [];
+  const shellCenter = new THREE.Vector3(0, 0.58, -0.2);
+  const shellRadii = new THREE.Vector3(0.48 * 0.92, 0.48 * 1.02, 0.48 * 0.84);
+  const sideDirection = new THREE.Vector3(0.72, 0.06, 0.69).normalize();
+  const spiralCenter = shellCenter.clone().add(new THREE.Vector3(
+    sideDirection.x * shellRadii.x,
+    sideDirection.y * shellRadii.y,
+    sideDirection.z * shellRadii.z
+  ));
+  const horizontalTangent = new THREE.Vector3(sideDirection.z, 0, -sideDirection.x).normalize();
+  const verticalTangent = new THREE.Vector3(0, 1, 0);
   for (let index = 0; index < 28; index += 1) {
     const t = index / 27;
     const angle = t * Math.PI * 4.2;
-    const radius = 0.25 * (1 - t * 0.78);
+    const radius = 0.17 * (1 - t * 0.78);
+    const rawPoint = spiralCenter.clone()
+      .addScaledVector(horizontalTangent, Math.sin(angle) * radius)
+      .addScaledVector(verticalTangent, Math.cos(angle) * radius);
+    // Project every point back to the ellipsoid surface so the groove follows
+    // the shell instead of becoming a flat coil hovering in front of it.
+    const normalized = new THREE.Vector3(
+      (rawPoint.x - shellCenter.x) / shellRadii.x,
+      (rawPoint.y - shellCenter.y) / shellRadii.y,
+      (rawPoint.z - shellCenter.z) / shellRadii.z
+    ).normalize().multiplyScalar(1.008);
     spiralPoints.push([
-      0.385,
-      0.59 + Math.sin(angle) * radius,
-      -0.2 + Math.cos(angle) * radius,
+      shellCenter.x + normalized.x * shellRadii.x,
+      shellCenter.y + normalized.y * shellRadii.y,
+      shellCenter.z + normalized.z * shellRadii.z,
     ]);
   }
-  const spiral = tube(spiralPoints, 0.027, cream, 48, 8);
+  const spiral = tube(spiralPoints, 0.009, shellDark, 48, 7);
   spiral.name = 'HermitCrabCandidateShellSpiral';
   spiral.castShadow = true;
   shell.add(spiral);
+  const opening = add(shell, new THREE.SphereGeometry(0.25, 30, 20), dark,
+    [0, 0.34, 0.12], [0.92, 0.58, 0.22], 'HermitCrabCandidateShellOpening');
+  const openingRim = add(shell, new THREE.TorusGeometry(0.22, 0.038, 12, 38), shellDark,
+    [0, 0.35, 0.155], [1, 0.72, 1], 'HermitCrabCandidateShellOpeningRim');
+  [
+    [-0.22, 0.82, 0.045, 0.065], [0.13, 0.91, 0.015, 0.052],
+    [0.28, 0.7, 0.065, 0.045], [-0.31, 0.59, 0.04, 0.04],
+    [0.02, 0.76, 0.18, 0.038],
+  ].forEach(([x, y, z, radius], index) => {
+    const barnacle = add(shell, new THREE.CylinderGeometry(radius * 0.6, radius, radius * 0.82, 9), cream,
+      [x, y, z], [1, 1, 0.82], `HermitCrabCandidateBarnacle${index + 1}`);
+    barnacle.rotation.x = Math.PI * 0.5 - 0.18;
+    barnacle.rotation.z = x * -0.45;
+  });
 
   add(body, new THREE.SphereGeometry(0.31, 30, 20), orange,
     [0, 0.29, 0.2], [1.05, 0.62, 0.9], 'HermitCrabCandidateBody');
@@ -852,6 +1496,8 @@ export function createHermitCrabCandidate() {
 
   [leftClaw, rightClaw].forEach((claw, index) => {
     const side = index === 0 ? -1 : 1;
+    const clawScale = index === 0 ? 0.82 : 1.28;
+    claw.scale.setScalar(clawScale);
     add(claw, new THREE.SphereGeometry(0.19, 26, 18), orangeLight,
       [side * 0.07, 0.02, 0.03], [1.05, 0.78, 0.9], `HermitCrabClawPalm${index + 1}`);
     const upper = add(claw, new THREE.ConeGeometry(0.085, 0.24, 18), orangeLight,
@@ -862,6 +1508,9 @@ export function createHermitCrabCandidate() {
       [side * 0.1, -0.045, 0.13], [0.8, 1, 0.68], `HermitCrabClawLower${index + 1}`);
     lower.rotation.x = Math.PI / 2;
     lower.rotation.z = side * -0.22;
+    const knuckle = add(claw, new THREE.TorusGeometry(0.13, 0.026, 10, 28), cream,
+      [side * -0.015, 0.015, -0.07], [1, 1, 0.82], `HermitCrabClawKnuckle${index + 1}`);
+    knuckle.rotation.x = Math.PI / 2;
   });
 
   const legs = [];
@@ -925,71 +1574,111 @@ export function createGhostSharkCandidate() {
   group.name = 'GhostSharkCandidate';
   const rig = pivot(group, 'GhostSharkCandidateRig');
   const body = pivot(rig, 'GhostSharkBody');
-  const leftFin = pivot(rig, 'GhostSharkFinLeft', [-0.31, 0.52, 0.02]);
-  const rightFin = pivot(rig, 'GhostSharkFinRight', [0.31, 0.52, 0.02]);
-  const tail = pivot(rig, 'GhostSharkTail', [0, 0.5, -0.58]);
+  const leftFin = pivot(rig, 'GhostSharkFinLeft', [-0.29, 0.52, 0.12]);
+  const rightFin = pivot(rig, 'GhostSharkFinRight', [0.29, 0.52, 0.12]);
+  const tail = pivot(rig, 'GhostSharkTail', [0, 0.55, -0.55]);
 
-  const ghost = physical(0x6c86b8, {
-    roughness: 0.62,
-    clearcoat: 0,
-    transparent: true,
-    opacity: 0.7,
-    emissive: 0x1b2c55,
-    emissiveIntensity: 0.3,
-    depthWrite: false,
-  });
-  const ghostLight = physical(0xb8d8eb, {
+  // The body remains opaque for a stable mobile-game shark silhouette.
+  // Spectral character comes from the pearlescent gradient, aura and tail.
+  const ghost = physical(0xffffff, {
     roughness: 0.7,
     clearcoat: 0,
-    transparent: true,
-    opacity: 0.62,
-    emissive: 0x31546e,
-    emissiveIntensity: 0.26,
-    depthWrite: false,
+    transparent: false,
+    opacity: 1,
+    emissive: 0x285b72,
+    emissiveIntensity: 0.42,
+    depthWrite: true,
+    vertexColors: true,
   });
-  const dark = standard(0x101528, { roughness: 0.36 });
-  const eyeGlow = glow(0x8ff5ff, 1.55);
+  const finMaterial = physical(0x83b4c2, {
+    roughness: 0.74,
+    clearcoat: 0,
+    transparent: false,
+    opacity: 1,
+    emissive: 0x28566a,
+    emissiveIntensity: 0.38,
+    depthWrite: true,
+  });
+  const spectralTrail = new THREE.MeshBasicMaterial({
+    color: 0x8cecf1,
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const auraMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7ce7ee,
+    side: THREE.BackSide,
+    transparent: true,
+    opacity: 0.2,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const dark = standard(0x07101b, { roughness: 0.32 });
+  const eyeGlow = glow(0xbaffff, 1.75);
 
-  add(body, new THREE.SphereGeometry(0.42, 36, 24), ghost,
-    [0, 0.54, 0], [0.86, 0.68, 1.3], 'GhostSharkCandidateBody');
-  add(body, new THREE.SphereGeometry(0.28, 30, 20), ghostLight,
-    [0, 0.44, 0.32], [0.72, 0.4, 0.9], 'GhostSharkCandidateBelly');
-  const snout = add(body, new THREE.CapsuleGeometry(0.09, 0.44, 8, 18), ghostLight,
-    [0, 0.53, 0.66], [1, 1, 0.8], 'GhostSharkCandidateSnout');
-  snout.rotation.x = Math.PI / 2;
-  addEye(body, -0.17, 0.62, 0.41, 0.06, dark, eyeGlow, 'GhostSharkCandidateLeft');
-  addEye(body, 0.17, 0.62, 0.41, 0.06, dark, eyeGlow, 'GhostSharkCandidateRight');
-
-  const spine = add(body, new THREE.ConeGeometry(0.09, 0.5, 18), ghostLight,
-    [0, 0.98, -0.12], [0.72, 1, 0.58], 'GhostSharkCandidateDorsalSpine');
-  spine.rotation.x = -0.12;
-  const dorsal = add(body, new THREE.SphereGeometry(0.18, 24, 16), ghost,
-    [0, 0.82, -0.35], [0.48, 1, 0.68], 'GhostSharkCandidateDorsalFin');
-  dorsal.rotation.x = -0.25;
-
-  const leftFinMesh = add(leftFin, new THREE.ConeGeometry(0.17, 0.48, 24), ghostLight,
-    [-0.16, 0, 0], [1, 1, 0.52], 'GhostSharkCandidateLeftFinMesh');
-  leftFinMesh.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    new THREE.Vector3(-1, 0, -0.16).normalize()
-  );
-  const rightFinMesh = add(rightFin, new THREE.ConeGeometry(0.17, 0.48, 24), ghostLight,
-    [0.16, 0, 0], [1, 1, 0.52], 'GhostSharkCandidateRightFinMesh');
-  rightFinMesh.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    new THREE.Vector3(1, 0, -0.16).normalize()
-  );
-
-  const tailStem = add(tail, new THREE.CapsuleGeometry(0.11, 0.5, 8, 18), ghost,
-    [0, 0, -0.18], [1, 1, 0.86], 'GhostSharkCandidateTailStem');
-  tailStem.rotation.x = Math.PI / 2;
+  const bodyGeometry = addGhostSharkSurfaceColors(ghostSharkBodyGeometry());
+  add(body, bodyGeometry, ghost,
+    [0, 0, 0], [1, 1, 1], 'GhostSharkCandidateBody');
+  const aura = add(body, bodyGeometry.clone(), auraMaterial,
+    [0, 0, 0], [1.045, 1.065, 1.035], 'GhostSharkCandidateAura');
+  aura.castShadow = false;
+  aura.receiveShadow = false;
   [-1, 1].forEach(side => {
-    const lobe = add(tail, new THREE.ConeGeometry(0.15, 0.4, 24), ghostLight,
-      [side * 0.1, 0, -0.6], [1, 1, 0.48], `GhostSharkTailLobe${side < 0 ? 'L' : 'R'}`);
-    lobe.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(side * 0.46, 0, -1).normalize()
-    );
+    const sideName = side < 0 ? 'Left' : 'Right';
+    add(body, new THREE.SphereGeometry(0.058, 24, 16), dark,
+      [side * 0.225, 0.61, 0.42], [0.38, 1, 0.82],
+      `GhostSharkCandidate${sideName}Eye`);
+    const reflectedCore = add(body, new THREE.SphereGeometry(0.019, 14, 10), eyeGlow,
+      [side * 0.244, 0.62, 0.435], [0.3, 0.8, 0.65],
+      `GhostSharkCandidate${sideName}Glint`);
+    reflectedCore.castShadow = false;
+  });
+  const sharkMouth = tube([
+    [-0.14, 0.455, 0.615], [0, 0.43, 0.665], [0.14, 0.455, 0.615],
+  ], 0.011, dark, 24, 7);
+  sharkMouth.name = 'GhostSharkCandidateMouth';
+  body.add(sharkMouth);
+
+  [-1, 1].forEach(side => {
+    const sideName = side < 0 ? 'L' : 'R';
+    for (let index = 0; index < 3; index += 1) {
+      const gill = add(body, new THREE.BoxGeometry(0.01, 0.115, 0.016), dark,
+        [side * (0.32 - index * 0.012), 0.53, 0.12 - index * 0.075],
+        [1, 1, 1], `GhostSharkCandidateGill${sideName}${index + 1}`);
+      gill.rotation.z = side * (0.18 + index * 0.025);
+    }
+  });
+  add(body, sharkDorsalFinGeometry(), finMaterial,
+    [0, 0.73, -0.12], [1, 0.92, 1], 'GhostSharkCandidateDorsalFinMesh');
+
+  add(leftFin, sharkPectoralFinGeometry(-1), finMaterial,
+    [0.02, 0, 0.08], [1, 1, 1], 'GhostSharkCandidateLeftFinMesh');
+  add(rightFin, sharkPectoralFinGeometry(1), finMaterial,
+    [-0.02, 0, 0.08], [1, 1, 1], 'GhostSharkCandidateRightFinMesh');
+
+  const tailStem = taperedTube([
+    [0, 0, 0.08],
+    [0, 0, -0.1],
+    [0.018, -0.006, -0.28],
+  ], 0.12, 0.065, finMaterial, 36, 16);
+  tailStem.name = 'GhostSharkCandidateTailStem';
+  tail.add(tailStem);
+  const tailVeil = add(tail, sharkTailFinGeometry(0.09), spectralTrail,
+    [0, 0, -0.24], [1, 0.88, 1], 'GhostSharkCandidateTailFinMesh');
+  tailVeil.castShadow = false;
+  tailVeil.receiveShadow = false;
+  [-0.14, 0, 0.14].forEach((x, index) => {
+    const wisp = tube([
+      [x * 0.12, 0, -0.5],
+      [x * 0.42, 0.02 + index * 0.008, -0.61],
+      [-x * 0.26, -0.006, -0.72 - index * 0.025],
+    ], 0.022 - index * 0.0025, spectralTrail, 32, 8);
+    wisp.name = `GhostSharkCandidateWisp${index + 1}`;
+    wisp.castShadow = false;
+    tail.add(wisp);
   });
 
   return finishCandidate({
@@ -997,14 +1686,16 @@ export function createGhostSharkCandidate() {
     rig,
     healthColor: 0x7089b9,
     scale: 0.94,
-    shadow: [0.48, 0.56, 0.18],
+    shadow: [0.5, 0.62, 0.14],
     nodes: [body, leftFin, rightFin, tail],
     idle: time => {
-      rig.position.y = 0.08 + Math.sin(time * 1.55) * 0.04;
-      rig.rotation.z = Math.sin(time * 1.2) * 0.025;
-      tail.rotation.y = Math.sin(time * 2.8) * 0.25;
-      leftFin.rotation.z = -0.08 + Math.sin(time * 2) * 0.07;
-      rightFin.rotation.z = 0.08 - Math.sin(time * 2) * 0.07;
+      rig.position.y = 0.1 + Math.sin(time * 1.35) * 0.045;
+      rig.rotation.z = Math.sin(time * 1.05) * 0.022;
+      tail.rotation.y = Math.sin(time * 2.25) * 0.2;
+      leftFin.rotation.z = -0.06 + Math.sin(time * 1.7) * 0.1;
+      rightFin.rotation.z = 0.06 - Math.sin(time * 1.7) * 0.1;
+      auraMaterial.opacity = 0.17 + (Math.sin(time * 1.8) + 1) * 0.025;
+      spectralTrail.opacity = 0.35 + (Math.sin(time * 1.5 + 0.8) + 1) * 0.035;
     },
     actions: {
       move: progress => {
@@ -1030,9 +1721,195 @@ export function createGhostSharkCandidate() {
   });
 }
 
+function createArmoredSeaTurtleCandidate() {
+  const group = new THREE.Group();
+  group.name = 'IronTurtleCandidate';
+  const rig = pivot(group, 'IronTurtleCandidateRig');
+  const shell = pivot(rig, 'IronTurtleShell');
+  const head = pivot(rig, 'IronTurtleHead', [0, 0.42, 0.59]);
+  const frontLeft = pivot(rig, 'IronTurtleFrontFlipperLeft', [-0.38, 0.36, 0.24]);
+  const frontRight = pivot(rig, 'IronTurtleFrontFlipperRight', [0.38, 0.36, 0.24]);
+  const rearLeft = pivot(rig, 'IronTurtleRearFlipperLeft', [-0.39, 0.33, -0.3]);
+  const rearRight = pivot(rig, 'IronTurtleRearFlipperRight', [0.39, 0.33, -0.3]);
+
+  const ironDark = physical(0x354d55, {
+    roughness: 0.76,
+    metalness: 0.5,
+    clearcoat: 0,
+  });
+  const shellPaint = physical(0xffffff, {
+    roughness: 0.58,
+    metalness: 0.63,
+    clearcoat: 0,
+    vertexColors: true,
+  });
+  const platePaint = physical(0xffffff, {
+    roughness: 0.52,
+    metalness: 0.68,
+    clearcoat: 0,
+    vertexColors: true,
+  });
+  const edge = physical(0x718b90, { roughness: 0.66, metalness: 0.48, clearcoat: 0 });
+  const groove = standard(0x22363d, { roughness: 0.94, metalness: 0.24 });
+  const rust = standard(0x6f5343, { roughness: 0.97 });
+  const skin = standard(0x4f8c83, { roughness: 0.86 });
+  const skinLight = standard(0x82b1a0, { roughness: 0.9 });
+  const bodyPaint = standard(0xffffff, { roughness: 0.88, vertexColors: true });
+  const dark = standard(0x101a1d, { roughness: 0.42 });
+  const glint = glow(0xe9fff3, 1.25);
+
+  const bodyGeometry = addVertexColorVariation(
+    new THREE.SphereGeometry(0.5, 42, 28), 0x4f8c83, 0.045, 21
+  );
+  add(rig, bodyGeometry, bodyPaint,
+    [0, 0.36, 0.01], [1.03, 0.36, 1.12], 'IronTurtleCandidateBody');
+
+  // A sea turtle carapace is a low hydrodynamic oval. The steel shell keeps
+  // the defensive role, but never rises into a land-tortoise backpack.
+  add(shell, new THREE.SphereGeometry(0.54, 46, 30), ironDark,
+    [0, 0.46, -0.02], [1.15, 0.24, 1.25], 'IronTurtleCandidateShellUnderlay');
+  const shellGeometry = addVertexColorVariation(
+    new THREE.SphereGeometry(0.52, 50, 32), 0x607b80, 0.055, 23
+  );
+  add(shell, shellGeometry, shellPaint,
+    [0, 0.5, -0.02], [1.12, 0.28, 1.22], 'IronTurtleCandidateShell');
+  const shellRim = add(shell, new THREE.TorusGeometry(0.5, 0.052, 14, 56), edge,
+    [0, 0.47, -0.02], [1.08, 1.18, 0.86], 'IronTurtleCandidateShellRim');
+  shellRim.rotation.x = Math.PI / 2;
+
+  const plateSpecs = [
+    [0, 0.675, 0.2, 0.17, 0],
+    [0, 0.69, -0.06, 0.19, 1],
+    [0, 0.655, -0.32, 0.15, 2],
+    [-0.255, 0.64, 0.12, 0.145, 3],
+    [0.255, 0.64, 0.12, 0.145, 4],
+    [-0.275, 0.615, -0.19, 0.135, 5],
+    [0.275, 0.615, -0.19, 0.135, 6],
+  ];
+  const shellUp = new THREE.Vector3(0, 1, 0);
+  plateSpecs.forEach(([x, y, z, radius, seed], index) => {
+    const mount = pivot(shell, `IronTurtleCandidatePlateMount${index + 1}`, [x, y, z]);
+    const normal = new THREE.Vector3(x * 0.8, 1, (z + 0.02) * 0.72).normalize();
+    mount.quaternion.setFromUnitVectors(shellUp, normal);
+    add(mount, new THREE.CylinderGeometry(radius * 1.06, radius * 1.1, 0.026, 6), groove,
+      [0, 0, 0], [1, 1, 0.92], `IronTurtleCandidatePlateGroove${index + 1}`);
+    const plateGeometry = addVertexColorVariation(
+      new THREE.CylinderGeometry(radius * 0.94, radius, 0.062, 6, 2, false),
+      index === 1 ? 0x9aa9aa : 0x7f9194,
+      0.042,
+      seed + 30
+    );
+    add(mount, plateGeometry, platePaint,
+      [0, 0.038, 0], [1, 1, 0.92], `IronTurtleCandidatePlate${index + 1}`);
+  });
+
+  // Low overlapping edge guards suggest articulated deep-sea armor without
+  // rebuilding the rim as a tall mechanical wall.
+  for (let index = 0; index < 8; index += 1) {
+    const angle = index / 8 * Math.PI * 2;
+    const x = Math.sin(angle) * 0.54;
+    const z = -0.02 + Math.cos(angle) * 0.59;
+    const mount = pivot(shell, `IronTurtleCandidateRimGuardMount${index + 1}`, [x, 0.485, z]);
+    const outward = new THREE.Vector3(Math.sin(angle), 0.3, Math.cos(angle)).normalize();
+    mount.quaternion.setFromUnitVectors(shellUp, outward);
+    add(mount, new THREE.CylinderGeometry(0.088, 0.1, 0.05, 6), edge,
+      [0, 0.024, 0], [1.08, 1, 0.78], `IronTurtleCandidateRimGuard${index + 1}`);
+    add(mount, new THREE.SphereGeometry(0.022, 12, 8), shellPaint,
+      [0, 0.055, 0], [1, 0.68, 1], `IronTurtleCandidateRivet${index + 1}`);
+  }
+
+  const scratchOne = add(shell, new THREE.BoxGeometry(0.012, 0.015, 0.14), groove,
+    [-0.07, 0.72, -0.04], [1, 1, 1], 'IronTurtleCandidateScratch1');
+  scratchOne.rotation.y = -0.55;
+  const rustPatch = add(shell, new THREE.SphereGeometry(0.06, 16, 10), rust,
+    [0.34, 0.63, -0.12], [1, 0.11, 0.55], 'IronTurtleCandidateRustPatch');
+  rustPatch.rotation.x = -0.3;
+
+  // The head and neck remain low and forward, continuing the swimming line.
+  add(rig, new THREE.SphereGeometry(0.2, 30, 20), skin,
+    [0, 0.39, 0.43], [0.84, 0.5, 1.02], 'IronTurtleCandidateNeck');
+  add(head, addVertexColorVariation(new THREE.SphereGeometry(0.24, 38, 24), 0x4f8c83, 0.04, 26),
+    bodyPaint, [0, 0, 0], [0.86, 0.62, 1.15], 'IronTurtleCandidateHeadMesh');
+  add(head, new THREE.SphereGeometry(0.16, 28, 18), skinLight,
+    [0, -0.035, 0.19], [0.88, 0.46, 0.36], 'IronTurtleCandidateMuzzle');
+  addEye(head, -0.085, 0.045, 0.225, 0.043, dark, glint, 'IronTurtleCandidateLeft');
+  addEye(head, 0.085, 0.045, 0.225, 0.043, dark, glint, 'IronTurtleCandidateRight');
+  [-0.045, 0.045].forEach((x, index) => {
+    add(head, new THREE.SphereGeometry(0.011, 10, 7), dark,
+      [x, -0.035, 0.253], [1, 0.62, 0.38], `IronTurtleCandidateNostril${index + 1}`);
+  });
+  const mouth = tube([
+    [-0.066, -0.085, 0.245], [0, -0.095, 0.257], [0.066, -0.085, 0.245],
+  ], 0.006, dark, 18, 6);
+  mouth.name = 'IronTurtleCandidateMouth';
+  head.add(mouth);
+
+  add(frontLeft, seaTurtleFlipperGeometry(-1), skin,
+    [0, 0, 0], [1, 1, 1], 'IronTurtleCandidateFrontFlipperMeshL');
+  add(frontRight, seaTurtleFlipperGeometry(1), skin,
+    [0, 0, 0], [1, 1, 1], 'IronTurtleCandidateFrontFlipperMeshR');
+  const rearLeftMesh = add(rearLeft, seaTurtleFlipperGeometry(-1), skinLight,
+    [0, 0, 0], [0.68, 0.78, 0.7], 'IronTurtleCandidateRearFlipperMeshL');
+  const rearRightMesh = add(rearRight, seaTurtleFlipperGeometry(1), skinLight,
+    [0, 0, 0], [0.68, 0.78, 0.7], 'IronTurtleCandidateRearFlipperMeshR');
+  rearLeftMesh.rotation.y = -0.12;
+  rearRightMesh.rotation.y = 0.12;
+
+  const tail = add(rig, new THREE.ConeGeometry(0.075, 0.22, 16), skin,
+    [0, 0.37, -0.65], [1, 1, 0.7], 'IronTurtleCandidateTail');
+  tail.rotation.x = -Math.PI / 2;
+
+  return finishCandidate({
+    group,
+    rig,
+    healthColor: 0x668b91,
+    // Wide sea-turtle flippers need a species-specific footprint. At 0.74,
+    // the complete tip-to-tip silhouette stays inside one review hex after
+    // the page's shared 0.86 model scale is applied.
+    scale: 0.74,
+    shadow: [0.73, 0.58, 0.2],
+    nodes: [shell, head, frontLeft, frontRight, rearLeft, rearRight, tail],
+    idle: time => {
+      const swim = Math.sin(time * 1.8);
+      rig.position.y = 0.035 + Math.sin(time * 1.45) * 0.018;
+      head.rotation.y = Math.sin(time * 1.15) * 0.055;
+      frontLeft.rotation.z = 0.035 + swim * 0.045;
+      frontRight.rotation.z = -0.035 - swim * 0.045;
+      rearLeft.rotation.z = swim * -0.02;
+      rearRight.rotation.z = swim * 0.02;
+    },
+    actions: {
+      move: progress => {
+        const stroke = Math.sin(progress * Math.PI * 3);
+        frontLeft.rotation.z += stroke * 0.34;
+        frontRight.rotation.z -= stroke * 0.34;
+        rearLeft.rotation.z -= stroke * 0.14;
+        rearRight.rotation.z += stroke * 0.14;
+        rig.position.y += Math.sin(progress * Math.PI) * 0.07;
+      },
+      attack: progress => {
+        const lunge = Math.sin(progress * Math.PI);
+        head.position.z += lunge * 0.27;
+        frontLeft.rotation.z += lunge * 0.16;
+        frontRight.rotation.z -= lunge * 0.16;
+        shell.position.z -= lunge * 0.035;
+      },
+      hit: progress => {
+        const recoil = Math.sin(progress * Math.PI);
+        head.position.z -= recoil * 0.2;
+        frontLeft.rotation.z -= recoil * 0.28;
+        frontRight.rotation.z += recoil * 0.28;
+        rearLeft.rotation.z += recoil * 0.14;
+        rearRight.rotation.z -= recoil * 0.14;
+        shell.rotation.z = Math.sin(progress * Math.PI * 5) * (1 - progress) * 0.055;
+      },
+    },
+  });
+}
+
 const CANDIDATE_FACTORIES = {
   jellyfish: createJellyfishCandidate,
-  iron_turtle: createIronTurtleCandidate,
+  iron_turtle: createArmoredSeaTurtleCandidate,
   archerfish: createArcherfishCandidate,
   vortex_eel: createVortexEelCandidate,
   electric_ray: createElectricRayCandidate,

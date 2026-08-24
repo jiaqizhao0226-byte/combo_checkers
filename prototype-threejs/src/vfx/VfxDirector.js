@@ -79,6 +79,20 @@ function makeBladeStreakGeometry(length = 1.5, width = 0.16) {
   return geometry;
 }
 
+function makeMeleeCutGeometry(length = 1.1, width = 0.13) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -length * 0.54, -width * 0.08, 0,
+    -length * 0.22, width, 0,
+    length * 0.54, width * 0.02, 0,
+    -length * 0.54, -width * 0.08, 0,
+    length * 0.54, width * 0.02, 0,
+    -length * 0.18, -width * 0.55, 0,
+  ], 3));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function makeContactBurstGeometry(rays = 8, innerRadius = 0.13, outerRadius = 0.52) {
   const positions = [];
   const pointCount = rays * 2;
@@ -184,6 +198,7 @@ export class VfxDirector {
       mote: new THREE.IcosahedronGeometry(0.055, 0),
       flash: new THREE.IcosahedronGeometry(0.18, 1),
       bladeStreak: makeBladeStreakGeometry(),
+      meleeCut: makeMeleeCutGeometry(),
       contactBurst: makeContactBurstGeometry(),
       groundPlane: new THREE.PlaneGeometry(2, 2),
       rock: new THREE.TetrahedronGeometry(0.12, 0),
@@ -236,104 +251,85 @@ export class VfxDirector {
     Object.values(this.shared).forEach(geometry => geometry.dispose?.());
   }
 
-  impact({ position, direction = new THREE.Vector3(1, 0, 0), camera, strong = true }) {
+  impact({ position, direction = new THREE.Vector3(1, 0, 0), camera }) {
     const root = new THREE.Group();
-    root.name = strong ? 'HeavyDirectionalImpact' : 'DirectionalImpact';
+    root.name = 'ApprovedHeroMeleeImpact';
     root.position.copy(position);
-    const warm = strong ? 0xffc64f : 0xff9a54;
-    const hot = 0xfff4c7;
-    const burstMaterial = vfxMaterial(hot, 1, { depthTest: false });
-    const bladeMaterial = vfxMaterial(warm, 0.96, { depthTest: false });
-    const bladeCoreMaterial = vfxMaterial(hot, 1, { depthTest: false });
-    const counterMaterial = strong ? vfxMaterial(0xff8e42, 0.78, { depthTest: false }) : null;
-    const sparkMaterial = vfxMaterial(warm, 1, { depthTest: false });
+    const cutMaterial = vfxMaterial(0xffa43c, 0.92, { depthTest: false });
+    const coreMaterial = vfxMaterial(0xfff3c0, 1, { depthTest: false });
+    const flashMaterial = vfxMaterial(0xffd36a, 1, { depthTest: false });
+    const shardMaterial = vfxMaterial(0xffb548, 1, { depthTest: false });
+    const angle = screenAngleForDirection(direction, camera) + 0.34;
 
-    const screenAngle = screenAngleForDirection(direction, camera);
-    const burst = new THREE.Mesh(this.shared.contactBurst, burstMaterial);
-    burst.name = 'ContactBurst';
-    burst.quaternion.copy(camera.quaternion);
-    burst.renderOrder = 37;
-    root.add(burst);
+    const cut = new THREE.Mesh(this.shared.meleeCut, cutMaterial);
+    cut.name = 'DirectionalCut';
+    cut.quaternion.copy(camera.quaternion);
+    cut.rotateZ(angle);
+    cut.renderOrder = 41;
+    root.add(cut);
 
-    const blade = new THREE.Mesh(this.shared.bladeStreak, bladeMaterial);
-    blade.name = 'DirectionalBladeStreak';
-    blade.quaternion.copy(camera.quaternion);
-    blade.rotateZ(screenAngle);
-    blade.renderOrder = 35;
-    root.add(blade);
+    const core = new THREE.Mesh(this.shared.meleeCut, coreMaterial);
+    core.name = 'CutCore';
+    core.quaternion.copy(camera.quaternion);
+    core.rotateZ(angle);
+    core.renderOrder = 42;
+    root.add(core);
 
-    const bladeCore = new THREE.Mesh(this.shared.bladeStreak, bladeCoreMaterial);
-    bladeCore.name = 'BladeCore';
-    bladeCore.quaternion.copy(camera.quaternion);
-    bladeCore.rotateZ(screenAngle);
-    bladeCore.renderOrder = 36;
-    root.add(bladeCore);
+    const flash = new THREE.Mesh(this.shared.flash, flashMaterial);
+    flash.name = 'ContactFlash';
+    flash.quaternion.copy(camera.quaternion);
+    flash.renderOrder = 43;
+    root.add(flash);
 
-    let counterBlade = null;
-    if (strong) {
-      counterBlade = new THREE.Mesh(this.shared.bladeStreak, counterMaterial);
-      counterBlade.name = 'HeavyCounterCut';
-      counterBlade.quaternion.copy(camera.quaternion);
-      counterBlade.rotateZ(screenAngle + 0.72);
-      counterBlade.renderOrder = 34;
-      root.add(counterBlade);
-    }
-
-    const count = strong ? 16 : 11;
-    const sparks = new THREE.InstancedMesh(this.shared.spark, sparkMaterial, count);
-    sparks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    sparks.frustumCulled = false;
-    sparks.renderOrder = 36;
-    root.add(sparks);
+    const count = 9;
+    const shards = new THREE.InstancedMesh(this.shared.spark, shardMaterial, count);
+    shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    shards.frustumCulled = false;
+    shards.renderOrder = 42;
+    root.add(shards);
 
     const forward = direction.clone().setY(0).normalize();
     if (forward.lengthSq() < 0.001) forward.set(1, 0, 0);
     const lateral = new THREE.Vector3(-forward.z, 0, forward.x);
     const particles = Array.from({ length: count }, (_, index) => {
-      const spread = (seededNoise(index, 4) - 0.5) * 1.9;
-      const speed = 0.65 + seededNoise(index, 8) * 1.05;
+      const centered = index - (count - 1) * 0.5;
+      const side = centered / Math.max(1, count - 1);
       return {
-        direction: forward.clone().multiplyScalar(0.35 + seededNoise(index, 2) * 0.9)
-          .addScaledVector(lateral, spread)
-          .add(new THREE.Vector3(0, 0.35 + seededNoise(index, 11) * 1.1, 0))
+        direction: forward.clone().multiplyScalar(0.72 + (index % 3) * 0.12)
+          .addScaledVector(lateral, side * 0.95)
+          .add(new THREE.Vector3(0, 0.28 + (index % 4) * 0.14, 0))
           .normalize(),
-        speed,
-        spin: seededNoise(index, 19) * TAU,
-        scale: 0.55 + seededNoise(index, 23) * 1.15,
+        speed: 0.52 + (index % 3) * 0.16,
+        spin: index * 1.71,
+        scale: 0.72 + (index % 4) * 0.16,
       };
     });
 
-    this.onCameraImpulse(strong ? 0.06 : 0.025, strong ? 0.18 : 0.11);
-    return this._add(root, strong ? 0.44 : 0.34, progress => {
-      const strike = easeOutCubic(Math.min(1, progress * 3.8));
-      const cutFade = 1 - clamp01((progress - 0.2) / 0.8);
-      const bladeLength = 0.16 + strike * (strong ? 1.48 : 1.08);
-      blade.scale.set(bladeLength, 1.55 - strike * 0.55, 1);
-      bladeCore.scale.set(bladeLength * 0.92, 0.31, 1);
-      bladeMaterial.opacity = cutFade * 0.96;
-      bladeCoreMaterial.opacity = cutFade;
-      const burstPop = easeOutBack(Math.min(1, progress * 4.2));
-      burst.scale.setScalar(0.12 + burstPop * (strong ? 1.36 : 0.94));
-      burstMaterial.opacity = Math.max(0, 1 - progress * 2.9);
-      if (counterBlade) {
-        const counterProgress = clamp01((progress - 0.08) / 0.92);
-        const counterStrike = easeOutCubic(Math.min(1, counterProgress * 3.4));
-        counterBlade.scale.set(0.12 + counterStrike * 1.02, 1.35 - counterStrike * 0.45, 1);
-        counterMaterial.opacity = (1 - counterProgress) * 0.76;
-      }
+    return this._add(root, 0.29, progress => {
+      const snap = easeOutCubic(Math.min(1, progress * 3.2));
+      const fade = 1 - easeOutCubic(clamp01((progress - 0.18) / 0.82));
+      cut.scale.set(0.14 + snap * 0.86, 1.04 - snap * 0.14, 1);
+      core.scale.set(0.09 + snap * 0.7, 0.27, 1);
+      cutMaterial.opacity = fade * 0.9;
+      coreMaterial.opacity = fade;
+
+      const flashPop = easeOutCubic(Math.min(1, progress * 4.8));
+      flash.scale.set(0.35 + flashPop * 1.42, 0.35 + flashPop * 0.9, 0.35);
+      flashMaterial.opacity = Math.max(0, 1 - progress * 3.6);
+
       particles.forEach((particle, index) => {
         const travel = easeOutCubic(progress) * particle.speed;
         this._dummy.position.copy(particle.direction).multiplyScalar(travel);
-        this._dummy.position.y -= progress * progress * 0.42;
-        this._dummy.rotation.set(particle.spin + progress * 7, progress * 9 + index, progress * 5);
-        const scale = particle.scale * Math.max(0.02, 1 - progress * 0.86);
-        this._dummy.scale.set(scale * 1.7, scale * 0.55, scale * 0.55);
+        this._dummy.position.y -= progress * progress * 0.16;
+        this._dummy.rotation.set(particle.spin + progress * 6, progress * 8 + index, progress * 4);
+        const scale = particle.scale * Math.max(0.04, 1 - progress);
+        this._dummy.scale.set(scale * 1.75, scale * 0.5, scale * 0.5);
         this._dummy.updateMatrix();
-        sparks.setMatrixAt(index, this._dummy.matrix);
+        shards.setMatrixAt(index, this._dummy.matrix);
       });
-      sparks.instanceMatrix.needsUpdate = true;
-      sparkMaterial.opacity = Math.max(0, 1 - progress);
-    }, { materials: [burstMaterial, bladeMaterial, bladeCoreMaterial, counterMaterial, sparkMaterial].filter(Boolean) });
+      shards.instanceMatrix.needsUpdate = true;
+      shardMaterial.opacity = Math.max(0, 1 - progress * 1.12);
+    }, { materials: [cutMaterial, coreMaterial, flashMaterial, shardMaterial] });
   }
 
   comboBurst({ position, camera, combo = 3 }) {

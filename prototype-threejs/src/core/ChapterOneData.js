@@ -43,10 +43,11 @@ export const COMBO_REWARDS = Object.freeze({
   2: { name: '追踪飞镖', color: '#ffb64c', duration: 1.25 },
   3: { name: '稻草人', color: '#c48cff', duration: 1.35 },
   4: { name: '六芒冲击波', color: '#60dfff', duration: 1.5 },
-  5: { name: '生命虹吸', color: '#f05c95', duration: 1.65 },
-  6: { name: '天罚陨石', color: '#ff843e', duration: 1.8 },
-  7: { name: '末日炸弹', color: '#ef496f', duration: 1.8 },
-  8: { name: '毁灭重生', color: '#fff0a3', duration: 2.1 },
+  5: { name: '生命虹吸', color: '#73edb3', duration: 1.65 },
+  6: { name: '时间静止', color: '#8be5ff', duration: 1.45 },
+  7: { name: '流星火雨', color: '#ff843e', duration: 2.25 },
+  8: { name: '绝对反射', color: '#ffd56a', duration: 1.25 },
+  9: { name: '特殊技能抉择', color: '#f5d7ff', duration: 0.8, deferred: true },
 });
 
 const skill = (id, name, color, maxLevel, describe) => ({ id, name, color, maxLevel, describe });
